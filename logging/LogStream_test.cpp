@@ -14,5 +14,7 @@ int main()
 
 	test1();
 
+	int i;
+	std::cin >> i;
 	return 0;
 }
