@@ -1,4 +1,3 @@
-#pragma once
 #ifndef NONCOPYABLE_H_
 #define NONCOPYABLE_H_
 // 私有的拷贝构造和拷贝赋值，阻止noncopyable被拷贝

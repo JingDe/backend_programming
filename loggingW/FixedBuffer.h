@@ -1,4 +1,3 @@
-#pragma once
 #ifndef FIXEDBUFFER_H_
 #define FIXEDBUFFER_H_
 
@@ -21,15 +20,15 @@ public:
 	bool empty() { return cur_ == data_; }
 	bool full() { return cur_ == end(); }
 
-	int size() { return cur_ - data_; }
-	int available() { return sizeof(data_) - size(); }
+	int length() const { return cur_ - data_; }
+	int available() const { return sizeof(data_) - length(); }
 
 	char* current() { return cur_; }
 
 	void add(size_t len) { cur_ += len; }
 
 	void append(const std::string& str) {
-		int len = str.size();
+		int len = static_cast<int>(str.size());
 		if (len > available())
 			len = available();
 		for (int i = 0; i<len; i++)
@@ -48,11 +47,14 @@ public:
 
 	void append(const char* buf, size_t len)
 	{
-		if (len < static_cast<size_t>(available()))
+		if (len > strlen(buf))
+			len = strlen(buf);
+		if (len > static_cast<size_t>(available()))
 		{			
-			memcpy(cur_, buf, len);
-			cur_ += len;
+			len = static_cast<size_t>(available());
 		}
+		memcpy(cur_, buf, len);
+		cur_ += len;
 	}
 
 	void reset() { cur_ = data_; }
@@ -62,7 +64,7 @@ public:
 	}
 
 
-	std::string ToString() { return std::string(data_, size()); }
+	std::string ToString() const { return std::string(data_, length()); }
 
 	const char* debugString();
 

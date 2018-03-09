@@ -116,10 +116,12 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="FixedBuffer.cpp" />
-    <ClCompile Include="FixedBuffer_test.cpp" />
+    <ClCompile Include="LogStream.cpp" />
+    <ClCompile Include="LogStream_test.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="FixedBuffer.h" />
+    <ClInclude Include="LogStream.h" />
     <ClInclude Include="noncopyable.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
