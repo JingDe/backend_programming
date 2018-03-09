@@ -23,6 +23,7 @@ public:
 	int length() const { return cur_ - data_; }
 	int available() const { return sizeof(data_) - length(); }
 
+	char* data() { return data_;  }
 	char* current() { return cur_; }
 
 	void add(size_t len) { cur_ += len; }
