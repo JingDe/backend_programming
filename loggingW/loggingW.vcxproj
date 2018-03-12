@@ -76,6 +76,7 @@
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
+      <PreprocessorDefinitions>_MBCS;%(PreprocessorDefinitions);WIN32;_CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -115,12 +116,19 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="AppendFile.cpp" />
     <ClCompile Include="FixedBuffer.cpp" />
+    <ClCompile Include="LogFile.cpp" />
+    <ClCompile Include="LogFile_test.cpp" />
+    <ClCompile Include="Logging.cpp" />
+    <ClCompile Include="Logging_test.cpp" />
     <ClCompile Include="LogStream.cpp" />
-    <ClCompile Include="LogStream_test.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="AppendFile.h" />
     <ClInclude Include="FixedBuffer.h" />
+    <ClInclude Include="LogFile.h" />
+    <ClInclude Include="Logging.h" />
     <ClInclude Include="LogStream.h" />
     <ClInclude Include="noncopyable.h" />
   </ItemGroup>

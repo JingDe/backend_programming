@@ -20,10 +20,10 @@ public:
 	bool empty() { return cur_ == data_; }
 	bool full() { return cur_ == end(); }
 
-	int length() const { return cur_ - data_; }
+	int length() const { return static_cast<int>(cur_ - data_); }
 	int available() const { return sizeof(data_) - length(); }
 
-	char* data() { return data_;  }
+	const char* data() const { return data_;  }
 	char* current() { return cur_; }
 
 	void add(size_t len) { cur_ += len; }
@@ -48,8 +48,8 @@ public:
 
 	void append(const char* buf, size_t len)
 	{
-		if (len > strlen(buf))
-			len = strlen(buf);
+		//if (len > strlen(buf)) // 如果buf字符数组没有null字符，将未定义
+		//	len = strlen(buf);
 		if (len > static_cast<size_t>(available()))
 		{			
 			len = static_cast<size_t>(available());

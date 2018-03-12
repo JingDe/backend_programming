@@ -1,19 +1,59 @@
 #include"logging.h"
 
+#include<iostream>
 #include<cstdio>
 #include<cstring>
 #include<cstdlib>
+#include<ctime>
+#include<cassert>
 
-void defaultOutput(const char* msg, int len)
-{
-	fwrite(msg, 1,len, stdout); 
+#ifdef WIN32
+#include<windows.h>
+#elif OS_LINUX
+#include<pthread.h>
+#endif
+
+
+
+namespace {
+	void defaultOutput(const char* msg, int len)
+	{
+		fwrite(msg, 1, len, stdout);
+	}
+
+	void defaultFlush()
+	{
+		fflush(stdout);
+	}
+
+	int getThreadID()
+	{
+#ifdef WIN32
+		return GetCurrentThreadId();
+#elif OS_LINUX
+		return static_cast<int>(gettid());
+#else
+		return -1;
+#endif
+	}
+
+#ifdef OS_LINUX
+	pid_t gettid()
+	{
+		return syscall(SYS_tid);
+	}
+#endif
+
+	std::string formatTime()
+	{
+		time_t t = time(NULL);
+		struct tm* lt = localtime(&t);
+		char buf[256];
+		int len=snprintf(buf, sizeof buf, "%4d%02d%02d_%02d:%02d:%2d", lt->tm_year + 1900, lt->tm_mon + 1, lt->tm_mday, lt->tm_hour, lt->tm_min, lt->tm_sec);
+		assert(len == 17);
+		return std::string(buf, len);
+	}
 }
-
-void defaultFlush()
-{
-	fflush();
-}
-
 
 Logger::SourceFile::SourceFile(const char* name)
 	: filename_(name)
@@ -23,18 +63,18 @@ Logger::SourceFile::SourceFile(const char* name)
 	{
 		filename_ = slash + 1;
 	}
-	length_ = strlen(filename_);
+	length_ = static_cast<int>(strlen(filename_));
 }
 
-template<typename N>
+template<int N>
 Logger::SourceFile::SourceFile(const char (&arr)[N])
-	:filename_(arr), length_(N)
+	:filename_(arr), length_(N-1)
 {
 	const char* slash = strrchr(name, '/');
 	if (slash)
 	{
 		filename_ = slash + 1;
-		N -= static_cast<int>(filename_ - arr);
+		length_ -= static_cast<int>(filename_ - arr);
 	}
 }
 
@@ -42,25 +82,55 @@ Logger::LOG_LEVEL initLogLevel()
 {
 	// 根据环境变量设置
 
-	return LOG_LEVEL::WARN;
+	return Logger::WARN;
 }
-//Logger::LOG_LEVEL g_loglevel = initLogLevel();
+Logger::LOG_LEVEL g_loglevel = initLogLevel(); // 全局的日志级别
 
+Logger::OutputFunc g_output=defaultOutput; // 必须初始化，否则异常？？
+Logger::FlushFunc g_flush=defaultFlush;
+
+const char* levelStr[Logger::NUM_LEVELS] = {
+	"DEBUG",
+	"INFO",
+	"WARN",
+	"ERROR",
+	"FATAL"
+};
 
 Logger::Logger(SourceFile file, int line, LOG_LEVEL level)
 	:file_(file),line_(line),level_(level)
 {
-	setOutputFunc(defaultOutput());
-	setFlushFunc(flushFunc());
+	// 日志格式：时间、线程id、日志级别、文件名、行号、日志信息
+	logStream_ << formatTime()<<' ' << getThreadID()<<' ' << levelStr[level_]<<' '<<file_.fileName() <<' '<<line_<<' ';
 }
 
 Logger::~Logger()
 {
+	logStream_ << '\n';
 	const LogStream::Buffer& buf = stream().buffer();
-	outputFunc_(buf.data(), buf.length());
-	if (level_ > LOG_LEVEL::FATAL)
+	g_output(buf.data(), buf.length());
+	if (level_ >= LOG_LEVEL::FATAL)
 	{
-		flushFunc_();
+		g_flush();
 		abort();
 	}
+}
+
+Logger::LOG_LEVEL Logger::logLevel()
+{
+	return g_loglevel;
+}
+void Logger::setLogLevel(Logger::LOG_LEVEL level)
+{
+	g_loglevel = level;
+}
+
+void Logger::setOutput(OutputFunc out)
+{
+	g_output = out;
+}
+
+void Logger::setFlush(FlushFunc flush)
+{
+	g_flush = flush;
 }
