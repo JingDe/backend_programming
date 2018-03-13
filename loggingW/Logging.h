@@ -12,9 +12,9 @@ public:
 		DEBUG,
 		INFO,
 		WARN,
-		ERROR,
+		ERRORL, // ?? ERROR已被定义？？
 		FATAL,
-		NUM_LEVELS
+		NUM_LEVELS,
 	};
 
 	class SourceFile {
@@ -64,8 +64,8 @@ extern Logger::LOG_LEVEL g_loglevel; // 全局的日志级别
 	Logger(__FILE__, __LINE__, Logger::LOG_LEVEL::INFO).stream()
 #define LOG_WARN if(Logger::logLevel() <= Logger::WARN) \
 	Logger(__FILE__, __LINE__, Logger::LOG_LEVEL::WARN).stream()
-#define LOG_ERROR if(Logger::logLevel() <= Logger::ERROR) \
-	Logger(__FILE__, __LINE__, Logger::LOG_LEVEL::ERROR).stream()
+#define LOG_ERROR if(Logger::logLevel() <= Logger::ERRORL) \
+	Logger(__FILE__, __LINE__, Logger::LOG_LEVEL::ERRORL).stream()
 #define LOG_FATAL if(Logger::logLevel() <= Logger::FATAL) \
 	Logger(__FILE__, __LINE__, Logger::FATAL).stream()
 #endif

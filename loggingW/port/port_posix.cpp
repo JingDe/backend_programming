@@ -1,4 +1,4 @@
-#include"port/port_posix.h"
+#include"port_posix.h"
 
 namespace port {
 	
@@ -45,5 +45,39 @@ namespace port {
 	void Mutex::AssertHeld()
 	{
 
+	}
+
+	CondVar::CondVar(Mutex* mu) :mu_(mu)
+	{
+		PthreadCall("Init cv", pthread_cond_init(&cv_, NULL));
+		//cv_=PTHREAD_COND_INITIALIZER;
+	}
+
+	CondVar::~CondVar()
+	{
+		PthreadCall("Destroy cv", pthread_cond_destroy(&cv_));
+	}
+
+	void CondVar::Wait() 
+	{
+		// ÊÍ·ÅËø
+		PthreadCall("wait", pthread_cond_wait(&cv_, &mu_->mutex_));
+	}
+
+	void CondVar::Signal()
+	{
+		PthreadCall("signal", pthread_cond_signal(&cv_));
+	}
+
+	void CondVar::SignalAll()
+	{
+		PthreadCall("once", pthread_cond_broadcast(&cv_));
+	}
+
+	Thread::Thread(std::string name, ThreadFunc func) :
+		name_(name),
+		func_(func)
+	{
+		PthreadCall("create thread", pthread_create(&tid_, NULL, func_, arg));
 	}
 }

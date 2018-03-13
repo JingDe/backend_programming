@@ -1,10 +1,13 @@
 #include"LogFile.h"
+#include"port/port.h"
 
 #include<ctime>
 #include<iostream>
 
-LogFile::LogFile(const std::string& basename, size_t rollsize, int flushInterval, int checkEveryN_) :
-	basename_(basename), rollSize_(rollsize), flushInterval_(flushInterval), count_(0), startOfPeriod_(0), lastFlush_(0)
+LogFile::LogFile(const std::string& basename, size_t rollsize, bool threadSafe, int flushInterval, int checkEveryN_) :
+	basename_(basename), rollSize_(rollsize), 
+	mutex_(threadSafe ?  new port::Mutex  :  NULL),
+	flushInterval_(flushInterval), count_(0), startOfPeriod_(0), lastFlush_(0)
 {
 	rollFile();
 }
@@ -15,6 +18,17 @@ LogFile::~LogFile()
 }
 
 void LogFile::append(const char* buf, int len)
+{
+	if (mutex_)
+	{
+		port::MutexLock lock(*mutex_);
+		append_unlocked(buf, len);
+	}
+	else
+		append_unlocked(buf, len);
+}
+
+void LogFile::append_unlocked(const char* buf, int len)
 {
 	file_->append(buf, len);
 
@@ -49,7 +63,13 @@ void LogFile::append(const char* buf, int len)
 
 void LogFile::flush()
 {
-	file_->flush();
+	if (mutex_)
+	{
+		port::MutexLock lock(*mutex_);
+		file_->flush();
+	}
+	else
+		file_->flush();
 }
 
 void LogFile::rollFile()

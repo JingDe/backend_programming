@@ -50,7 +50,7 @@ namespace port {
 		mu_(mu),
 		sem1_(::CreateSemaphore(NULL, 0, 10000, NULL)), // 创建信号量，初始count0，最大count10000，初始nonsignaled
 		// 每次wait函数释放等待该信号量的一个线程， count减少1
-		sem1_(::CreateSemaphore(NULL, 0, 10000, NULL))
+		sem2_(::CreateSemaphore(NULL, 0, 10000, NULL))
 	{
 		assert(mu_);
 	}
@@ -69,6 +69,8 @@ namespace port {
 		++waiting_;
 		wait_mtx_.Unlock();
 
+		mu_->Unlock();
+
 		::WaitForSingleObject(sem1_, INFINITE); // 等待sem1_是signaled(count大于0)
 		::ReleaseSemaphore(sem2_, 1, NULL); // 增加sem2_的当前count
 
@@ -85,5 +87,21 @@ namespace port {
 			::ReleaseSemaphore(sem1_, 1, NULL);
 			::WaitForSingleObject(sem2_, INFINITE);
 		}
+		wait_mtx_.Unlock();
+	}
+
+	void CondVar::SignalAll()
+	{
+		wait_mtx_.Lock();
+		for (long i = 0; i < waiting_; i++)
+		{
+			::ReleaseSemaphore(sem1_, 1, NULL);
+			while (waiting_ > 0)
+			{
+				--waiting_;
+				::WaitForSingleObject(sem2_, INFINITE);
+			}
+		}
+		wait_mtx_.Unlock();
 	}
 }

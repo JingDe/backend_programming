@@ -2,13 +2,14 @@
 #define LOGFILE_H_
 
 #include"AppendFile.h"
+#include"port/port.h"
 
 #include<string>
 #include<memory>
 
 class LogFile {
 public:
-	LogFile(const std::string& basename, size_t rollsize, int flushInterval = 3, int checkEveryN_ = 1024);
+	LogFile(const std::string& basename, size_t rollsize, bool threadSafe=true, int flushInterval = 3, int checkEveryN_ = 1024);
 
 	~LogFile();
 
@@ -17,6 +18,8 @@ public:
 	void rollFile();
 
 private:
+	void append_unlocked(const char* buf, int len);
+
 	std::string getLogfileName(std::string basename, time_t* now);
 
 	std::string basename_; // 文件名前缀
@@ -25,6 +28,7 @@ private:
 	int checkEveryN_; // 不每次append都检查flush和rollFile条件，每checkEveryN_次append后检查一下
 	size_t count_; // 当前已经append的次数
 	
+	std::unique_ptr<port::Mutex> mutex_; // 保护以下成员变量
 	//文件对象
 	std::unique_ptr<AppendFile> file_;
 	time_t startOfPeriod_;

@@ -122,7 +122,6 @@
     <ClCompile Include="LogFile_test.cpp" />
     <ClCompile Include="Logging.cpp" />
     <ClCompile Include="LogStream.cpp" />
-    <ClCompile Include="port\port_posix.cpp" />
     <ClCompile Include="port\port_win32.cpp" />
   </ItemGroup>
   <ItemGroup>

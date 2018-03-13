@@ -29,9 +29,6 @@
     <ClCompile Include="LogFile_test.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="port\port_posix.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
     <ClCompile Include="port\port_win32.cpp">
       <Filter>源文件</Filter>
     </ClCompile>

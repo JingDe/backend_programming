@@ -1,13 +1,10 @@
 #ifndef LOGSTREAM_H_
 #define LOGSTREAM_H_
 
-
 #include"common/noncopyable.h"
 #include"FixedBuffer.h"
 #include<string>
 
-
-const int kSmallBuffer = 4000;
 
 // ´ýÐ´Êý¾ÝÁ÷
 class LogStream : noncopyable

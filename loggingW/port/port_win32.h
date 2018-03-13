@@ -26,6 +26,19 @@ namespace port {
 		void operator=(const Mutex&);
 	};
 
+	class MutexLock {
+	public:
+		MutexLock(Mutex& mu):mu_(mu) {
+			mu_.Lock();
+		}
+		~MutexLock(){
+			mu_.Unlock();
+		}
+
+	private:
+		Mutex& mu_;
+	};
+
 	class CondVar {
 	public:
 		explicit CondVar(Mutex* mu);
@@ -35,13 +48,13 @@ namespace port {
 		void SignalAll();
 
 	private:
-		Mutex * mu_;
+		Mutex *mu_;
 
-		Mutex wait_mtx_;
+		Mutex wait_mtx_; // 同步waiting_的访问
 		long waiting_; // 等待sem1_的个数
 
 		void *sem1_;
-		void *sem2_;
+		void *sem2_; // 作用？？
 	};
 }
 
