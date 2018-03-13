@@ -2,7 +2,7 @@
 #define LOGSTREAM_H_
 
 
-#include"noncopyable.h"
+#include"common/noncopyable.h"
 #include"FixedBuffer.h"
 #include<string>
 

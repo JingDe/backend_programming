@@ -1,7 +1,7 @@
 #ifndef FIXEDBUFFER_H_
 #define FIXEDBUFFER_H_
 
-#include"noncopyable.h"
+#include"common/noncopyable.h"
 
 #include<string>
 #include<cstring>  // memcpy

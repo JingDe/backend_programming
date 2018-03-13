@@ -1,4 +1,5 @@
 #include"logging.h"
+#include"port/port.h"
 
 #include<iostream>
 #include<cstdio>
@@ -6,13 +7,6 @@
 #include<cstdlib>
 #include<ctime>
 #include<cassert>
-
-#ifdef WIN32
-#include<windows.h>
-#elif OS_LINUX
-#include<pthread.h>
-#endif
-
 
 
 namespace {
@@ -25,24 +19,6 @@ namespace {
 	{
 		fflush(stdout);
 	}
-
-	int getThreadID()
-	{
-#ifdef WIN32
-		return GetCurrentThreadId();
-#elif OS_LINUX
-		return static_cast<int>(gettid());
-#else
-		return -1;
-#endif
-	}
-
-#ifdef OS_LINUX
-	pid_t gettid()
-	{
-		return syscall(SYS_tid);
-	}
-#endif
 
 	std::string formatTime()
 	{
@@ -101,7 +77,7 @@ Logger::Logger(SourceFile file, int line, LOG_LEVEL level)
 	:file_(file),line_(line),level_(level)
 {
 	// 日志格式：时间、线程id、日志级别、文件名、行号、日志信息
-	logStream_ << formatTime()<<' ' << getThreadID()<<' ' << levelStr[level_]<<' '<<file_.fileName() <<' '<<line_<<' ';
+	logStream_ << formatTime()<<' ' << port::getThreadID()<<' ' << levelStr[level_]<<' '<<file_.fileName() <<' '<<line_<<' ';
 }
 
 Logger::~Logger()

@@ -121,8 +121,9 @@
     <ClCompile Include="LogFile.cpp" />
     <ClCompile Include="LogFile_test.cpp" />
     <ClCompile Include="Logging.cpp" />
-    <ClCompile Include="Logging_test.cpp" />
     <ClCompile Include="LogStream.cpp" />
+    <ClCompile Include="port\port_posix.cpp" />
+    <ClCompile Include="port\port_win32.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="AppendFile.h" />
@@ -131,6 +132,9 @@
     <ClInclude Include="Logging.h" />
     <ClInclude Include="LogStream.h" />
     <ClInclude Include="noncopyable.h" />
+    <ClInclude Include="port\port.h" />
+    <ClInclude Include="port\port_posix.h" />
+    <ClInclude Include="port\port_win32.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

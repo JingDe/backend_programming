@@ -20,8 +20,8 @@ public:
 	class SourceFile {
 	public:
 		SourceFile(const char* file);
-		template<int N> // 
-		SourceFile(const char(&arr)[N]); // 
+		template<int N> // 模板使得函数不局限于一个长度的数组
+		SourceFile(const char (&arr)[N]); // 形参是数组的引用，维度是类型的一部分，具有N个char的数组的引用
 		const char* fileName() { return filename_;  }
 
 	private:

@@ -20,9 +20,6 @@
     <ClCompile Include="Logging.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="Logging_test.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
     <ClCompile Include="LogFile.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
@@ -30,6 +27,12 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="LogFile_test.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="port\port_posix.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="port\port_win32.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>
@@ -50,6 +53,15 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="AppendFile.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="port\port.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="port\port_posix.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="port\port_win32.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>
