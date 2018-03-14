@@ -1,7 +1,7 @@
 #ifndef ASYNCLOGGING_H_
 #define ASYNCLOGGING_H_
 
-#include"FixedBuffer.h"
+#include"common/FixedBuffer.h"
 #include"port/port.h"
 
 #include<vector>

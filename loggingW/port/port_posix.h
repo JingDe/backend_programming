@@ -2,6 +2,7 @@
 #define PORT_POSIX_H_
 
 
+
 #include<pthread.h>
 #include<string>
 
@@ -71,8 +72,8 @@ namespace port {
 	public:
 		typedef std::function<void(void)> ThreadFunc; // 线程函数类型
 
-		ThreadData(ThreadFunc func);
-		~ThreadData();
+		ThreadData(ThreadFunc func) :func_(func) {}
+		~ThreadData() {}
 
 		void runInThread()
 		{

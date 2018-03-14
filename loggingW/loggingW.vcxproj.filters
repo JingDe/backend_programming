@@ -11,50 +11,32 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="FixedBuffer.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="LogStream.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="Logging.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="LogFile.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="AppendFile.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
     <ClCompile Include="port\port_win32.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="AsyncLogging.cpp">
+    <ClCompile Include="logging.muduo\AsyncLogging.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="thread_test.cpp">
+    <ClCompile Include="logging.muduo\LogFile.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="logging.muduo\Logging.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="logging.muduo\LogStream.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="common\AppendFile.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="common\FixedBuffer.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="logging.muduo\LogFile_test.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="FixedBuffer.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="noncopyable.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="LogStream.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="LogFile.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="Logging.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="AppendFile.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
     <ClInclude Include="port\port.h">
       <Filter>头文件</Filter>
     </ClInclude>
@@ -64,7 +46,25 @@
     <ClInclude Include="port\port_win32.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="AsyncLogging.h">
+    <ClInclude Include="logging.muduo\AsyncLogging.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="logging.muduo\LogFile.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="logging.muduo\Logging.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="logging.muduo\LogStream.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="common\AppendFile.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="common\FixedBuffer.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="common\noncopyable.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

@@ -1,7 +1,7 @@
 #ifndef LOGFILE_H_
 #define LOGFILE_H_
 
-#include"AppendFile.h"
+#include"common/AppendFile.h"
 #include"port/port.h"
 
 #include<string>

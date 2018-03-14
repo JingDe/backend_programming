@@ -1,5 +1,5 @@
 #include"port_win32.h"
-#include"../logging.h"
+#include"logging.muduo/logging.h"
 
 #include<cassert>
 #include<system_error>
@@ -144,7 +144,7 @@ namespace port {
 		catch (const std::system_error& e)
 		{
 			delete thread_;
-			LOG_FATAL << "start std::thread failed";
+			LOG_FATAL << "start std::thread failed: " << e.what() ;
 		}
 		started_ = true;
 	}
