@@ -77,6 +77,22 @@ namespace port {
 		mu_->Lock();
 	}
 
+	void CondVar::waitForSeconds(int secs)
+	{
+		mu_->AssertHeld();
+
+		wait_mtx_.Lock();
+		++waiting_;
+		wait_mtx_.Unlock();
+
+		mu_->Unlock();
+
+		::WaitForSingleObject(sem1_, secs*1000); // 等待sem1_是signaled(count大于0)，等待毫秒
+		::ReleaseSemaphore(sem2_, 1, NULL); // 增加sem2_的当前count
+
+		mu_->Lock();
+	}
+
 	void CondVar::Signal()
 	{
 		wait_mtx_.Lock();
@@ -103,5 +119,25 @@ namespace port {
 			}
 		}
 		wait_mtx_.Unlock();
+	}
+
+	Thread::Thread(const ThreadFunc& func, std::string name):thread_(func),name_(name)
+	{
+
+	}
+
+	Thread::~Thread()
+	{
+
+	}
+
+	void Thread::start()
+	{
+
+	}
+
+	void Thread::stop()
+	{
+
 	}
 }

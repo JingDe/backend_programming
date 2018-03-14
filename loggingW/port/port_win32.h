@@ -1,6 +1,10 @@
 #ifndef PORT_WIN32_H_
 #define PORT_WIN32_H_
 
+#include<string>
+#include<functional>
+#include<thread>
+
 #include<windows.h>
 
 namespace port {
@@ -25,25 +29,14 @@ namespace port {
 		Mutex(const Mutex&);
 		void operator=(const Mutex&);
 	};
-
-	class MutexLock {
-	public:
-		MutexLock(Mutex& mu):mu_(mu) {
-			mu_.Lock();
-		}
-		~MutexLock(){
-			mu_.Unlock();
-		}
-
-	private:
-		Mutex& mu_;
-	};
+		
 
 	class CondVar {
 	public:
 		explicit CondVar(Mutex* mu);
 		~CondVar();
 		void Wait(); 
+		void waitForSeconds(int secs);
 		void Signal();
 		void SignalAll();
 
@@ -55,6 +48,23 @@ namespace port {
 
 		void *sem1_;
 		void *sem2_; // 作用？？
+	};
+
+	class Thread {
+	public:
+		typedef std::function<void(void)> ThreadFunc; // 线程函数类型
+
+		Thread(const ThreadFunc& func, std::string name = std::string());
+		~Thread();
+
+		void start();
+		void stop();
+
+	private:
+		std::thread thread_;
+
+		ThreadFunc func_; // 线程函数
+		std::string name_; // 线程名
 	};
 }
 

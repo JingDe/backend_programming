@@ -26,10 +26,13 @@
     <ClCompile Include="AppendFile.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="LogFile_test.cpp">
+    <ClCompile Include="port\port_win32.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="port\port_win32.cpp">
+    <ClCompile Include="AsyncLogging.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="AsyncLogging_test.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>
@@ -59,6 +62,9 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="port\port_win32.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="AsyncLogging.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

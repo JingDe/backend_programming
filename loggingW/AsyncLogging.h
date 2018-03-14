@@ -2,14 +2,22 @@
 #define ASYNCLOGGING_H_
 
 #include"FixedBuffer.h"
+#include"port/port.h"
 
-class CondVar;
-class Mutex;
-class Thread;
+#include<vector>
+#include<memory>
+#include<algorithm>
+
 
 class AsyncLogging {
 public:
-	AsyncLogging(std::string basename, int flushInterval);
+	AsyncLogging(const std::string& basename, size_t rollSize, int flushInterval=3);
+	~AsyncLogging();
+
+	void start();
+	void threadFunc();
+
+	void append(const char* msg, int len);
 
 private:
 	/*typedef muduo::detail::FixedBuffer<muduo::detail::kLargeBuffer> Buffer;
@@ -25,9 +33,9 @@ private:
 	size_t rollSize_;
 	const int flushInterval_;
 	
-	Thread thread_; // 后台线程，负责将缓存中的日志数据写到LogFile日志文件中
-	Mutex mutex_;
-	CondVar cond_;
+	port::Thread thread_; // 后台线程，负责将缓存中的日志数据写到LogFile日志文件中
+	port::Mutex mutex_; // 同步对buffer的访问
+	port::CondVar cond_;
 
 	bool running_;
 
