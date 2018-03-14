@@ -23,14 +23,21 @@ AsyncLogging::AsyncLogging(const std::string& basename, size_t rollSize, int flu
 
 AsyncLogging::~AsyncLogging()
 {
-	running_ = false;
-	thread_.stop();
+	if (running_)
+		stop();
 }
 
 void AsyncLogging::start()
 {
 	running_ = true;
 	thread_.start();
+}
+
+void AsyncLogging::stop()
+{
+	running_ = false;
+	cond_.Signal();
+	thread_.join();
 }
 
 void AsyncLogging::threadFunc()
@@ -54,7 +61,18 @@ void AsyncLogging::threadFunc()
 			port::MutexLock lock(mutex_);
 			if (buffers_.empty())
 				cond_.waitForSeconds(flushInterval_); // 等待flushInterval_秒
-			buffers_.push_back(currentBuffer_.release()); //currentBuffer_释放拥有的Buffer对象，返回指向该Buffer的指针
+			
+			//1
+			//buffers_.push_back(currentBuffer_.release()); //currentBuffer_释放拥有的Buffer对象，返回指向该Buffer的指针
+			
+			//2
+			//buffers_.push_back(std::make_unique<Buffer>(currentBuffer_.release()));
+
+			//3
+			/*Buffer* buf = currentBuffer_.release();
+			BufferPtr ptr(buf);
+			buffers_.push_back(ptr);*/ // push_back()函数：创建一个ptr的拷贝添加到buffers_中，调用了unique_ptr的拷贝构造函数（=delete)
+
 			currentBuffer_ = std::move(newBuffer1); // 高效转移newBuffer1的资源到currentBuffer_
 			buffersToWrite.swap(buffers_); //交换容器的内容
 			if (!nextBuffer_)
@@ -81,7 +99,9 @@ void AsyncLogging::threadFunc()
 		if (!newBuffer1)
 		{
 			assert(!buffersToWrite.empty());
-			newBuffer1 = buffersToWrite.back();
+			//newBuffer1 = buffersToWrite.back(); // back()返回值BufferPtr的引用，unique_ptr的拷贝赋值函数=delete
+			//newBuffer1 = std::make_unique<Buffer>(buffersToWrite.back());
+
 			buffersToWrite.pop_back();
 			newBuffer1->reset(); // 修改unique_ptr管理的对象
 		}
@@ -89,7 +109,9 @@ void AsyncLogging::threadFunc()
 		if (!newBuffer2)
 		{
 			assert(!buffersToWrite.empty());
-			newBuffer2 = buffersToWrite.back();
+			//newBuffer2 = buffersToWrite.back(); // 
+
+
 			buffersToWrite.pop_back();
 			newBuffer2->reset(); // 修改unique_ptr管理的对象
 		}
@@ -109,7 +131,12 @@ void AsyncLogging::append(const char* msg, int len)
 	}
 	else
 	{
-		buffers_.push_back(currentBuffer_.release());
+		//buffers_.push_back(currentBuffer_.release());
+		//buffers_.push_back(std::make_unique<Buffer>(currentBuffer_.release()));
+
+		/*Buffer* buf = currentBuffer_.release();
+		BufferPtr ptr(buf);
+		buffers_.push_back(ptr);*/
 
 		if (nextBuffer_)
 			currentBuffer_ = std::move(nextBuffer_);

@@ -32,7 +32,7 @@
     <ClCompile Include="AsyncLogging.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="AsyncLogging_test.cpp">
+    <ClCompile Include="thread_test.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>

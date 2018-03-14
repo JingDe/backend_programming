@@ -1,6 +1,8 @@
 #include"port_win32.h"
+#include"../logging.h"
 
 #include<cassert>
+#include<system_error>
 
 #include<windows.h>
 
@@ -121,23 +123,35 @@ namespace port {
 		wait_mtx_.Unlock();
 	}
 
-	Thread::Thread(const ThreadFunc& func, std::string name):thread_(func),name_(name)
+	Thread::Thread(const ThreadFunc& func, std::string name):
+		func_(func),name_(name)
 	{
 
 	}
 
 	Thread::~Thread()
 	{
-
+		if (thread_)
+			delete thread_;
 	}
 
 	void Thread::start()
 	{
-
+		assert(started_ == false);
+		try {
+			thread_ = new std::thread(func_); // 构造后立即开始执行func_函数
+		}
+		catch (const std::system_error& e)
+		{
+			delete thread_;
+			LOG_FATAL << "start std::thread failed";
+		}
+		started_ = true;
 	}
 
-	void Thread::stop()
+	void Thread::join()
 	{
-
+		thread_->join();
+		joined_ = true;
 	}
 }

@@ -101,11 +101,35 @@ namespace port {
 
 	void Thread::start()
 	{
+		assert(started_ == false);
 		// 创建线程执行func_函数 
+		ThreadData td(func_);
+		if (pthread_create(&tid_, NULL, std::bind(&Thread::startThread, this), &td))
+		{
+			delete td;
+			LOG_FATAL << "Failed in pthread_create";
+		}
+		else
+		{
+			started_ = true;
+		}
 	}
 
-	void Thread::stop()
+	void* Thread::startThread(void* arg)
 	{
-		
+		ThreadData* td = static_cast<ThreadData*>(arg);
+		/*ThreadFunc func = td->func_;
+		func();*/
+		td->runInThread();
+		delete td;
+		return NULL;
+	}
+
+	void Thread::join()
+	{
+		assert(started_);
+		assert(!joined_);
+		joined_ = true;
+		return pthread_join(tid_, NULL);
 	}
 }

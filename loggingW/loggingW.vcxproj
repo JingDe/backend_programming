@@ -118,12 +118,12 @@
   <ItemGroup>
     <ClCompile Include="AppendFile.cpp" />
     <ClCompile Include="AsyncLogging.cpp" />
-    <ClCompile Include="AsyncLogging_test.cpp" />
     <ClCompile Include="FixedBuffer.cpp" />
     <ClCompile Include="LogFile.cpp" />
     <ClCompile Include="Logging.cpp" />
     <ClCompile Include="LogStream.cpp" />
     <ClCompile Include="port\port_win32.cpp" />
+    <ClCompile Include="thread_test.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="AppendFile.h" />

@@ -15,6 +15,7 @@ public:
 	~AsyncLogging();
 
 	void start();
+	void stop();
 	void threadFunc();
 
 	void append(const char* msg, int len);
@@ -40,7 +41,7 @@ private:
 	bool running_;
 
 	// 双缓冲，收集日志数据
-	BufferPtr currentBuffer_;
+	BufferPtr currentBuffer_; // unique_ptr<Buffer>
 	BufferPtr nextBuffer_;
 	BufferVector buffers_;
 

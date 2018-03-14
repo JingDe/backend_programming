@@ -54,17 +54,27 @@ namespace port {
 	public:
 		typedef std::function<void(void)> ThreadFunc; // 线程函数类型
 
-		Thread(const ThreadFunc& func, std::string name = std::string());
+		explicit Thread(const ThreadFunc& func, std::string name = std::string());
 		~Thread();
 
 		void start();
-		void stop();
+		void join();
+
+		bool started() const { return started_; }
+		const std::string& name() const { return name_; }
+
+		int tid() {
+			return port::getThreadID();
+		}
 
 	private:
-		std::thread thread_;
+		std::thread *thread_;
 
 		ThreadFunc func_; // 线程函数
 		std::string name_; // 线程名
+
+		bool started_;
+		bool joined_;
 	};
 }
 
