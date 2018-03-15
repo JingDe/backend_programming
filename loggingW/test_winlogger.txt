@@ -1,0 +1,1 @@
+2018/03/15-14:26:30.578 3050 hello, test_winlogger.txt

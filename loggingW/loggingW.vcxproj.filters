@@ -32,7 +32,13 @@
     <ClCompile Include="common\FixedBuffer.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="logging.muduo\LogFile_test.cpp">
+    <ClCompile Include="logging.leveldb\win_logger.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="logging.leveldb\Logger.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="logging.muduo\AsyncLogging_test.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>
@@ -65,6 +71,15 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="common\noncopyable.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="logging.leveldb\Logger.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="logging.leveldb\posix_logger.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="logging.leveldb\win_logger.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

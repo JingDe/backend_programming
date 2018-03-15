@@ -64,7 +64,7 @@ public:
 	void reset() { cur_ = data_; }
 	void bzero() {
 		//::bzero(data_, sizeof(data_)); // bzero函数，strings.h头文件，POSIX标准
-		memcpy(data_, 0, sizeof(data_));
+		memset(data_, 0, sizeof(data_));
 	}
 
 

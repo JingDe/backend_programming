@@ -1,6 +1,7 @@
 #include"AsyncLogging.h"
 #include"Logging.h"
 
+#include<iostream>
 #include<chrono>
 
 int kRollSize = 500 * 1000 * 1000;
@@ -39,13 +40,30 @@ void bench(bool longLog)
 	}
 }
 
-int main()
+void test_getenv()
 {
+	char* result = getenv("path");
+	if(result)
+		std::cout << result << std::endl;
+}
+
+void test_asyncLogging()
+{
+	Logger::setLogLevel(Logger::DEBUG);
+
 	AsyncLogging log("test_AsyncLogging", kRollSize);
 	log.start();
 	g_asyncLog = &log;
 
 	bench(false);
+	log.stop();
+}
+
+int main()
+{
+	//test_getenv();
+
+	test_asyncLogging();
 
 	system("pause");
 	return 0;

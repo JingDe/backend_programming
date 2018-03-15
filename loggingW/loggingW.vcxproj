@@ -119,9 +119,11 @@
   <ItemGroup>
     <ClCompile Include="common\AppendFile.cpp" />
     <ClCompile Include="common\FixedBuffer.cpp" />
+    <ClCompile Include="logging.leveldb\Logger.cpp" />
+    <ClCompile Include="logging.leveldb\win_logger.cpp" />
     <ClCompile Include="logging.muduo\AsyncLogging.cpp" />
+    <ClCompile Include="logging.muduo\AsyncLogging_test.cpp" />
     <ClCompile Include="logging.muduo\LogFile.cpp" />
-    <ClCompile Include="logging.muduo\LogFile_test.cpp" />
     <ClCompile Include="logging.muduo\Logging.cpp" />
     <ClCompile Include="logging.muduo\LogStream.cpp" />
     <ClCompile Include="port\port_win32.cpp" />
@@ -130,6 +132,9 @@
     <ClInclude Include="common\AppendFile.h" />
     <ClInclude Include="common\FixedBuffer.h" />
     <ClInclude Include="common\noncopyable.h" />
+    <ClInclude Include="logging.leveldb\Logger.h" />
+    <ClInclude Include="logging.leveldb\posix_logger.h" />
+    <ClInclude Include="logging.leveldb\win_logger.h" />
     <ClInclude Include="logging.muduo\AsyncLogging.h" />
     <ClInclude Include="logging.muduo\LogFile.h" />
     <ClInclude Include="logging.muduo\Logging.h" />

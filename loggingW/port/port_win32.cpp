@@ -10,7 +10,7 @@ namespace port {
 
 	int getThreadID()
 	{
-		return GetCurrentThreadId();
+		return GetCurrentThreadId(); // DWORD 32λ
 	}
 
 	Mutex::Mutex() :cs_(nullptr) {

@@ -57,8 +57,19 @@ Logger::SourceFile::SourceFile(const char (&arr)[N])
 Logger::LOG_LEVEL initLogLevel()
 {
 	// 根据环境变量设置
+#if defined(POSIX)
+	Logger::LogLevel initLogLevel()
+	{
+		if (::getenv("MUDUO_LOG_TRACE"))
+			return Logger::TRACE;
+		else if (::getenv("MUDUO_LOG_DEBUG"))
+			return Logger::DEBUG;
+		else
+			return Logger::INFO;
+	}
+#endif
 
-	return Logger::WARN;
+	return Logger::DEBUG;
 }
 Logger::LOG_LEVEL g_loglevel = initLogLevel(); // 全局的日志级别
 
