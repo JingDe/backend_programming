@@ -2,6 +2,7 @@
 #define SLICE_H_
 
 #include<string>
+#include<cassert>
 
 class Slice {
 public:

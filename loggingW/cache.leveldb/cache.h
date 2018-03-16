@@ -3,6 +3,10 @@
 
 #include"common/Slice.h"
 
+class Cache;
+
+Cache* NewLRUCache(size_t capacity);
+
 class Cache {
 public:
 	Cache() {}

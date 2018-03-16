@@ -1,5 +1,6 @@
 #include"AsyncLogging.h"
 #include"LogFile.h"
+#include"common/MutexLock.h"
 
 #include<iostream>
 #include<utility>
@@ -59,7 +60,7 @@ void AsyncLogging::threadFunc()
 		assert(buffersToWrite.empty());
 
 		{
-			port::MutexLock lock(mutex_);
+			MutexLock lock(mutex_);
 			if (buffers_.empty())
 				cond_.waitForSeconds(flushInterval_); // µÈ´ýflushInterval_Ãë
 			
@@ -126,7 +127,7 @@ void AsyncLogging::threadFunc()
 
 void AsyncLogging::append(const char* msg, int len)
 {
-	port::MutexLock lock(mutex_);
+	MutexLock lock(mutex_);
 	if (currentBuffer_->available() > len)
 	{
 		currentBuffer_->append(msg, len);

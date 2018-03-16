@@ -117,21 +117,31 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="cache.leveldb\cache.cpp" />
+    <ClCompile Include="cache.leveldb\cache_test.cpp" />
     <ClCompile Include="common\AppendFile.cpp" />
+    <ClCompile Include="common\coding.cpp" />
+    <ClCompile Include="common\endian.cpp" />
     <ClCompile Include="common\FixedBuffer.cpp" />
+    <ClCompile Include="common\hash.cpp" />
     <ClCompile Include="logging.leveldb\Logger.cpp" />
     <ClCompile Include="logging.leveldb\win_logger.cpp" />
     <ClCompile Include="logging.muduo\AsyncLogging.cpp" />
-    <ClCompile Include="logging.muduo\AsyncLogging_test.cpp" />
     <ClCompile Include="logging.muduo\LogFile.cpp" />
     <ClCompile Include="logging.muduo\Logging.cpp" />
     <ClCompile Include="logging.muduo\LogStream.cpp" />
     <ClCompile Include="port\port_win32.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="cache.leveldb\cache.h" />
     <ClInclude Include="common\AppendFile.h" />
+    <ClInclude Include="common\coding.h" />
+    <ClInclude Include="common\endian.h" />
     <ClInclude Include="common\FixedBuffer.h" />
+    <ClInclude Include="common\hash.h" />
+    <ClInclude Include="common\MutexLock.h" />
     <ClInclude Include="common\noncopyable.h" />
+    <ClInclude Include="common\Slice.h" />
     <ClInclude Include="logging.leveldb\Logger.h" />
     <ClInclude Include="logging.leveldb\posix_logger.h" />
     <ClInclude Include="logging.leveldb\win_logger.h" />

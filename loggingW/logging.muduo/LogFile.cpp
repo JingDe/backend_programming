@@ -1,5 +1,6 @@
 #include"LogFile.h"
 #include"port/port.h"
+#include"common/MutexLock.h"
 
 #include<ctime>
 #include<iostream>
@@ -21,7 +22,7 @@ void LogFile::append(const char* buf, int len)
 {
 	if (mutex_)
 	{
-		port::MutexLock lock(*mutex_);
+		MutexLock lock(*mutex_);
 		append_unlocked(buf, len);
 	}
 	else
@@ -65,7 +66,7 @@ void LogFile::flush()
 {
 	if (mutex_)
 	{
-		port::MutexLock lock(*mutex_);
+		MutexLock lock(*mutex_);
 		file_->flush();
 	}
 	else
