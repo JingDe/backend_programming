@@ -43,7 +43,7 @@ public:
 		return std::string(data_, size_);
 	}
 
-	int compare(const Slice& b);
+	int compare(const Slice& b) const;
 
 	bool starts_with(const Slice& buf) const;
 
@@ -56,9 +56,9 @@ inline int Slice::compare(const Slice& b) const
 {
 	const size_t sz = (size_ < b.size_) ? size_ : b.size_;
 	int ret = memcmp(data_, b.data(), sz);
-	if (ret<0 || (ret == 0 && size_<b.size())
+	if (ret<0 || (ret == 0 && size_<b.size()))
 		return -1;
-	else if (ret>0 || (ret == 0 && size_>b.size())
+	else if (ret>0 || (ret == 0 && size_>b.size()))
 		return 1;
 	return 0;
 }

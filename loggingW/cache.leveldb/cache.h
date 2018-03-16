@@ -10,10 +10,9 @@ public:
 	virtual ~Cache();
 
 	// 指向缓存中的一个条目
-	struct Handle {};
+	struct Handle {}; // LRUHandle
 
-	// 
-	virtual Handle* Insert(cost Slice& key, void* value, size_t charge, void(*deleter)(const Slice& key, void* value)) = 0;
+	virtual Handle* Insert(const Slice& key, void* value, size_t charge, void(*deleter)(const Slice& key, void* value)) = 0;
 
 	virtual Handle* Lookup(const Slice& key) = 0;
 
