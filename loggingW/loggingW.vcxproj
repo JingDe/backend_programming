@@ -118,8 +118,9 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="cache.leveldb\cache.cpp" />
-    <ClCompile Include="cache.leveldb\cache_test.cpp" />
     <ClCompile Include="common\AppendFile.cpp" />
+    <ClCompile Include="common\arena.cpp" />
+    <ClCompile Include="common\arena_test.cpp" />
     <ClCompile Include="common\coding.cpp" />
     <ClCompile Include="common\endian.cpp" />
     <ClCompile Include="common\FixedBuffer.cpp" />
@@ -136,12 +137,14 @@
   <ItemGroup>
     <ClInclude Include="cache.leveldb\cache.h" />
     <ClInclude Include="common\AppendFile.h" />
+    <ClInclude Include="common\arena.h" />
     <ClInclude Include="common\coding.h" />
     <ClInclude Include="common\endian.h" />
     <ClInclude Include="common\FixedBuffer.h" />
     <ClInclude Include="common\hash.h" />
     <ClInclude Include="common\MutexLock.h" />
     <ClInclude Include="common\noncopyable.h" />
+    <ClInclude Include="common\random.h" />
     <ClInclude Include="common\Slice.h" />
     <ClInclude Include="common\testharness.h" />
     <ClInclude Include="logging.leveldb\Logger.h" />
