@@ -53,6 +53,9 @@
     <ClCompile Include="common\coding.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="common\testharness.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="port\port.h">
@@ -110,6 +113,9 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="common\endian.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="common\testharness.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

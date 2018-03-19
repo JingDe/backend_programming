@@ -124,6 +124,7 @@
     <ClCompile Include="common\endian.cpp" />
     <ClCompile Include="common\FixedBuffer.cpp" />
     <ClCompile Include="common\hash.cpp" />
+    <ClCompile Include="common\testharness.cpp" />
     <ClCompile Include="logging.leveldb\Logger.cpp" />
     <ClCompile Include="logging.leveldb\win_logger.cpp" />
     <ClCompile Include="logging.muduo\AsyncLogging.cpp" />
@@ -142,6 +143,7 @@
     <ClInclude Include="common\MutexLock.h" />
     <ClInclude Include="common\noncopyable.h" />
     <ClInclude Include="common\Slice.h" />
+    <ClInclude Include="common\testharness.h" />
     <ClInclude Include="logging.leveldb\Logger.h" />
     <ClInclude Include="logging.leveldb\posix_logger.h" />
     <ClInclude Include="logging.leveldb\win_logger.h" />
