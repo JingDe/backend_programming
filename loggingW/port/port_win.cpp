@@ -1,4 +1,4 @@
-#include"port_win32.h"
+#include"port_win.h"
 #include"logging.muduo/logging.h"
 
 #include<cassert>
@@ -153,5 +153,9 @@ namespace port {
 	{
 		thread_->join();
 		joined_ = true;
+	}
+
+	AtomicPointer::AtomicPointer(void* v) {
+		Release_Store(v);
 	}
 }

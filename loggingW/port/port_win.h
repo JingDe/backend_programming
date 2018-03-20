@@ -1,5 +1,5 @@
-#ifndef PORT_WIN32_H_
-#define PORT_WIN32_H_
+#ifndef PORT_WIN_H_
+#define PORT_WIN_H_
 
 #include<string>
 #include<functional>
@@ -75,6 +75,19 @@ namespace port {
 
 		bool started_;
 		bool joined_;
+	};
+
+	class AtomicPointer {
+	private:
+		void* rep_;
+
+	public:
+		AtomicPointer() :rep_(nullptr) {}
+		explicit AtomicPointer(void* v);
+		void* Acquire_Load() const;
+		void* Release_Store(void* v);
+		void* NoBarrier_Load() const;
+		void NoBarrier_Store(void* v);
 	};
 }
 

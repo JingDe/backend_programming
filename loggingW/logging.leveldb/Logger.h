@@ -1,7 +1,7 @@
 #ifndef LOGGER_H_LEVELDB_
 #define LOGGER_H_LEVELDB_
 
-//#if defined(WIN32)
+//#if defined(OS_WIN)
 //#include"win_logger.h"
 //#elif defined(POSIX)
 //#include"posix_logger.h"
