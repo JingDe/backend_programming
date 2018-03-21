@@ -133,5 +133,8 @@
     <ClInclude Include="common\Atomic.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="common\skiplist.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
