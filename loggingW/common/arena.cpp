@@ -7,7 +7,7 @@ static const int kBlockSize = 4096;
 
 
 Arena::Arena()
-	: blocks_memory_(0), alloc_bytes_remaining_(0), alloc_ptr_(0),blocks_(std::vector<char*>())
+	: memory_usage_(0), alloc_bytes_remaining_(0), alloc_ptr_(0),blocks_(std::vector<char*>())
 {
 
 }
@@ -74,7 +74,8 @@ char* Arena::AllocateFallback(size_t bytes)
 char* Arena::AllocateNewBlock(size_t bytes)
 {
 	char* result = new char[bytes];
-	blocks_memory_ += bytes;
+	size_t new_usage = MemoryUsage() + bytes + sizeof(char*);
+	memory_usage_.Release_Store(reinterpret_cast<void*>(new_usage)); //NoBarrier_Store??
 	blocks_.push_back(result);
 	return result;
 }

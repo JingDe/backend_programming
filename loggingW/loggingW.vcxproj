@@ -76,7 +76,7 @@
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
-      <PreprocessorDefinitions>_MBCS;%(PreprocessorDefinitions);WIN32;_CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_MBCS;%(PreprocessorDefinitions);OS_WIN;COMPILER_MSVC;_CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>D:\WorkSpace\vs_workspace\practice\loggingW</AdditionalIncludeDirectories>
     </ClCompile>
   </ItemDefinitionGroup>
@@ -132,12 +132,14 @@
     <ClCompile Include="logging.muduo\LogFile.cpp" />
     <ClCompile Include="logging.muduo\Logging.cpp" />
     <ClCompile Include="logging.muduo\LogStream.cpp" />
-    <ClCompile Include="port\port_win32.cpp" />
+    <ClCompile Include="port\port_win.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="cache.leveldb\cache.h" />
     <ClInclude Include="common\AppendFile.h" />
     <ClInclude Include="common\arena.h" />
+    <ClInclude Include="common\Atomic.h" />
+    <ClInclude Include="common\atomic_pointer.h" />
     <ClInclude Include="common\coding.h" />
     <ClInclude Include="common\endian.h" />
     <ClInclude Include="common\FixedBuffer.h" />
@@ -156,7 +158,7 @@
     <ClInclude Include="logging.muduo\LogStream.h" />
     <ClInclude Include="port\port.h" />
     <ClInclude Include="port\port_posix.h" />
-    <ClInclude Include="port\port_win32.h" />
+    <ClInclude Include="port\port_win.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

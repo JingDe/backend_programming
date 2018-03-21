@@ -11,9 +11,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="port\port_win32.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
     <ClCompile Include="logging.muduo\AsyncLogging.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
@@ -56,6 +53,9 @@
     <ClCompile Include="common\arena.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="port\port_win.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
     <ClCompile Include="common\arena_test.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
@@ -65,9 +65,6 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="port\port_posix.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="port\port_win32.h">
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="logging.muduo\AsyncLogging.h">
@@ -125,6 +122,15 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="common\random.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="port\port_win.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="common\atomic_pointer.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="common\Atomic.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

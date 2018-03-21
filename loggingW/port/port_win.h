@@ -77,6 +77,8 @@ namespace port {
 		bool joined_;
 	};
 
+#ifdef ATOMICPOINTER_WINAPI
+	// ¥Ê¥¢ŒﬁÀ¯÷∏’Î
 	class AtomicPointer {
 	private:
 		void* rep_;
@@ -85,10 +87,11 @@ namespace port {
 		AtomicPointer() :rep_(nullptr) {}
 		explicit AtomicPointer(void* v);
 		void* Acquire_Load() const;
-		void* Release_Store(void* v);
+		void Release_Store(void* v);
 		void* NoBarrier_Load() const;
 		void NoBarrier_Store(void* v);
 	};
+#endif
 }
 
 #endif

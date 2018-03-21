@@ -155,7 +155,28 @@ namespace port {
 		joined_ = true;
 	}
 
+#ifdef ATOMICPOINTER_WINAPI
 	AtomicPointer::AtomicPointer(void* v) {
 		Release_Store(v);
 	}
+
+	void* AtomicPointer::Acquire_Load() const {
+		void* p = nullptr;
+		InterlockedExchangePointer(&p, rep_); // InterlockedExchangePointer原子地交换一对地址，p=rep_;
+		return p;
+	}
+
+	void AtomicPointer::Release_Store(void* v)
+	{
+		InterlockedExchangePointer(&rep_, v); // rep_=v;
+	}
+
+	void* AtomicPointer::NoBarrier_Load() const {
+		return rep_;
+	}
+
+	void AtomicPointer::NoBarrier_Store(void* v) {
+		rep_ = v;
+	}
+#endif
 }
