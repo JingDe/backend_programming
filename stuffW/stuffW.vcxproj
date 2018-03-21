@@ -23,7 +23,7 @@
     <ProjectGuid>{BCE50781-461D-4038-A0CB-7322A1EA761B}</ProjectGuid>
     <RootNamespace>loggingW</RootNamespace>
     <WindowsTargetPlatformVersion>10.0.16299.0</WindowsTargetPlatformVersion>
-    <ProjectName>stuffsW</ProjectName>
+    <ProjectName>stuffW</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -78,7 +78,7 @@
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
       <PreprocessorDefinitions>_MBCS;%(PreprocessorDefinitions);OS_WIN;COMPILER_MSVC;_CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>D:\WorkSpace\vs_workspace\practice\stuffsW</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>D:\WorkSpace\vs_workspace\practice\stuffW</AdditionalIncludeDirectories>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
