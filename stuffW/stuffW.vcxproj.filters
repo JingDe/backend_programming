@@ -56,7 +56,16 @@
     <ClCompile Include="port\port_win.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="common\arena_test.cpp">
+    <ClCompile Include="skiplist.leveldb\skiplist.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="skiplist.leveldb\skiplist_test.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="skiplist.leveldb\skiplist_lite.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="skiplist.leveldb\skiplist_lite_test.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>
@@ -133,7 +142,13 @@
     <ClInclude Include="common\Atomic.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="common\skiplist.h">
+    <ClInclude Include="skiplist.leveldb\skiplist.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="skiplist.leveldb\comparator.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="skiplist.leveldb\skiplist_lite.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>
