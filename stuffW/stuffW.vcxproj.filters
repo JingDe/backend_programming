@@ -68,6 +68,9 @@
     <ClCompile Include="skiplist.leveldb\skiplist_lite_test.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="common\env_win.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="port\port.h">
@@ -149,6 +152,9 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="skiplist.leveldb\skiplist_lite.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="common\env.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

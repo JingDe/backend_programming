@@ -1,5 +1,15 @@
 #include"skiplist_lite.h"
 #include"common/testharness.h"
+#include"common/hash.h"
+#include"common/random.h"
+#include"common/atomic_pointer.h"
+#include"common/arena.h"
+#include"port/port.h"
+#include"common/MutexLock.h"
+#include"common/env.h"
+
+#include<cassert>
+#include<set>
 
 struct CMP {
 	/*int compare(const int& a, int b) const
@@ -29,8 +39,6 @@ class SkipTest {};
 
 TEST(SkipTest, EMPTY)
 {
-	//Comparator<int> cmp;
-	//SkipList<int, Comparator<int> > slist(4, cmp);
 	Comparator cmp;
 	SkipList slist(4, cmp);
 	slist.Display();
@@ -41,6 +49,201 @@ TEST(SkipTest, EMPTY)
 	slist.Display();
 
 	printf("end empty\n");
+}
+
+TEST(SkipTest, InsertAndLookup)
+{
+	const int N = 200;
+	const int R = 500;
+	std::set<int> keys;
+	Comparator cmp;
+	SkipList list(6, cmp);
+	for (int i = 0; i < N; i++)
+	{
+		int key = rand() % R; // rand()返回值[0, RAND_MAX], RAND_MAX至少32767
+		if (keys.insert(key).second) // set.insert()返回值std::pair<iterator,bool>
+			list.Insert(key); // key的范围[0, R-1]
+	}
+
+	for (int i = 0; i < R; i++)
+	{
+		if (list.Contains(i))
+			ASSERT_EQ(keys.count(i), 1);
+		else
+			ASSERT_EQ(keys.count(i), 0);
+	}
+
+	list.Display();
+}
+
+class ConcurrentTest {
+private:
+	static const uint32_t K = 4;
+
+	static uint64_t key(int key) { return (key >> 40); }
+	static uint64_t gen(int key) { return (key >> 8) & 0xffffffffu; }
+	static uint64_t hash(int key) { return key & 0xff; }
+
+	static uint64_t HashNumbers(uint64_t k, uint64_t g) {
+		uint64_t data[2] = { k, g };
+		return Hash(reinterpret_cast<char*>(data), sizeof(data), 0);
+	}
+
+	static int MakeKey(uint64_t k, uint64_t g) {
+		assert(sizeof(int) == sizeof(uint64_t));
+		assert(k <= K);  // We sometimes pass K to seek to the end of the skiplist
+		assert(g <= 0xffffffffu);
+		return ((k << 40) | (g << 8) | (HashNumbers(k, g) & 0xff));
+	}
+
+	static bool IsValidKey(int k) {
+		return hash(k) == (HashNumbers(key(k), gen(k)) & 0xff);
+	}
+
+	static int RandomTarget(Random* rnd) {
+		switch (rnd->Next() % 10) {
+		case 0:
+			// Seek to beginning
+			return MakeKey(0, 0);
+		case 1:
+			// Seek to end
+			return MakeKey(K, 0);
+		default:
+			// Seek to middle
+			return MakeKey(rnd->Next() % K, 0);
+		}
+	}
+
+	// 用于生成value
+	struct State {
+		port::AtomicPointer generation[K];
+		void Set(int k, intptr_t v)
+		{
+			generation[k].Release_Store(reinterpret_cast<void*>(v));
+		}
+		intptr_t Get(int k)
+		{
+			return reinterpret_cast<intptr_t>(generation[k].Acquire_Load());
+		}
+
+		State() {
+			for (int k = 0; k < K; k++) {
+				Set(k, 0);
+			}
+		}
+	};
+
+	State current_;
+	
+	Arena arena_;
+
+	SkipList list_;
+
+public:
+	ConcurrentTest() :list_(8, Comparator()) {}
+
+	// 插入一个key, 需要外部同步
+	void WriteStep(Random* rnd)
+	{
+		const uint32_t k = rnd->Next() % K;
+		const intptr_t g = current_.Get(k) + 1;
+		const int key = MakeKey(k, g);
+		list_.Insert(key);
+		current_.Set(k, g);
+	}
+
+	void ReadStep(Random* rnd)
+	{
+		State initial_state;
+		for (int k = 0; k < K; k++)
+		{
+			initial_state.Set(k, current_.Get(k));
+		}
+
+		int pos = RandomTarget(rnd);
+		
+		list_.Display();
+	}
+};
+
+const uint32_t ConcurrentTest::K;
+
+// ConcurrentTest 的单线程测试
+TEST(SkipTest, ConcurrentWithoutThreads)
+{
+	ConcurrentTest test;
+	Random rnd(test::RandomSeed());
+	for (int i = 0; i < 10000; i++)
+	{
+		test.ReadStep(&rnd);
+		test.WriteStep(&rnd);
+	}
+}
+
+class TestState {
+public:
+	ConcurrentTest t_;
+	int seed_;
+	port::AtomicPointer quit_flag_;
+
+	enum ReaderState {
+		STARTING,
+		RUNNING,
+		DONE
+	};
+
+	explicit TestState(int s)
+		:seed_(s), quit_flag_(NULL), state_(STARTING), state_cv_(&mu_) {}
+
+	void Wait(ReaderState s)
+	{
+		MutexLock lock(mu_);
+		while (state_ != s) {
+			state_cv_.Wait();
+		}
+	}
+
+	void Change(ReaderState s) {
+		MutexLock lock(mu_);
+		state_ = s;
+		state_cv_.Signal();
+	}
+
+private:
+	port::Mutex mu_;
+	ReaderState state_;
+	port::CondVar state_cv_;
+};
+
+static void ConcurrentReader(void* arg) {
+	printf("in ConcurrentReader\n");
+
+	TestState* state = reinterpret_cast<TestState*>(arg);
+	Random rnd(state->seed_);
+	int64_t reads = 0;
+	state->Change(TestState::RUNNING);
+	while (!state->quit_flag_.Acquire_Load())
+	{
+		state->t_.ReadStep(&rnd); // 
+		++reads;
+	}
+	state->Change(TestState::DONE);
+}
+
+static void RunConcurrent(int run)
+{
+	const int seed = test::RandomSeed() + (run * 100);
+	Random rnd(seed);
+	const int N = 1000;
+	const int kSize = 1000;
+	for (int i = 0; i < N; i++)
+	{
+		if ((i % 100) == 0)
+			fprintf(stderr, "Run %d of %d\n", i, N);
+		TestState state(seed + 1);
+		Env::Default()->Schedule(ConcurrentReader, &state);
+
+	}
 }
 
 int main()

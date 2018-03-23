@@ -50,6 +50,7 @@ namespace port {
 		void *sem2_; // 作用？？
 	};
 
+	// todo: 带参数的线程函数
 	class Thread {
 	public:
 		typedef std::function<void(void)> ThreadFunc; // 线程函数类型

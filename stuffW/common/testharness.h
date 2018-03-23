@@ -91,6 +91,7 @@ void TCONCAT(_Test_, name)::_Run()
 
 	extern bool RegisterTest(const char* base, const char* name, void(*func)());
 
+	extern int RandomSeed();
 }
 
 #endif

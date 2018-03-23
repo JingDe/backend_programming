@@ -36,11 +36,11 @@ public:
 
 	void Insert(int key);
 	void Remove(int key);
-	bool Get(int key);
+	bool Contains(int key);
 	void Display();
 
 private:
-	int RandomLevel();
+	int RandomLevel(); // 返回值[0, MAXLEVEL-1]
 	Node * NewNode(const int& key, int level);
 	int Compare(const int& a, const int& b);
 	bool FindPre(const int& key, Node** pre, int* level);
@@ -50,7 +50,7 @@ private:
 
 	const Comparator comparator_;// 比较对象
 								 // Arena *arena_;
-	const int MAXLEVEL;
+	const int MAXLEVEL; // [0, MAXLEVEL-1]层
 };
 
 

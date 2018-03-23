@@ -49,4 +49,14 @@ namespace test {
 		return 0;
 	}
 
+	int RandomSeed() {
+		const char* env = getenv("TEST_RANDOM_SEED");
+		int result = (env != NULL ? atoi(env) : 301);
+		if (result <= 0) {
+			result = 301;
+		}
+		return result;
+	}
+
 }
+

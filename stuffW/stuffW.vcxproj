@@ -123,6 +123,7 @@
     <ClCompile Include="common\arena.cpp" />
     <ClCompile Include="common\coding.cpp" />
     <ClCompile Include="common\endian.cpp" />
+    <ClCompile Include="common\env_win.cpp" />
     <ClCompile Include="common\FixedBuffer.cpp" />
     <ClCompile Include="common\hash.cpp" />
     <ClCompile Include="common\testharness.cpp" />
@@ -146,6 +147,7 @@
     <ClInclude Include="common\atomic_pointer.h" />
     <ClInclude Include="common\coding.h" />
     <ClInclude Include="common\endian.h" />
+    <ClInclude Include="common\env.h" />
     <ClInclude Include="common\FixedBuffer.h" />
     <ClInclude Include="common\hash.h" />
     <ClInclude Include="common\MutexLock.h" />

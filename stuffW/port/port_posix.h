@@ -1,7 +1,8 @@
 #ifndef PORT_POSIX_H_
 #define PORT_POSIX_H_
 
-
+#ifdef POSIX
+#include"common/noncopyable.h"
 
 #include<pthread.h>
 #include<string>
@@ -98,5 +99,6 @@ namespace port {
 		ThreadFunc func_;
 	};
 }
+#endif
 
 #endif
