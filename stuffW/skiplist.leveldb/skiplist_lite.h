@@ -57,9 +57,10 @@ private:
 
 struct SkipList::Node {
 	explicit Node(const int& k) :key(k) {}
+	Node(const int& k, int l) :key(k), level(l) {}
 
 	int key;
-	int level;
+	int level;  // ȡֵ[1, MAXLEVEL]
 
 	SkipList::Node** next_;	// SkipList::Node* next_[1];
 };

@@ -1,4 +1,4 @@
-#include"skiplist.h"
+#include"skiplist_arena.h"
 #include"common/testharness.h"
 #include"common/hash.h"
 #include"common/random.h"
@@ -12,16 +12,6 @@
 #include<set>
 
 struct CMP {
-	/*int compare(const int& a, int b) const
-	{
-	if (a < b)
-	return -1;
-	else if (a == b)
-	return 0;
-	else
-	return 1;
-	}*/
-
 	int operator()(const int& a, const int& b) const {
 		if (a < b) {
 			return -1;
@@ -37,27 +27,43 @@ struct CMP {
 
 class SkipTest {};
 
+TEST(SkipTest, size)
+{
+	Arena arena;
+	CMP cmp;
+	SkipList<int, CMP> slist(4, cmp, &arena);
+	printf("sizeof(Node)=%d, sizeof(port::AtomicPointer)=%d, sizeof(char*)=%d\n", slist.NodeSize(), sizeof(port::AtomicPointer), sizeof(char*));
+}
+
 TEST(SkipTest, EMPTY)
 {
+	Arena arena;
 	CMP cmp;
-	SkipList<int, CMP> slist(4, cmp);
+	SkipList<int, CMP> slist(4, cmp, &arena);
+	slist.Display();
+}
+
+TEST(SkipTest, Insert)
+{
+	Arena arena;
+	CMP cmp;
+	SkipList<int, CMP> slist(4, cmp, &arena);
 	slist.Display();
 
 	slist.Insert(8);
 	slist.Insert(4);
 	slist.Insert(5);
 	slist.Display();
-
-	printf("end empty\n");
 }
 
 TEST(SkipTest, InsertAndLookup)
 {
+	Arena arena;
 	const int N = 200;
 	const int R = 500;
 	std::set<int> keys;
 	CMP cmp;
-	SkipList<int, CMP> list(6, cmp);
+	SkipList<int, CMP> list(4, cmp, &arena);
 	for (int i = 0; i < N; i++)
 	{
 		int key = rand() % R; // rand()返回值[0, RAND_MAX], RAND_MAX至少32767
@@ -73,7 +79,38 @@ TEST(SkipTest, InsertAndLookup)
 			ASSERT_EQ(keys.count(i), 0);
 	}
 
-	//list.Display();
+	list.Display();
+}
+
+TEST(SkipTest, InsertAndRemove)
+{
+	Arena arena;
+	const int N = 200;
+	const int R = 500;
+	std::set<int> keys;
+	CMP cmp;
+	SkipList<int, CMP> list(4, cmp, &arena);
+	for (int i = 0; i < N; i++)
+	{
+		int key = rand() % R; // rand()返回值[0, RAND_MAX], RAND_MAX至少32767
+		if (keys.insert(key).second) // set.insert()返回值std::pair<iterator,bool>
+			list.Insert(key); // key的范围[0, R-1]
+	}
+
+	for (int i = 0; i < R; i++)
+	{
+		if (list.Contains(i))
+			ASSERT_EQ(keys.count(i), 1);
+		else
+			ASSERT_EQ(keys.count(i), 0);
+	}
+
+	list.Display();
+
+	for (std::set<int>::iterator it = keys.begin(); it != keys.end(); it++)
+		list.Remove(*it);
+
+	list.Display();
 }
 
 class ConcurrentTest {
@@ -140,7 +177,7 @@ private:
 	SkipList<int, CMP> list_;
 
 public:
-	ConcurrentTest() :list_(8, CMP()) {}
+	ConcurrentTest() :arena_(), list_(4, CMP(), &arena_) {}
 
 	// 插入一个key, 需要外部同步
 	void WriteStep(Random* rnd)
@@ -253,7 +290,7 @@ static void RunConcurrent(int run)
 	}
 }
 
-TEST(SkipTest, Concurrent1) { RunConcurrent(1); }
+//TEST(SkipTest, Concurrent1) { RunConcurrent(1); }
 //TEST(SkipTest, Concurrent2) { RunConcurrent(2); }
 //TEST(SkipTest, Concurrent3) { RunConcurrent(3); }
 //TEST(SkipTest, Concurrent4) { RunConcurrent(4); }

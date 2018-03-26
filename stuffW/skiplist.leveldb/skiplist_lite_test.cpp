@@ -80,17 +80,17 @@ class ConcurrentTest {
 private:
 	static const uint32_t K = 4;
 
-	static uint64_t key(int key) { return (key >> 40); }
-	static uint64_t gen(int key) { return (key >> 8) & 0xffffffffu; }
-	static uint64_t hash(int key) { return key & 0xff; }
+	static int key(int key) { return (key >> 40); }
+	static int gen(int key) { return (key >> 8) & 0xffffffffu; }
+	static int hash(int key) { return key & 0xff; }
 
-	static uint64_t HashNumbers(uint64_t k, uint64_t g) {
-		uint64_t data[2] = { k, g };
+	static int HashNumbers(int k, int g) {
+		int data[2] = { k, g };
 		return Hash(reinterpret_cast<char*>(data), sizeof(data), 0);
 	}
 
-	static int MakeKey(uint64_t k, uint64_t g) {
-		assert(sizeof(int) == sizeof(uint64_t));
+	static int MakeKey(int k, int g) {
+		assert(sizeof(int) == sizeof(int));
 		assert(k <= K);  // We sometimes pass K to seek to the end of the skiplist
 		assert(g <= 0xffffffffu);
 		return ((k << 40) | (g << 8) | (HashNumbers(k, g) & 0xff));
@@ -242,9 +242,22 @@ static void RunConcurrent(int run)
 			fprintf(stderr, "Run %d of %d\n", i, N);
 		TestState state(seed + 1);
 		Env::Default()->Schedule(ConcurrentReader, &state);
-
+		printf("Wait Running...\n");
+		state.Wait(TestState::RUNNING);
+		printf("RUNNING\n");
+		for (int i = 0; i < kSize; i++)
+			state.t_.WriteStep(&rnd);
+		state.quit_flag_.Release_Store(&state); // 任意非NULL参数
+		state.Wait(TestState::DONE);
+		printf("DONE\n");
 	}
 }
+
+TEST(SkipTest, Concurrent1) { RunConcurrent(1); }
+TEST(SkipTest, Concurrent2) { RunConcurrent(2); }
+TEST(SkipTest, Concurrent3) { RunConcurrent(3); }
+TEST(SkipTest, Concurrent4) { RunConcurrent(4); }
+TEST(SkipTest, Concurrent5) { RunConcurrent(5); }
 
 int main()
 {

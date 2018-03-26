@@ -56,7 +56,7 @@ TEST(SkipTest, InsertAndLookup)
 	const int N = 200;
 	const int R = 500;
 	std::set<int> keys;
-	CMP cmp;
+	Comparator cmp;
 	SkipList<int, CMP> list(6, cmp);
 	for (int i = 0; i < N; i++)
 	{
@@ -73,7 +73,7 @@ TEST(SkipTest, InsertAndLookup)
 			ASSERT_EQ(keys.count(i), 0);
 	}
 
-	//list.Display();
+	list.Display();
 }
 
 class ConcurrentTest {
@@ -140,7 +140,7 @@ private:
 	SkipList<int, CMP> list_;
 
 public:
-	ConcurrentTest() :list_(8, CMP()) {}
+	ConcurrentTest() :list_(8, Comparator()) {}
 
 	// 插入一个key, 需要外部同步
 	void WriteStep(Random* rnd)
@@ -162,7 +162,7 @@ public:
 
 		int pos = RandomTarget(rnd);
 
-		//list_.Display();
+		list_.Display();
 	}
 };
 
@@ -216,7 +216,7 @@ private:
 };
 
 static void ConcurrentReader(void* arg) {
-	//printf("in ConcurrentReader\n");
+	printf("in ConcurrentReader\n");
 
 	TestState* state = reinterpret_cast<TestState*>(arg);
 	Random rnd(state->seed_);
@@ -242,22 +242,22 @@ static void RunConcurrent(int run)
 			fprintf(stderr, "Run %d of %d\n", i, N);
 		TestState state(seed + 1);
 		Env::Default()->Schedule(ConcurrentReader, &state);
-		//printf("Wait Running...\n");
+		printf("Wait Running...\n");
 		state.Wait(TestState::RUNNING);
-		//printf("RUNNING\n");
+		printf("RUNNING\n");
 		for (int i = 0; i < kSize; i++)
 			state.t_.WriteStep(&rnd);
 		state.quit_flag_.Release_Store(&state); // 任意非NULL参数
 		state.Wait(TestState::DONE);
-		//printf("DONE\n");
+		printf("DONE\n");
 	}
 }
 
 TEST(SkipTest, Concurrent1) { RunConcurrent(1); }
-//TEST(SkipTest, Concurrent2) { RunConcurrent(2); }
-//TEST(SkipTest, Concurrent3) { RunConcurrent(3); }
-//TEST(SkipTest, Concurrent4) { RunConcurrent(4); }
-//TEST(SkipTest, Concurrent5) { RunConcurrent(5); }
+TEST(SkipTest, Concurrent2) { RunConcurrent(2); }
+TEST(SkipTest, Concurrent3) { RunConcurrent(3); }
+TEST(SkipTest, Concurrent4) { RunConcurrent(4); }
+TEST(SkipTest, Concurrent5) { RunConcurrent(5); }
 
 int main()
 {
