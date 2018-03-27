@@ -134,7 +134,8 @@
     <ClCompile Include="logging.muduo\Logging.cpp" />
     <ClCompile Include="logging.muduo\LogStream.cpp" />
     <ClCompile Include="port\port_win.cpp" />
-    <ClCompile Include="skiplist.leveldb\skiplist_arena_test.cpp" />
+    <ClCompile Include="skiplist.leveldb\comparator2\comparator.cpp" />
+    <ClCompile Include="skiplist.leveldb\skiplist_iterator_test.cpp" />
     <ClCompile Include="skiplist.leveldb\skiplist_lite.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -163,9 +164,11 @@
     <ClInclude Include="port\port.h" />
     <ClInclude Include="port\port_posix.h" />
     <ClInclude Include="port\port_win.h" />
-    <ClInclude Include="skiplist.leveldb\comparator.h" />
+    <ClInclude Include="skiplist.leveldb\comparator2\comparator2.h" />
+    <ClInclude Include="skiplist.leveldb\comparator2\object.h" />
     <ClInclude Include="skiplist.leveldb\skiplist.h" />
     <ClInclude Include="skiplist.leveldb\skiplist_arena.h" />
+    <ClInclude Include="skiplist.leveldb\skiplist_iterator.h" />
     <ClInclude Include="skiplist.leveldb\skiplist_lite.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

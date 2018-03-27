@@ -14,7 +14,6 @@ Arena::Arena()
 
 Arena::~Arena()
 {
-	fprintf(stdout, "Arena.MemoryUsage = %d\n", MemoryUsage());
 	for (std::vector<char*>::iterator it = blocks_.begin(); it != blocks_.end(); it++)
 		delete [] *it;
 }

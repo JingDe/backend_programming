@@ -62,7 +62,10 @@
     <ClCompile Include="common\env_win.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="skiplist.leveldb\skiplist_arena_test.cpp">
+    <ClCompile Include="skiplist.leveldb\comparator2\comparator.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="skiplist.leveldb\skiplist_iterator_test.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>
@@ -142,9 +145,6 @@
     <ClInclude Include="skiplist.leveldb\skiplist.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="skiplist.leveldb\comparator.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
     <ClInclude Include="skiplist.leveldb\skiplist_lite.h">
       <Filter>头文件</Filter>
     </ClInclude>
@@ -152,6 +152,15 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="skiplist.leveldb\skiplist_arena.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="skiplist.leveldb\comparator2\comparator2.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="skiplist.leveldb\comparator2\object.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="skiplist.leveldb\skiplist_iterator.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

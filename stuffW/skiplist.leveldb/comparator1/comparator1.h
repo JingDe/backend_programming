@@ -15,11 +15,5 @@ public:
 	}
 };
 
-template<>
-class Comparator<int>;
-
-
-
-
 
 #endif
