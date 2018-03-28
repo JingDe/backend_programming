@@ -67,7 +67,7 @@ private:
 
 template<typename T, typename Comparator>
 struct SkipList<T, Comparator>::Node {
-	T key;
+	T const key;
 	int level;
 
 	port::AtomicPointer next_[1]; // void*
@@ -320,9 +320,14 @@ typename SkipList<T, Comparator>::Node* SkipList<T, Comparator>::FindGreaterOrEq
 }
 
 template<typename T, typename Comparator>
-bool SkipList<T, Comparator>::KeyIsAfterNode(const T& key, Node* n) const
-{
-	return (n!=NULL)  &&  comparator_(key, n->key) > 0;
+//bool SkipList<T, Comparator>::KeyIsAfterNode(const T& key, Node* n) const
+//{
+//	return (n!=NULL)  &&  (comparator_(key, n->key) > 0);
+//}
+bool SkipList<T, Comparator>::KeyIsAfterNode(const T& key, Node* n) const {
+	// NULL n is considered infinite
+	
+	return (n != NULL) && (comparator_(n->key, key) < 0);
 }
 
 template<typename T, class Comparator>
