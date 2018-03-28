@@ -5,6 +5,8 @@ VisualStudioVersion = 15.0.27130.2010
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "stuffW", "stuffW\stuffW.vcxproj", "{BCE50781-461D-4038-A0CB-7322A1EA761B}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "stuffL", "stuffL\stuffL.vcxproj", "{660EEE2D-B659-4DF6-90AC-19693A654A9C}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|ARM = Debug|ARM
@@ -25,6 +27,18 @@ Global
 		{BCE50781-461D-4038-A0CB-7322A1EA761B}.Release|x64.Build.0 = Release|x64
 		{BCE50781-461D-4038-A0CB-7322A1EA761B}.Release|x86.ActiveCfg = Release|Win32
 		{BCE50781-461D-4038-A0CB-7322A1EA761B}.Release|x86.Build.0 = Release|Win32
+		{660EEE2D-B659-4DF6-90AC-19693A654A9C}.Debug|ARM.ActiveCfg = Debug|ARM
+		{660EEE2D-B659-4DF6-90AC-19693A654A9C}.Debug|ARM.Build.0 = Debug|ARM
+		{660EEE2D-B659-4DF6-90AC-19693A654A9C}.Debug|x64.ActiveCfg = Debug|x64
+		{660EEE2D-B659-4DF6-90AC-19693A654A9C}.Debug|x64.Build.0 = Debug|x64
+		{660EEE2D-B659-4DF6-90AC-19693A654A9C}.Debug|x86.ActiveCfg = Debug|x86
+		{660EEE2D-B659-4DF6-90AC-19693A654A9C}.Debug|x86.Build.0 = Debug|x86
+		{660EEE2D-B659-4DF6-90AC-19693A654A9C}.Release|ARM.ActiveCfg = Release|ARM
+		{660EEE2D-B659-4DF6-90AC-19693A654A9C}.Release|ARM.Build.0 = Release|ARM
+		{660EEE2D-B659-4DF6-90AC-19693A654A9C}.Release|x64.ActiveCfg = Release|x64
+		{660EEE2D-B659-4DF6-90AC-19693A654A9C}.Release|x64.Build.0 = Release|x64
+		{660EEE2D-B659-4DF6-90AC-19693A654A9C}.Release|x86.ActiveCfg = Release|x86
+		{660EEE2D-B659-4DF6-90AC-19693A654A9C}.Release|x86.Build.0 = Release|x86
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
