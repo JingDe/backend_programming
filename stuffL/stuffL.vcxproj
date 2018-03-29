@@ -27,14 +27,21 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="common\noncopyable.h" />
     <ClInclude Include="dummy.h" />
+    <ClInclude Include="logging.muduo\Logging.h" />
+    <ClInclude Include="logging.muduo\LogStream.h" />
     <ClInclude Include="thread.muduo\tests\__thread__test\ThreadObject.h" />
+    <ClInclude Include="thread.muduo\Thread.h" />
     <ClInclude Include="thread.muduo\thread_util.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dummy.cpp" />
+    <ClCompile Include="logging.muduo\Logging.cpp" />
+    <ClCompile Include="logging.muduo\LogStream.cpp" />
     <ClCompile Include="thread.muduo\tests\__thread__test\ThreadObject.cpp" />
     <ClCompile Include="thread.muduo\tests\__thread__test\__thread_test.cpp" />
+    <ClCompile Include="thread.muduo\Thread.cpp" />
     <ClCompile Include="thread.muduo\thread_util.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
@@ -72,7 +79,7 @@
   <ImportGroup Label="PropertySheets" />
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>$(IncludePath);$(ISenseIncludePath);D:\WorkSpace\vs_workspace\practice\stuffL</IncludePath>
+    <IncludePath>$(IncludePath);$(ISenseIncludePath);D:\WorkSpace\vs_workspace\practice\stuffL;D:\WorkSpace\linux_usr_include\include</IncludePath>
     <SourcePath>D:\WorkSpace\vs_workspace\practice\stuffL\thread.muduo;$(SourcePath)</SourcePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">

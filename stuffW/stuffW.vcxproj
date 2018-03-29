@@ -133,6 +133,7 @@
     <ClCompile Include="logging.muduo\LogFile.cpp" />
     <ClCompile Include="logging.muduo\Logging.cpp" />
     <ClCompile Include="logging.muduo\LogStream.cpp" />
+    <ClCompile Include="port\port_posix.cpp" />
     <ClCompile Include="port\port_win.cpp" />
     <ClCompile Include="skiplist.leveldb\comparator2\comparator.cpp" />
     <ClCompile Include="skiplist.leveldb\skiplist_iterator_test.cpp" />

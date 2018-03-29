@@ -68,6 +68,9 @@
     <ClCompile Include="skiplist.leveldb\skiplist_iterator_test.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="port\port_posix.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="port\port.h">

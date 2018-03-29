@@ -6,7 +6,7 @@
 
 __thread ThreadObject* t_objectInThread=0;
 
-ThreadObject::ThreadObject() :threadID_(gettid()) // TODO: 预先一次系统调用
+ThreadObject::ThreadObject(const std::string& name):name_(name), threadID_(gettid()) // TODO: 预先一次系统调用
 {
 	if (t_objectInThread)
 	{
