@@ -1,4 +1,8 @@
+#ifdef POSIX
+
+
 #include"port_posix.h"
+
 
 namespace port {
 	
@@ -133,3 +137,5 @@ namespace port {
 		return pthread_join(tid_, NULL);
 	}
 }
+
+#endif

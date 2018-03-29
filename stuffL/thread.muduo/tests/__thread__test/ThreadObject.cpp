@@ -4,6 +4,8 @@
 #include<cstdio>
 #include<cstdlib>
 
+__thread ThreadObject* t_objectInThread=0;
+
 ThreadObject::ThreadObject() :threadID_(gettid()) // TODO: 预先一次系统调用
 {
 	if (t_objectInThread)

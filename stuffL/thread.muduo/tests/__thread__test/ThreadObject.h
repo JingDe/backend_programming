@@ -6,15 +6,17 @@
 
 class ThreadObject {
 public:
-	ThreadObject();
+	explicit ThreadObject(const std::string& name) :name_(name) {}
+	std::string Name() { return name_; }
+	void setName(const std::string& name) { name_ = name;  }
 
 private:
 	pid_t threadID_;
+	std::string name_;
 };
 
-// 全局变量在头文件中extern声明
 
-// __thread变量呢？
-__thread ThreadObject* t_objectInThread = 0;
+// __thread变量，同全局变量在头文件中extern声明
+//extern __thread ThreadObject* t_objectInThread;
 
 #endif

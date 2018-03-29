@@ -27,10 +27,12 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="dummy.h" />
     <ClInclude Include="thread.muduo\tests\__thread__test\ThreadObject.h" />
     <ClInclude Include="thread.muduo\thread_util.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="dummy.cpp" />
     <ClCompile Include="thread.muduo\tests\__thread__test\ThreadObject.cpp" />
     <ClCompile Include="thread.muduo\tests\__thread__test\__thread_test.cpp" />
     <ClCompile Include="thread.muduo\thread_util.cpp" />
@@ -71,10 +73,11 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <IncludePath>$(IncludePath);$(ISenseIncludePath);D:\WorkSpace\vs_workspace\practice\stuffL</IncludePath>
+    <SourcePath>D:\WorkSpace\vs_workspace\practice\stuffL\thread.muduo;$(SourcePath)</SourcePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>$(StlIncludeDirectories);%(AdditionalIncludeDirectories);D:\WorkSpace\vs_workspace\practice\stuffL</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(StlIncludeDirectories);%(AdditionalIncludeDirectories);D:\WorkSpace\vs_workspace\practice\stuffL;/home/norah/projects/stuffL</AdditionalIncludeDirectories>
     </ClCompile>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
