@@ -3,10 +3,14 @@
 
 #include"Logger.h"
 
+#include<ctime>
+#include<cstdio>
+#include<cassert>
+
 class PosixLogger : public Logger2 {
 public:
-	PosixLogger(File* f, uint64_t(*gettid)()) : file_(f), gettid_(gettid) {}
-	virutal ~PosixLogger() {
+	PosixLogger(FILE* f, uint64_t(*gettid)()) : file_(f), gettid_(gettid) {}
+	virtual ~PosixLogger() {
 		fclose(file_);
 	}
 
@@ -16,7 +20,7 @@ public:
 
 		char buf[500];
 		
-		while (int iter = 0; iter < 2; iter++)
+		for (int iter = 0; iter < 2; iter++)
 		{
 			char* base;
 			int bufsize;
@@ -71,17 +75,11 @@ public:
 	}
 
 private:
-	FILE * file_;
+	FILE* file_;
 	uint64_t (*gettid_)();
 };
 
-static uin64_t gettid()
-{
-	pthread_t tid = pthread_self();
-	uint64_t thread_id = 0;
-	memcpy(&thread_id, &tid, std::min(sizeof(thread_id), sizeof(tid)));
-	return thread_id;
-}
+
 
 bool NewPosixLogger(const std::string& fname, Logger2** result)
 {

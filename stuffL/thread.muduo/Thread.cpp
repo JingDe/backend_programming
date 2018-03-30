@@ -1,5 +1,6 @@
 #include"Thread.h"
 #include"logging.muduo/Logging.h"
+#include"thread.muduo/CurrentThread.h"
 
 #include<string>
 #include<cassert>
@@ -54,4 +55,23 @@ int Thread::join()
 	assert(!joined_);
 	joined_ = true;
 	return pthread_join(pthreadId_, NULL); // 线程join失败，返回结果
+}
+
+void ThreadData::runInThread()
+{
+	*tid_ = tid();
+	tid_ = NULL;
+
+	try {
+		func_();
+	}
+	catch (const std::exception& ex)
+	{
+		fprintf(stderr, "reason: %s\n", ex.what());
+		abort();
+	}
+	catch (...)
+	{
+		throw;
+	}
 }

@@ -1,12 +1,13 @@
 #include"EventLoop.h"
-#include"logging.muduo\Logging.h"
+#include"logging.muduo/Logging.h"
+#include"thread.muduo/CurrentThread.h"
 
 #include<cassert>
 
 __thread EventLoop* t_loopInThisThread = 0;
 
 
-EventLoop::EventLoop():looping_(false),pid_()
+EventLoop::EventLoop():looping_(false),pid_(tid())
 {
 	if (t_loopInThisThread)
 	{
@@ -16,7 +17,7 @@ EventLoop::EventLoop():looping_(false),pid_()
 		t_loopInThisThread = this;
 }
 
-EventLoop::EventLoop()
+EventLoop::~EventLoop()
 {
 	assert(!looping_);
 	t_loopInThisThread = 0;

@@ -27,21 +27,33 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="common\AppendFile.h" />
     <ClInclude Include="common\FixedBuffer.h" />
+    <ClInclude Include="common\MutexLock.h" />
     <ClInclude Include="common\noncopyable.h" />
     <ClInclude Include="dummy.h" />
+    <ClInclude Include="logging.muduo\LogFile.h" />
     <ClInclude Include="logging.muduo\Logging.h" />
     <ClInclude Include="logging.muduo\LogStream.h" />
+    <ClInclude Include="port\port.h" />
+    <ClInclude Include="port\port_posix.h" />
+    <ClInclude Include="reactor.muduo\EventLoop.h" />
+    <ClInclude Include="thread.muduo\CurrentThread.h" />
     <ClInclude Include="thread.muduo\tests\__thread__test\ThreadObject.h" />
     <ClInclude Include="thread.muduo\Thread.h" />
     <ClInclude Include="thread.muduo\thread_util.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="common\AppendFile.cpp" />
     <ClCompile Include="dummy.cpp" />
+    <ClCompile Include="logging.muduo\LogFile.cpp" />
     <ClCompile Include="logging.muduo\Logging.cpp" />
     <ClCompile Include="logging.muduo\LogStream.cpp" />
+    <ClCompile Include="port\port_posix.cpp" />
+    <ClCompile Include="reactor.muduo\EventLoop.cpp" />
+    <ClCompile Include="reactor.muduo\EventLoop_test.cpp" />
+    <ClCompile Include="thread.muduo\CurrentThread.cpp" />
     <ClCompile Include="thread.muduo\tests\__thread__test\ThreadObject.cpp" />
-    <ClCompile Include="thread.muduo\tests\__thread__test\__thread_test.cpp" />
     <ClCompile Include="thread.muduo\Thread.cpp" />
     <ClCompile Include="thread.muduo\thread_util.cpp" />
   </ItemGroup>
@@ -80,7 +92,7 @@
   <ImportGroup Label="PropertySheets" />
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>$(IncludePath);$(ISenseIncludePath);D:\WorkSpace\vs_workspace\practice\stuffL;D:\WorkSpace\linux_usr_include\include</IncludePath>
+    <IncludePath>$(IncludePath);$(ISenseIncludePath);D:\WorkSpace\vs_workspace\practice\stuffL;D:\WorkSpace\linux_usr_include\include;D:\Programs\Microsoft Visual Studio\2017\Community\Common7\IDE\VC\Linux\include\usr\include</IncludePath>
     <SourcePath>D:\WorkSpace\vs_workspace\practice\stuffL\thread.muduo;$(SourcePath)</SourcePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">

@@ -39,24 +39,7 @@ public:
 	explicit ThreadData(ThreadFunc func, pid_t* tid) :func_(func), tid_(tid) {}
 	~ThreadData() {}
 
-	void runInThread()
-	{
-		*tid_ = gettid();
-		tid_ = NULL;
-
-		try {
-			func_();
-		}
-		catch (const std::exception& ex)
-		{
-			fprintf(stderr, "reason: %s\n", ex.what());
-			abort();
-		}
-		catch (...)
-		{
-			throw;
-		}
-	}
+	void runInThread();
 
 	friend class Thread;
 
