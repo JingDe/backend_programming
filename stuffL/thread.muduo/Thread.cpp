@@ -1,11 +1,13 @@
 #include"Thread.h"
-#include"logging.muduo/logging.h"
+#include"logging.muduo/Logging.h"
 
 #include<string>
 #include<cassert>
 #include<functional>
 #include<sys/types.h>
 #include<unistd.h>
+
+#include <pthread.h>
 
 void* startThread(void* arg)
 {
@@ -19,9 +21,15 @@ void* startThread(void* arg)
 
 
 Thread::Thread(const ThreadFunc&func) :
-	func_(func)
+	func_(func), started_(false), joined_(false)
 {
 	// 计算tid_
+}
+
+Thread::~Thread()
+{
+	if (started_ && !joined_)
+		pthread_detach(pthreadId_); // detach线程：当detach线程终止时，资源自动释放给系统，不需要另一个线程join它
 }
 
 void Thread::start()

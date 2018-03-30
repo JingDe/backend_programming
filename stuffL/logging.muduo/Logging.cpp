@@ -1,5 +1,6 @@
-#include"logging.muduo/logging.h"
+#include"logging.muduo/Logging.h"
 //#include"port/port.h"
+#include"thread.muduo/thread_util.h"
 
 #include<iostream>
 #include<cstdio>
@@ -46,7 +47,7 @@ template<int N>
 Logger::SourceFile::SourceFile(const char (&arr)[N])
 	:filename_(arr), length_(N-1)
 {
-	const char* slash = strrchr(name, '/');
+	const char* slash = strrchr(arr, '/');
 	if (slash)
 	{
 		filename_ = slash + 1;
@@ -88,7 +89,7 @@ Logger::Logger(SourceFile file, int line, LOG_LEVEL level)
 	:file_(file),line_(line),level_(level)
 {
 	// 日志格式：时间、线程id、日志级别、文件名、行号、日志信息
-	logStream_ << formatTime()<<' ' << port::getThreadID()<<' ' << levelStr[level_]<<' '<<file_.fileName() <<' '<<line_<<' ';
+	logStream_ << formatTime()<<' ' << static_cast<int>(gettid()) <<' ' << levelStr[level_]<<' '<<file_.fileName() <<' '<<line_<<' ';
 }
 
 Logger::~Logger()

@@ -20,6 +20,8 @@ int main()
 
 	// 线程1创建线程对象
 	Thread thread(threadFunc);
+	thread.start();
+	thread.join();
 
 
 	return 0;
