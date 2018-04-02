@@ -7,11 +7,19 @@
 class EventLoop
 {
 public:
+
+	static EventLoop* getEventLoopOfCurrentThread();
 	EventLoop();
 	~EventLoop();
 
+	void loop();
+	void quit();
+
 private:
+	void AssertInLoopThread();
+
 	bool looping_;
+	bool quit_;
 	const pid_t pid_;
 };
 

@@ -15,7 +15,7 @@ LogFile::LogFile(const std::string& basename, size_t rollsize, bool threadSafe, 
 
 LogFile::~LogFile()
 {
-	// std::unique_ptr<AppendFile> file_; // 自动关闭
+	// std::unique_ptr<AppendFile> file_; // 自动fflush、fclose
 }
 
 void LogFile::append(const char* buf, int len)

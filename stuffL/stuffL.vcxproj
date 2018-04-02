@@ -38,6 +38,7 @@
     <ClInclude Include="port\port.h" />
     <ClInclude Include="port\port_posix.h" />
     <ClInclude Include="reactor.muduo\EventLoop.h" />
+    <ClInclude Include="test.leveldb\testharness.h" />
     <ClInclude Include="thread.muduo\CurrentThread.h" />
     <ClInclude Include="thread.muduo\tests\__thread__test\ThreadObject.h" />
     <ClInclude Include="thread.muduo\Thread.h" />
@@ -52,6 +53,7 @@
     <ClCompile Include="port\port_posix.cpp" />
     <ClCompile Include="reactor.muduo\EventLoop.cpp" />
     <ClCompile Include="reactor.muduo\EventLoop_test.cpp" />
+    <ClCompile Include="test.leveldb\testharness.cpp" />
     <ClCompile Include="thread.muduo\CurrentThread.cpp" />
     <ClCompile Include="thread.muduo\tests\__thread__test\ThreadObject.cpp" />
     <ClCompile Include="thread.muduo\Thread.cpp" />

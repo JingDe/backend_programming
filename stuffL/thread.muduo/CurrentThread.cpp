@@ -1,7 +1,7 @@
 #include"CurrentThread.h"
+#include"thread_util.h"
 
-
-pid_t t_cachedPid=0;
+__thread pid_t t_cachedPid=0;
 
 void cacheTid()
 {
