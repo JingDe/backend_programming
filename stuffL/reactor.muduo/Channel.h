@@ -17,12 +17,20 @@ public:
 
 	void tie(const std::shared_ptr<void>& obj);
 	void set_revents(int revt) { revents_ = revt; }
+	void set_index(int index) { index_ = index;  }
+
 	void handleEvent(time_t receiveTime);
 
 	void update();
 	void enableReading() { events_ |= kReadEvent; update(); }
 	void enableWriting() { events_ |= kWriteEvent; update(); }
 
+	bool isNoneEvent() const { return events_ == kNoneEvent;  }
+
+	int fd() const { return fd_;  }
+	int index() const { return index_;  }
+	int events() const { return events_;  }
+	int revents() const { return revents_;  }
 	EventLoop* ownerLoop() { return loop_;  }
 
 private:
@@ -31,6 +39,8 @@ private:
 	const int fd_; // Channel管理的文件描述符
 	int events_; // 关心的事件
 	int revents_; // epoll或poll接受的事件
+
+	int index_;
 
 	EventLoop* loop_;
 	bool tied_;

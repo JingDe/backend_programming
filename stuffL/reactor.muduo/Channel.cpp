@@ -12,7 +12,7 @@ const int Channel::kWriteEvent = POLLOUT;
 const int Channel::kNoneEvent = 0;
 
 Channel::Channel(int fd, EventLoop* loop) 
-	:fd_(fd), loop_(loop), tied_(false), eventHandling_(false),events_(0),revents_(0)
+	:fd_(fd), index_(-1),loop_(loop), tied_(false), eventHandling_(false),events_(0),revents_(0)
 {}
 
 Channel::~Channel()

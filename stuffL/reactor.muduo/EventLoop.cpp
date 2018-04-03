@@ -34,7 +34,7 @@ EventLoop::~EventLoop()
 void EventLoop::loop()
 {
 	assert(!looping_);
-	AssertInLoopThread();
+	assertInLoopThread();
 	looping_ = true;
 
 	quit_ = false;
@@ -55,7 +55,7 @@ void EventLoop::quit()
 
 }
 
-void EventLoop::AssertInLoopThread()
+void EventLoop::assertInLoopThread()
 {
 	pid_t callerId = tid(); // Îªcaller¼ÆËãpid_t
 	if (callerId != pid_)
@@ -63,13 +63,12 @@ void EventLoop::AssertInLoopThread()
 		LOG_FATAL << "AssertInLoopThread failed: EventLoop "<<this<<" was created in "<<pid_<<" , current thread id = "<< callerId;
 		return;
 	}
-
-
+	
 }
 
 void EventLoop::updateChannel(Channel* c)
 {
 	assert(c->ownerLoop() == this);
-	AssertInLoopThread();
+	assertInLoopThread();
 	poller_->updateChannel(c);
 }

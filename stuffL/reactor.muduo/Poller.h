@@ -17,6 +17,8 @@ public:
 	virtual void updateChannel(Channel*) = 0;
 	virtual time_t poll(int timeoutMs, ChannelList* activeChannels) = 0;
 
+	void assertInLoopThread() const;
+
 private:
 	EventLoop * ownerLoop_;
 

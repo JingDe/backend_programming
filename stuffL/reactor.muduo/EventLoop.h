@@ -2,6 +2,7 @@
 #define EVENTLOOP_H_
 
 #include<sys/types.h>
+#include<memory>
 
 class Channel;
 class Poller;
@@ -17,10 +18,11 @@ public:
 	void loop();
 	void quit();
 
+	void assertInLoopThread();
+
 	void updateChannel(Channel* c);
 
-private:
-	void AssertInLoopThread();
+private:	
 
 	bool looping_;
 	bool quit_;
