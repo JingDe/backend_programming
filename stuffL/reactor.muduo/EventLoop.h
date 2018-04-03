@@ -3,6 +3,7 @@
 
 #include<sys/types.h>
 #include<memory>
+#include<vector>
 
 class Channel;
 class Poller;
@@ -23,12 +24,21 @@ public:
 	void updateChannel(Channel* c);
 
 private:	
+	void printActiveChannels() const;
+	void doPendingFunctors();
 
 	bool looping_;
 	bool quit_;
 	const pid_t pid_;
 
 	std::auto_ptr<Poller> poller_;
+
+	typedef std::vector<Channel*> ChannelList;
+	ChannelList activeChannels_;
+
+	Channel* currentActiveChannel_;
+
+	time_t pollReturnTime_;
 };
 
 #endif

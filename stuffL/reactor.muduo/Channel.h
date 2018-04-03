@@ -10,9 +10,9 @@ class EventLoop;
 class Channel {
 public:
 	typedef std::function<void()> EventCallback;
-	typedef std::function<void(time_t)> ReadCallback;
+	typedef std::function<void(time_t)> ReadEventCallback;
 
-	Channel(int fd, EventLoop* loop) :fd_(fd),loop_(loop),tied_(false), eventHandling_(false){}
+	Channel(EventLoop* loop, int fd);
 	~Channel();
 
 	void tie(const std::shared_ptr<void>& obj);
@@ -33,6 +33,8 @@ public:
 	int revents() const { return revents_;  }
 	EventLoop* ownerLoop() { return loop_;  }
 
+	void setReadCallback(ReadEventCallback cb) { readCallback_ = cb;  }
+
 private:
 	void handleEventWithGuard(time_t receiveTime);
 
@@ -48,7 +50,7 @@ private:
 	bool eventHandling_;
 	EventCallback closeCallback_;
 	EventCallback errorCallback_;
-	ReadCallback readCallback_;
+	ReadEventCallback readCallback_;
 	EventCallback writeCallback_;
 
 	static const int kReadEvent;

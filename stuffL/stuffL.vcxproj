@@ -37,7 +37,10 @@
     <ClInclude Include="logging.muduo\LogStream.h" />
     <ClInclude Include="port\port.h" />
     <ClInclude Include="port\port_posix.h" />
+    <ClInclude Include="reactor.muduo\Channel.h" />
     <ClInclude Include="reactor.muduo\EventLoop.h" />
+    <ClInclude Include="reactor.muduo\Poller.h" />
+    <ClInclude Include="reactor.muduo\PollPoller.h" />
     <ClInclude Include="test.leveldb\testharness.h" />
     <ClInclude Include="thread.muduo\CurrentThread.h" />
     <ClInclude Include="thread.muduo\tests\__thread__test\ThreadObject.h" />
@@ -51,8 +54,13 @@
     <ClCompile Include="logging.muduo\Logging.cpp" />
     <ClCompile Include="logging.muduo\LogStream.cpp" />
     <ClCompile Include="port\port_posix.cpp" />
+    <ClCompile Include="reactor.muduo\Channel.cpp" />
+    <ClCompile Include="reactor.muduo\Channel_test.cpp" />
+    <ClCompile Include="reactor.muduo\DefaultPoller.cpp" />
     <ClCompile Include="reactor.muduo\EventLoop.cpp" />
-    <ClCompile Include="reactor.muduo\EventLoop_test.cpp" />
+    <ClCompile Include="reactor.muduo\Poller.cpp" />
+    <ClCompile Include="reactor.muduo\PollPoller.cpp" />
+    <ClCompile Include="reactor.muduo\reactor_test1.cpp" />
     <ClCompile Include="test.leveldb\testharness.cpp" />
     <ClCompile Include="thread.muduo\CurrentThread.cpp" />
     <ClCompile Include="thread.muduo\tests\__thread__test\ThreadObject.cpp" />

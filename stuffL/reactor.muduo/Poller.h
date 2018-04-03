@@ -11,6 +11,8 @@ class Poller {
 public:
 	typedef std::vector<Channel*> ChannelList;
 
+	static Poller* newDefaultPoller(EventLoop*);
+
 	Poller(EventLoop* loop);
 	virtual ~Poller();
 

@@ -11,11 +11,18 @@
 
 __thread EventLoop* t_loopInThisThread = 0;
 
+const int kPollTimeMs = 10000; // poll×èÈûÊ±¼ä10Ãë
+
 EventLoop* EventLoop::getEventLoopOfCurrentThread()
 {
 	return t_loopInThisThread;
 }
-EventLoop::EventLoop():looping_(false),quit_(false),pid_(tid())
+
+
+EventLoop::EventLoop()
+	:looping_(false),quit_(false),pid_(tid()),
+	poller_(Poller::newDefaultPoller(this)),
+	currentActiveChannel_(NULL)
 {
 	if (t_loopInThisThread)
 	{
@@ -40,11 +47,22 @@ void EventLoop::loop()
 	quit_ = false;
 	LOG_INFO << "EventLoop " << this << " start looping";
 
-	poll(NULL, 0, 5 * 1000); // ×èÈû5000ºÁÃë
-	/*while (quit_ == false)
+	//poll(NULL, 0, 5 * 1000); // ×èÈû5000ºÁÃë
+	while (quit_ == false)
 	{
+		activeChannels_.clear();
+		pollReturnTime_=poller_->poll(kPollTimeMs, &activeChannels_);
+		if (Logger::logLevel() <= Logger::INFO)
+			printActiveChannels();
 
-	}*/
+		for (ChannelList::iterator it = activeChannels_.begin(); it != activeChannels_.end(); it++)
+		{
+			currentActiveChannel_ = *it;
+			currentActiveChannel_->handleEvent(pollReturnTime_);
+		}
+		currentActiveChannel_ = NULL;
+		doPendingFunctors();
+	}
 	LOG_INFO << "EventLoop " << this << " stop looping";
 	looping_ = false;
 }
@@ -71,4 +89,14 @@ void EventLoop::updateChannel(Channel* c)
 	assert(c->ownerLoop() == this);
 	assertInLoopThread();
 	poller_->updateChannel(c);
+}
+
+void EventLoop::printActiveChannels() const 
+{
+
+}
+
+void EventLoop::doPendingFunctors()
+{
+
 }

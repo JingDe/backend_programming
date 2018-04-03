@@ -26,7 +26,7 @@ namespace {
 		time_t t = time(NULL);
 		struct tm* lt = localtime(&t);
 		char buf[256];
-		int len=snprintf(buf, sizeof buf, "%4d%02d%02d_%02d:%02d:%2d", lt->tm_year + 1900, lt->tm_mon + 1, lt->tm_mday, lt->tm_hour, lt->tm_min, lt->tm_sec);
+		int len=snprintf(buf, sizeof buf, "%4d%02d%02d_%02d:%02d:%02d", lt->tm_year + 1900, lt->tm_mon + 1, lt->tm_mday, lt->tm_hour, lt->tm_min, lt->tm_sec);
 		assert(len == 17);
 		return std::string(buf, len);
 	}
@@ -58,16 +58,12 @@ Logger::SourceFile::SourceFile(const char (&arr)[N])
 Logger::LOG_LEVEL initLogLevel()
 {
 	// 根据环境变量设置
-#if defined(POSIX)
-	Logger::LogLevel initLogLevel()
-	{
-		if (::getenv("MUDUO_LOG_TRACE"))
-			return Logger::TRACE;
-		else if (::getenv("MUDUO_LOG_DEBUG"))
+#if defined(__GNUG__)
+	
+		if (::getenv("MUDUO_LOG_DEBUG"))
 			return Logger::DEBUG;
 		else
 			return Logger::INFO;
-	}
 #endif
 
 	return Logger::DEBUG;

@@ -126,6 +126,7 @@ void PollPoller::removeChannel(Channel* channel)
 		iter_swap(pollfds_.begin() + idx, pollfds_.end() - 1); // 交换两个迭代器指向的值
 		if (channelAtEnd < 0)
 			channelAtEnd = -channelAtEnd - 1;
-
+		channels_[channelAtEnd]->set_index(idx); // ???
+		pollfds_.pop_back();
 	}
 }

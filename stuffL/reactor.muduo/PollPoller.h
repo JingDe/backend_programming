@@ -3,7 +3,7 @@
 
 #include"Poller.h"
 
-class PollPoller : Poller {
+class PollPoller : public Poller {
 public:
 	PollPoller(EventLoop* loop);
 	virtual ~PollPoller();

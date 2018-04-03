@@ -13,3 +13,4 @@ void Poller::assertInLoopThread() const
 {
 	ownerLoop_->assertInLoopThread();
 }
+
