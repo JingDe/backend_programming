@@ -38,6 +38,7 @@
     <ClInclude Include="port\port.h" />
     <ClInclude Include="port\port_posix.h" />
     <ClInclude Include="reactor.muduo\Channel.h" />
+    <ClInclude Include="reactor.muduo\EPollPoller.h" />
     <ClInclude Include="reactor.muduo\EventLoop.h" />
     <ClInclude Include="reactor.muduo\Poller.h" />
     <ClInclude Include="reactor.muduo\PollPoller.h" />
@@ -57,6 +58,7 @@
     <ClCompile Include="reactor.muduo\Channel.cpp" />
     <ClCompile Include="reactor.muduo\Channel_test.cpp" />
     <ClCompile Include="reactor.muduo\DefaultPoller.cpp" />
+    <ClCompile Include="reactor.muduo\EPollPoller.cpp" />
     <ClCompile Include="reactor.muduo\EventLoop.cpp" />
     <ClCompile Include="reactor.muduo\Poller.cpp" />
     <ClCompile Include="reactor.muduo\PollPoller.cpp" />
@@ -105,12 +107,21 @@
     <IncludePath>$(IncludePath);$(ISenseIncludePath);D:\WorkSpace\vs_workspace\practice\stuffL;D:\WorkSpace\linux_usr_include\include;D:\Programs\Microsoft Visual Studio\2017\Community\Common7\IDE\VC\Linux\include\usr\include</IncludePath>
     <SourcePath>D:\WorkSpace\vs_workspace\practice\stuffL\thread.muduo;$(SourcePath)</SourcePath>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <IncludePath>$(IncludePath);$(ISenseIncludePath);D:\WorkSpace\vs_workspace\practice\stuffL;D:\WorkSpace\linux_usr_include\include</IncludePath>
+    <SourcePath>D:\WorkSpace\vs_workspace\practice\stuffL\thread.muduo</SourcePath>
+  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <AdditionalIncludeDirectories>$(StlIncludeDirectories);%(AdditionalIncludeDirectories);D:\WorkSpace\vs_workspace\practice\stuffL;/home/norah/projects/stuffL</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>
       </PreprocessorDefinitions>
     </ClCompile>
+    <Link>
+      <LibraryDependencies>pthread</LibraryDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Link>
       <LibraryDependencies>pthread</LibraryDependencies>
     </Link>
