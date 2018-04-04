@@ -3,6 +3,7 @@
 
 #include<ctime>
 #include<memory>
+#include<string>
 
 class EventLoop;
 
@@ -33,16 +34,21 @@ public:
 	int revents() const { return revents_;  }
 	EventLoop* ownerLoop() { return loop_;  }
 
+	std::string eventsToString() const;
+	std::string reventsToString() const;
+
 	void setReadCallback(ReadEventCallback cb) { readCallback_ = cb;  }
 
 private:
 	void handleEventWithGuard(time_t receiveTime);
+	std::string eventsToString(int fd, int ev) const;
 
 	const int fd_; // Channel管理的文件描述符
 	int events_; // 关心的事件
 	int revents_; // epoll或poll接受的事件
 
-	int index_;
+	int index_; // 在PollPoller类中表示该Channel在PollPoller类pollfd_中的下标
+				// 在EPollPoller类中表示kNew kAdded kDeleted
 
 	EventLoop* loop_;
 	bool tied_;

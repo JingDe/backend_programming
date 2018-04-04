@@ -2,6 +2,8 @@
 #include"logging.muduo/Logging.h"
 #include"EventLoop.h"
 
+#include<sstream>
+
 #include"poll.h"
 
 
@@ -71,4 +73,35 @@ void Channel::handleEventWithGuard(time_t receiveTime)
 void Channel::update()
 {
 	loop_->updateChannel(this);
+}
+
+std::string Channel::eventsToString() const
+{
+	return eventsToString(fd_, events_);
+}
+
+std::string Channel::reventsToString() const
+{
+	return eventsToString(fd_, revents_);
+}
+
+std::string Channel::eventsToString(int fd, int ev) const
+{
+	std::ostringstream oss;
+	oss << fd << ": ";
+	if (ev  &  POLLIN)
+		oss << "IN ";
+	if (ev  &  POLLPRI)
+		oss << "PRI ";
+	if (ev  &  POLLOUT)
+		oss << "OUT ";
+	if (ev  &  POLLHUP)
+		oss << "HUP ";
+	if (ev  &  POLLRDHUP)
+		oss << "RDHUP";
+	if (ev  &  POLLERR)
+		oss << "ERR ";
+	if (ev  &  POLLNVAL)
+		oss << "NVAL ";
+	return oss.str().c_str();
 }

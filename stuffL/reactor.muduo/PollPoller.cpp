@@ -65,7 +65,7 @@ void PollPoller::updateChannel(Channel* c)
 	Poller::assertInLoopThread();
 	int fd = c->fd();
 	LOG_INFO << "fd = " << fd << " events = " << c->events();
-	//ChannelMap::const_iterator it = channels_.find(fd); // 使用index（channel在PollFdList中的下标）避免查找开销
+	//ChannelMap::const_iterator it = channels_.find(fd); // 使用index（channel在PollFdList pollfds_中的下标）避免查找开销
 	if(c->index()<0)	//if (it == channels_.end())
 	{
 		struct pollfd pfd;
@@ -76,7 +76,7 @@ void PollPoller::updateChannel(Channel* c)
 
 		c->set_index(pollfds_.size()-1);
 		//channels_.insert(std::make_pair(fd, c));
-		channels_[fd] = c; // 查找或插入
+		channels_[fd] = c; // 修改或插入
 	}
 	else
 	{
