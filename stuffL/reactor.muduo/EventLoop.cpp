@@ -91,6 +91,13 @@ void EventLoop::updateChannel(Channel* c)
 	poller_->updateChannel(c);
 }
 
+void EventLoop::removeChannel(Channel* c)
+{
+	assert(c->ownerLoop() == this);
+	assertInLoopThread();
+	poller_->removeChannel(c);
+}
+
 void EventLoop::printActiveChannels() const 
 {
 

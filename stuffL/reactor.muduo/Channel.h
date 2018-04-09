@@ -25,6 +25,7 @@ public:
 	void update();
 	void enableReading() { events_ |= kReadEvent; update(); }
 	void enableWriting() { events_ |= kWriteEvent; update(); }
+	void disableAll() { events_ = kNoneEvent; update(); }
 
 	bool isNoneEvent() const { return events_ == kNoneEvent;  }
 
@@ -38,6 +39,8 @@ public:
 	std::string reventsToString() const;
 
 	void setReadCallback(ReadEventCallback cb) { readCallback_ = cb;  }
+
+	void remove();
 
 private:
 	void handleEventWithGuard(time_t receiveTime);
@@ -58,6 +61,8 @@ private:
 	EventCallback errorCallback_;
 	ReadEventCallback readCallback_;
 	EventCallback writeCallback_;
+
+	bool addedToLoop_;
 
 	static const int kReadEvent; // 输入事件 POLLIN |  POLLPRI
 	static const int kWriteEvent; // 输出事件 POLLOUT

@@ -28,6 +28,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="common\AppendFile.h" />
+    <ClInclude Include="common\atomic_pointer.h" />
     <ClInclude Include="common\FixedBuffer.h" />
     <ClInclude Include="common\MutexLock.h" />
     <ClInclude Include="common\noncopyable.h" />
@@ -47,6 +48,10 @@
     <ClInclude Include="thread.muduo\tests\__thread__test\ThreadObject.h" />
     <ClInclude Include="thread.muduo\Thread.h" />
     <ClInclude Include="thread.muduo\thread_util.h" />
+    <ClInclude Include="TimerQueue.muduo\AtomicPointer_temp.h" />
+    <ClInclude Include="TimerQueue.muduo\Timer.h" />
+    <ClInclude Include="TimerQueue.muduo\TimerId.h" />
+    <ClInclude Include="TimerQueue.muduo\TimerQueue.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="common\AppendFile.cpp" />
@@ -62,12 +67,14 @@
     <ClCompile Include="reactor.muduo\EventLoop.cpp" />
     <ClCompile Include="reactor.muduo\Poller.cpp" />
     <ClCompile Include="reactor.muduo\PollPoller.cpp" />
-    <ClCompile Include="reactor.muduo\reactor_test1.cpp" />
     <ClCompile Include="test.leveldb\testharness.cpp" />
     <ClCompile Include="thread.muduo\CurrentThread.cpp" />
     <ClCompile Include="thread.muduo\tests\__thread__test\ThreadObject.cpp" />
     <ClCompile Include="thread.muduo\Thread.cpp" />
     <ClCompile Include="thread.muduo\thread_util.cpp" />
+    <ClCompile Include="TimerQueue.muduo\Timer.cpp" />
+    <ClCompile Include="TimerQueue.muduo\TimerQueue.cpp" />
+    <ClCompile Include="TimerQueue.muduo\TimerQueue_unittest.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{660eee2d-b659-4df6-90ac-19693a654a9c}</ProjectGuid>

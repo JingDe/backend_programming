@@ -22,6 +22,7 @@ public:
 	void assertInLoopThread();
 
 	void updateChannel(Channel* c);
+	void removeChannel(Channel* c);
 
 private:	
 	void printActiveChannels() const;

@@ -3,6 +3,7 @@
 #include"EventLoop.h"
 
 #include<sstream>
+#include<cassert>
 
 #include"poll.h"
 
@@ -14,12 +15,12 @@ const int Channel::kWriteEvent = POLLOUT;
 const int Channel::kNoneEvent = 0;
 
 Channel::Channel(EventLoop* loop, int fd) 
-	:fd_(fd), index_(-1),loop_(loop), tied_(false), eventHandling_(false),events_(0),revents_(0)
+	:fd_(fd), index_(-1),loop_(loop), tied_(false), eventHandling_(false),events_(0),revents_(0),addedToLoop_(false)
 {}
 
 Channel::~Channel()
 {
-
+	assert(!addedToLoop_);
 }
 
 // handleEvent()在回调用户onClose函数时，有可能析构Channel对象自身
@@ -46,7 +47,7 @@ void Channel::handleEvent(time_t receiveTime)
 void Channel::handleEventWithGuard(time_t receiveTime)
 {
 	eventHandling_ = true;
-	if ((revents_ & POLLHUP) && !(revents_ & POLLIN)) // socket正常关闭关闭返回POLLHUP，连接异常断开返回POLLIN，read返回0??
+	if ((revents_ & POLLHUP) && !(revents_ & POLLIN)) // socket正常关闭返回POLLHUP，连接异常断开返回POLLI并且read返回0??
 	{
 		LOG_WARN << "fd = " << fd_ << " Channel::handle_event() POLLHUP";
 		if (closeCallback_)
@@ -72,7 +73,15 @@ void Channel::handleEventWithGuard(time_t receiveTime)
 
 void Channel::update()
 {
+	addedToLoop_ = true;
 	loop_->updateChannel(this);
+}
+
+void Channel::remove()
+{
+	assert(isNoneEvent());
+	addedToLoop_ = false;
+	loop_->removeChannel();
 }
 
 std::string Channel::eventsToString() const
@@ -105,3 +114,4 @@ std::string Channel::eventsToString(int fd, int ev) const
 		oss << "NVAL ";
 	return oss.str().c_str();
 }
+
