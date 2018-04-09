@@ -59,9 +59,9 @@ private:
 	ReadEventCallback readCallback_;
 	EventCallback writeCallback_;
 
-	static const int kReadEvent;
-	static const int kWriteEvent;
-	static const int kNoneEvent;
+	static const int kReadEvent; // 输入事件 POLLIN |  POLLPRI
+	static const int kWriteEvent; // 输出事件 POLLOUT
+	static const int kNoneEvent; // 0
 };
 
 /*

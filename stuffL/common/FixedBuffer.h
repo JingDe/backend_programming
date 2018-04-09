@@ -24,7 +24,10 @@ public:
 	bool full() { return cur_ == end(); }
 
 	int length() const { return static_cast<int>(cur_ - data_); }
-	int available() const { return sizeof(data_) - length(); }
+	int available() const { 
+		// return static_cast<int>(sizeof(data_)) - length(); 
+		return static_cast<int>(end()-data_);
+	}
 
 	const char* data() const { return data_;  }
 	char* current() { return cur_; }

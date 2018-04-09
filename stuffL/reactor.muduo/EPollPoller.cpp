@@ -10,16 +10,16 @@
 #include<sys/epoll.h>
 
 // 执行编译期断言，同BOOST_STATIC_ASSERT
-static_assert(EPOLLIN == POLLIN);
-static_assert(EPOLLPRI == POLLPRI);
-static_assert(EPOLLOUT == POLLOUT);
-static_assert(EPOLLRDHUP == POLLRDHUP);
-static_assert(EPOLLERR == POLLERR);
-static_assert(EPOLLHUP == POLLHUP);
+static_assert((EPOLLIN == POLLIN), "EPOLL != POLLIN");
+static_assert((EPOLLPRI == POLLPRI), "EPOLLPRI != POLLPRI");
+static_assert((EPOLLOUT == POLLOUT), "EPOLLOUT != POLLOUT");
+static_assert((EPOLLRDHUP == POLLRDHUP), "EPOLLRDHUP != POLLRDHUP");
+static_assert((EPOLLERR == POLLERR), "EPOLLERR != POLLERR");
+static_assert((EPOLLHUP == POLLHUP), "EPOLLHUP != POLLHUP");
 
-const int kNew = -1;
-const int kAdded = 1;
-const int kDeleted = 2;
+const int kNew = -1; // 新创建的channel，不存在channelMap中，未添加到epollfd_中过
+const int kAdded = 1; // 已添加到epollfd_中，在channelMap中
+const int kDeleted = 2; // 从epollfd_中删除了，在channelMap中
 
 
 EPollPoller::EPollPoller(EventLoop* loop) 
@@ -110,24 +110,38 @@ void EPollPoller::fillActiveChannels(int numEvents, ChannelList* activeChannels)
 void EPollPoller::updateChannel(Channel* channel)
 {
 	Poller::assertInLoopThread();
-	const int index = channel->index(); // Channel的index表示
+	const int index = channel->index(); // Channel的index表示状态：kNew/kDeleted/kAdded
 	LOG_INFO << "fd = " << channel->fd();
-	if (index == kNew || index == kDeleted)
+	if (index == kNew || index == kDeleted) // kNew或kDeleted的channel不存在epollfd_中，使用EPOLL_CTL_ADD添加
 	{
 		int fd = channel->fd();
 		if (index == kNew)
 		{
 			assert(channels_.find(fd) == channels_.end());
-			channels_[fd] = channel;
+			channels_[fd] = channel; // 添加新channel
 		}
 		else
 		{
 			assert(channels_.find(fd) != channels_.end());
-			assert(channels_[fd] == channel);
+			assert(channels_[fd] == channel); // channel map里已有kDeleted的channel
 		}
 
-		channel->set_index(kAdded);
+		channel->set_index(kAdded); // 更新channel的状态
 		update(EPOLL_CTL_ADD, channel);
+	}
+	else // kAdded的channel存在epollfd_中，使用EPOLL_CTL_MOD或EPOLL_CTL_DEL修改或删除
+	{
+		int fd = channel->fd();
+		assert(channels_.find(fd) != channels_.end());
+		assert(channels_[fd] = channel);
+		assert(index == kAdded);
+		if (channel->isNoneEvent())
+		{
+			update(EPOLL_CTL_DEL, channel);
+			channel->set_index(kDeleted);
+		}
+		else
+			update(EPOLL_CTL_MOD, channel);
 	}
 }
 
@@ -143,9 +157,13 @@ void EPollPoller::update(int operation, Channel* channel)
 	if (epoll_ctl(epollfd_, operation, fd, &event) < 0)
 	{
 		if (operation == EPOLL_CTL_DEL)
+		{
 			LOG_ERROR << "epoll_ctl op=" << operationToString(operation);
+		}
 		else
+		{
 			LOG_FATAL << "epoll_ctl op=" << operationToString(operation);
+		}
 	}
 }
 
@@ -155,6 +173,7 @@ int epoll_ctl(int epfd, int op, int fd, struct epoll_event* event);
 
 
 // 返回一个值同初始化一个变量或形参的方式一样：返回的值用于初始化调用点的一个临时量
+// 在字符串常量区创建字符串，返回该字符串的地址，函数调用点获得该地址
 const char* EPollPoller::operationToString(int op)
 {
 	switch (op)
@@ -169,4 +188,22 @@ const char* EPollPoller::operationToString(int op)
 		//assert(false && "ERROR op");
 		return "Unknown Operation";
 	}
+}
+
+void EPollPoller::removeChannel(Channel* channel)
+{
+	Poller::assertInLoopThread();
+	int fd = channel->fd();
+	LOG_INFO << "fd = " << fd;
+	assert(channels_.find(fd) != channels_.end());
+	assert(channels_[fd] == channel);
+	assert(channel->isNoneEvent());
+	int index = channel->index();
+	assert(index == kAdded || index == kDeleted);
+	size_t n = channels_.erase(fd);
+	assert(n == 1);
+
+	if(index==kAdded)
+		update(EPOLL_CTL_DEL, channel);
+	channel->set_index(kNew);
 }
