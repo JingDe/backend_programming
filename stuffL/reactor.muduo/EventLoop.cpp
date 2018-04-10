@@ -6,7 +6,9 @@
 
 #include<cassert>
 
+#include<unistd.h>
 #include<poll.h>
+#include<sys/eventfd.h>
 
 #include"logging.muduo/Logging.h"
 #include"thread.muduo/CurrentThread.h"
@@ -26,19 +28,36 @@ inline time_t addTime(time_t t, long seconds)
 }
 
 
+/*
+int eventfd(unsigned int initval, int flags);
+创建一个文件描述符用来事件通知
+*/
+int createEventfd()
+{
+	int evtfd = eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
+	if (evtfd < 0)
+	{
+		LOG_FATAL << "Failed int eventfd";
+		abort();
+	}
+	return evtfd;
+}
+
 EventLoop* EventLoop::getEventLoopOfCurrentThread()
 {
 	return t_loopInThisThread;
 }
 
 EventLoop::EventLoop()
-	:looping_(false),
+	:pid_(tid()), 
+	looping_(false),
 	quit_(false),
-	pid_(tid()),
 	poller_(Poller::newDefaultPoller(this)),
+	currentActiveChannel_(NULL),
 	timerQueue_(new TimerQueue(this)),
-	callingPendingFunctors_(false),
-	currentActiveChannel_(NULL)
+	wakeupFd_(createEventfd()),
+	wakeupChannel_(new Channel(this, wakeupFd_)),
+	callingPendingFunctors_(false)
 {
 	if (t_loopInThisThread)
 	{
@@ -46,6 +65,10 @@ EventLoop::EventLoop()
 	}
 	else
 		t_loopInThisThread = this;
+
+	// wakeupFd_被注册到EventLoop的poller_中，其他线程调用wakeup往wakeupFd_写
+	wakeupChannel_->setReadCallback(std::bind(&EventLoop::handleRead, this));
+	wakeupChannel_->enableReading();
 }
 
 EventLoop::~EventLoop()
@@ -77,7 +100,8 @@ void EventLoop::loop()
 			currentActiveChannel_->handleEvent(pollReturnTime_);
 		}
 		currentActiveChannel_ = NULL;
-		doPendingFunctors();
+
+		doPendingFunctors(); // IO线程被其他线程唤醒执行函数
 	}
 	LOG_INFO << "EventLoop " << this << " stop looping";
 	looping_ = false;
@@ -86,14 +110,15 @@ void EventLoop::loop()
 void EventLoop::quit()
 {
 	quit_ = true;
-
+	if (!isInLoopThread())
+		wakeup();
 }
 
 void EventLoop::assertInLoopThread()
 {
 	if (!isInLoopThread())
 	{
-		LOG_FATAL << "AssertInLoopThread failed: EventLoop "<<this<<" was created in "<<pid_<<" , current thread id = "<< callerId;
+		LOG_FATAL << "AssertInLoopThread failed: EventLoop "<<this<<" was created in "<<pid_<<" , current thread id = "<< tid();
 		return;
 	}	
 }
@@ -119,7 +144,19 @@ void EventLoop::printActiveChannels() const
 
 void EventLoop::doPendingFunctors()
 {
+	std::vector<Functor> functors;
+	callingPendingFunctors_ = true; // 设置，以允许wakeup
 
+	{
+		MutexLock lock(mutex_);
+		functors.swap(pendingFunctors_); // 既缩小临界区，又放置functor调用queueInLoop()死锁
+	}
+
+	for (size_t i = 0; i < functors.size(); i++)
+	{
+		functors[i]();
+	}
+	callingPendingFunctors_ = false;
 }
 
 bool EventLoop::isInLoopThread()
@@ -146,7 +183,7 @@ void EventLoop::queueInLoop(const Functor& cb)
 		MutexLock lock(mutex_);
 		pendingFunctors_.push_back(cb);
 	}
-	if (!isInLoopThread() || callingPendingFunctors_)
+	if (!isInLoopThread() || callingPendingFunctors_) // 当不在IO线程，或者正在执行doPendingFunctors()函数时，需要唤醒IO线程
 		wakeup();
 }
 
@@ -164,5 +201,16 @@ TimerId EventLoop::runAfter(long delay, const TimerCallback& cb)
 
 void EventLoop::wakeup()
 {
+	uint64_t one = 1;
+	ssize_t n = write(wakeupFd_, &one, sizeof one);
+	if (n != sizeof one)
+		LOG_ERROR << "EventLoop::handleRead() writes "<<n<<" bytes instead of 8";
+}
 
+void EventLoop::handleRead()
+{
+	uint64_t one = 1;
+	ssize_t n = read(wakeupFd_, &one, sizeof one);
+	if (n != sizeof one)
+		LOG_ERROR << "EventLoop::handleRead() reads " << n << " bytes instead of 8";
 }

@@ -1,6 +1,8 @@
 #ifndef _ATOMICPOINTER_TEMP_H_
 #define _ATOMICPOINTER_TEMP_H_
 
+#include<cstdint>
+
 inline void MemoryBarrier() {
 	__asm__ __volatile__("" : : : "memory");
 }
@@ -29,7 +31,7 @@ public:
 	void* incrementAndGet() // ¼Ó1£¬·µ»Ørep_
 	{
 		MemoryBarrier();
-		void* result = reinterpret_cast<void*>(reinterpret_cast<int>(rep_)+1);
+		void* result = reinterpret_cast<void*>(reinterpret_cast<intptr_t>(rep_)+1);
 		//Release_Store(result);
 		MemoryBarrier();
 		rep_ = result;

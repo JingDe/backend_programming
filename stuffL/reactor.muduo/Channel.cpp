@@ -15,7 +15,14 @@ const int Channel::kWriteEvent = POLLOUT;
 const int Channel::kNoneEvent = 0;
 
 Channel::Channel(EventLoop* loop, int fd) 
-	:fd_(fd), index_(-1),loop_(loop), tied_(false), eventHandling_(false),events_(0),revents_(0),addedToLoop_(false)
+	:loop_(loop), 
+	fd_(fd), 
+	events_(0), 
+	revents_(0), 
+	index_(-1),
+	tied_(false), 
+	eventHandling_(false),
+	addedToLoop_(false)
 {}
 
 Channel::~Channel()
@@ -81,7 +88,7 @@ void Channel::remove()
 {
 	assert(isNoneEvent());
 	addedToLoop_ = false;
-	loop_->removeChannel();
+	loop_->removeChannel(this);
 }
 
 std::string Channel::eventsToString() const

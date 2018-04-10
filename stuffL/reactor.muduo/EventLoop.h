@@ -39,6 +39,7 @@ public:
 	TimerId runAt(const time_t& time, const TimerCallback& cb);
 
 	void wakeup();
+	void handleRead();
 
 private:	
 	void printActiveChannels() const;
@@ -59,7 +60,7 @@ private:
 	
 
 	std::unique_ptr<TimerQueue> timerQueue_; // 定时器
-	int wakeupFd_;
+	int wakeupFd_; // 其他线程用来唤醒IO线程，唤醒loop()的poll调用
 	std::unique_ptr<Channel> wakeupChannel_;
 
 	port::Mutex mutex_;

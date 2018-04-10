@@ -33,6 +33,15 @@ struct timespec howMuchTimeFromNow(time_t when)
 	return ts;
 }
 
+void readTimerfd(int timerfd, time_t now)
+{
+	uint64_t howmany;
+	ssize_t n = read(timerfd, &howmany, sizeof howmany);
+	LOG_INFO << "TimerQueue::handleRead() " << howmany << " at " << now;
+	if (n != sizeof howmany)
+		LOG_ERROR << "TimerQueue::handleRead() reads " << n << " bytes instead of 8";
+}
+
 /*
 struct itimerspec{
 	struct timespec it_iterval;
@@ -176,4 +185,45 @@ std::vector<TimerQueue::Entry> TimerQueue::getExpired(time_t now)
 	}
 	assert(timers_.size() == activeTimers_.size());
 	return expired_;
+}
+
+void TimerQueue::handleRead()
+{
+	loop_->assertInLoopThread();
+	time_t now = time(NULL);
+	readTimerfd(timerfd_, now); // ?? ÄÚºËÍùtimerfd_ÀïÐ´£¿£¿
+
+	//std::vector<Entry> expired = getExpired(now);
+	getExpired(now);
+
+	callingExpiredTimers_ = true;
+	cancelingTimers_.clear();
+	for (std::vector<Entry>::iterator it = expired_.begin(); it != expired_.end(); ++it)
+		it->second->run();
+	callingExpiredTimers_ = false;
+
+	reset(now);
+}
+
+void TimerQueue::reset(time_t now)
+{
+	time_t nextExpire;
+
+	for (std::vector<Entry>::const_iterator it = expired_.begin(); it != expired_.end(); ++it)
+	{
+		ActiveTimer timer(it->second, it->second->sequence());
+		if (it->second->repeat() && cancelingTimers_.find(timer) == cancelingTimers_.end())
+		{
+			it->second->restart(now);
+			insert(it->second);
+		}
+		else
+			delete it->second;
+	}
+
+	if (!timers_.empty())
+		nextExpire = timers_.begin()->second->expiration();
+	
+	if(nextExpire>0)
+		resetTimerfd(timerfd_, nextExpire);
 }

@@ -46,6 +46,8 @@ private:
 	void handleEventWithGuard(time_t receiveTime);
 	std::string eventsToString(int fd, int ev) const;
 
+	EventLoop* loop_;
+
 	const int fd_; // Channel管理的文件描述符
 	int events_; // 关心的事件
 	int revents_; // epoll或poll接受的事件
@@ -53,16 +55,19 @@ private:
 	int index_; // 在PollPoller类中表示该Channel在PollPoller类pollfd_中的下标
 				// 在EPollPoller类中表示kNew kAdded kDeleted
 
-	EventLoop* loop_;
+	
 	bool tied_;
 	std::weak_ptr<void> tie_;
+
 	bool eventHandling_;
-	EventCallback closeCallback_;
-	EventCallback errorCallback_;
-	ReadEventCallback readCallback_;
-	EventCallback writeCallback_;
 
 	bool addedToLoop_;
+
+	ReadEventCallback readCallback_;
+	EventCallback writeCallback_;
+	EventCallback closeCallback_;
+	EventCallback errorCallback_;
+	
 
 	static const int kReadEvent; // 输入事件 POLLIN |  POLLPRI
 	static const int kWriteEvent; // 输出事件 POLLOUT

@@ -22,8 +22,6 @@ public:
 
 	void cancel(TimerId timerId);
 
-	void handleRead();
-
 private:
 	typedef std::pair<time_t, Timer*> Entry; // TODO: unique_ptr
 	typedef std::set<Entry> TimerList;
@@ -35,6 +33,9 @@ private:
 	void cancelInLoop(TimerId timer);
 	bool insert(Timer*);
 	std::vector<TimerQueue::Entry> getExpired(time_t now);
+	void handleRead();
+	//void reset(const std::vector<Entry>& expired, time_t now);
+	void reset(time_t now);
 
 	EventLoop * loop_;
 	const int timerfd_;
