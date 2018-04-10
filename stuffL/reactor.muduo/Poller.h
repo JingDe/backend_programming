@@ -17,6 +17,7 @@ public:
 	virtual ~Poller();
 
 	virtual void updateChannel(Channel*) = 0;
+	virtual void removeChannel(Channel*) = 0;
 	virtual time_t poll(int timeoutMs, ChannelList* activeChannels) = 0;
 
 	void assertInLoopThread() const;

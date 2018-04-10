@@ -7,10 +7,14 @@
 
 class Channel;
 class Poller;
+class TimerQueue;
+class TimerId;
 
 class EventLoop
 {
 public:
+	typedef std::function<void()> Functor;
+	typedef std::function<void()> TimerCallback;
 
 	static EventLoop* getEventLoopOfCurrentThread();
 	EventLoop();
@@ -23,6 +27,12 @@ public:
 
 	void updateChannel(Channel* c);
 	void removeChannel(Channel* c);
+
+	void runInLoop(const Functor& cb);
+
+	// 定时器功能
+	TimerId runAfter(long delay, const TimerCallback& cb);
+	TimerId runAt(time_t time, const TimerCallback& cb);
 
 private:	
 	void printActiveChannels() const;
@@ -40,6 +50,8 @@ private:
 	Channel* currentActiveChannel_;
 
 	time_t pollReturnTime_;
+
+	std::unique_ptr<TimerQueue> timerQueue_; // 定时器
 };
 
 #endif

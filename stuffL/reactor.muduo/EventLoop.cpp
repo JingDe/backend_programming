@@ -1,23 +1,32 @@
 #include"EventLoop.h"
-#include"logging.muduo/Logging.h"
-#include"thread.muduo/CurrentThread.h"
-#include"thread.muduo/thread_util.h"
 #include"Channel.h"
 #include"Poller.h"
+#include"TimerQueue.muduo/TimerId.h"
 
 #include<cassert>
 
 #include<poll.h>
 
+#include"logging.muduo/Logging.h"
+#include"thread.muduo/CurrentThread.h"
+#include"thread.muduo/thread_util.h"
+
 __thread EventLoop* t_loopInThisThread = 0;
 
 const int kPollTimeMs = 10000; // poll×èÈûÊ±¼ä10Ãë
+static const int kMicroSecondsPerSecond = 1000 * 1000;
+
+inline time_t addTime(time_t t, long int seconds)
+{
+	int64_t delta = static_cast<int64_t>(seconds * kMicroSecondsPerSecond); // long long
+
+}
+
 
 EventLoop* EventLoop::getEventLoopOfCurrentThread()
 {
 	return t_loopInThisThread;
 }
-
 
 EventLoop::EventLoop()
 	:looping_(false),quit_(false),pid_(tid()),
@@ -106,4 +115,11 @@ void EventLoop::printActiveChannels() const
 void EventLoop::doPendingFunctors()
 {
 
+}
+
+TimerId EventLoop::runAfter(long delay, const TimerCallback& cb)
+{
+	time_t now = time(NULL);
+	time_t time(addTime(now, delay));
+	return runAt(time, cb);
 }

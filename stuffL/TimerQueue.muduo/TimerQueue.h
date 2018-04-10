@@ -22,25 +22,30 @@ public:
 
 	void cancel(TimerId timerId);
 
-private:
-	void addTimerInLoop(Timer* timer);
+	
 
+private:
 	typedef std::pair<time_t, Timer*> Entry; // TODO: unique_ptr
 	typedef std::set<Entry> TimerList;
 
-	typedef std::pair<Timer*, int> ActiveTimer;
+	typedef std::pair<Timer*, int> ActiveTimer; // <Timer*, sequence>
 	typedef std::set<ActiveTimer> ActiveTimerSet;
+
+	void addTimerInLoop(Timer* timer);
+	void cancelInLoop(TimerId timer);
+	bool insert(Timer*);
+	std::vector<TimerQueue::Entry> getExpired(time_t now);
 
 	EventLoop * loop_;
 	const int timerfd_;
 	Channel timerfdChannel_;
 	TimerList timers_; // 所有定时器
 
-	std::vector<Timer*> expired_;
+	std::vector<Entry> expired_;
 
-	ActiveTimerSet activeTimers_;
+	ActiveTimerSet activeTimers_; // activeTimers_和TimerList的Timer*相同
 	bool callingExpiredTimers_;
-	ActiveTimerSet cancelingTimers_;
+	ActiveTimerSet cancelingTimers_; // 取消了的Timer
 };
 
 #endif 
