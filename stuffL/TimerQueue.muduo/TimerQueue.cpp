@@ -67,8 +67,13 @@ TimerQueue::TimerQueue(EventLoop* loop)
 	timerfdChannel_(loop, timerfd_), // 创建一个channel，关注timerfd_
 	timers_(),
 	callingExpiredTimers_(false),
-	expired_()
-{}
+	expired_() // 默认构造一个空vector
+{
+	// 设置timerfdChannel_的read回调函数
+	// 将timerfdChannel_注册到loop的poller_
+	timerfdChannel_.setReadCallback(std::bind(&TimerQueue::handleRead, this));
+	timerfdChannel_.enableReading();
+}
 
 TimerQueue::~TimerQueue()
 {

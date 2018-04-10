@@ -2,6 +2,7 @@
 #include"Channel.h"
 #include"Poller.h"
 #include"TimerQueue.muduo/TimerId.h"
+#include"TimerQueue.muduo/TimerQueue.h"
 
 #include<cassert>
 
@@ -10,16 +11,18 @@
 #include"logging.muduo/Logging.h"
 #include"thread.muduo/CurrentThread.h"
 #include"thread.muduo/thread_util.h"
+#include"common/MutexLock.h"
 
 __thread EventLoop* t_loopInThisThread = 0;
 
 const int kPollTimeMs = 10000; // poll阻塞时间10秒
 static const int kMicroSecondsPerSecond = 1000 * 1000;
 
-inline time_t addTime(time_t t, long int seconds)
+inline time_t addTime(time_t t, long seconds)
 {
-	int64_t delta = static_cast<int64_t>(seconds * kMicroSecondsPerSecond); // long long
-
+	int64_t delta = static_cast<int64_t>(seconds * kMicroSecondsPerSecond); // int64_t = long long
+	time_t result = t + delta;
+	return result;
 }
 
 
@@ -29,8 +32,12 @@ EventLoop* EventLoop::getEventLoopOfCurrentThread()
 }
 
 EventLoop::EventLoop()
-	:looping_(false),quit_(false),pid_(tid()),
+	:looping_(false),
+	quit_(false),
+	pid_(tid()),
 	poller_(Poller::newDefaultPoller(this)),
+	timerQueue_(new TimerQueue(this)),
+	callingPendingFunctors_(false),
 	currentActiveChannel_(NULL)
 {
 	if (t_loopInThisThread)
@@ -84,13 +91,11 @@ void EventLoop::quit()
 
 void EventLoop::assertInLoopThread()
 {
-	pid_t callerId = tid(); // 为caller计算pid_t
-	if (callerId != pid_)
+	if (!isInLoopThread())
 	{
 		LOG_FATAL << "AssertInLoopThread failed: EventLoop "<<this<<" was created in "<<pid_<<" , current thread id = "<< callerId;
 		return;
-	}
-	
+	}	
 }
 
 void EventLoop::updateChannel(Channel* c)
@@ -117,9 +122,47 @@ void EventLoop::doPendingFunctors()
 
 }
 
+bool EventLoop::isInLoopThread()
+{
+	pid_t callerId = tid(); // 为caller计算pid_t
+	return callerId == pid_;
+}
+
+void EventLoop::runInLoop(const Functor& cb)
+{
+	if (isInLoopThread())
+	{
+		cb();
+	}
+	else
+	{
+		queueInLoop(cb);
+	}
+}
+
+void EventLoop::queueInLoop(const Functor& cb)
+{
+	{
+		MutexLock lock(mutex_);
+		pendingFunctors_.push_back(cb);
+	}
+	if (!isInLoopThread() || callingPendingFunctors_)
+		wakeup();
+}
+
+TimerId EventLoop::runAt(const time_t& time, const TimerCallback& cb)
+{
+	return timerQueue_->addTimer(cb, time, 0);
+}
+
 TimerId EventLoop::runAfter(long delay, const TimerCallback& cb)
 {
 	time_t now = time(NULL);
 	time_t time(addTime(now, delay));
 	return runAt(time, cb);
+}
+
+void EventLoop::wakeup()
+{
+
 }

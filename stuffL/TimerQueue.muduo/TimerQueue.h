@@ -22,7 +22,7 @@ public:
 
 	void cancel(TimerId timerId);
 
-	
+	void handleRead();
 
 private:
 	typedef std::pair<time_t, Timer*> Entry; // TODO: unique_ptr

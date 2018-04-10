@@ -74,6 +74,7 @@
     <ClCompile Include="thread.muduo\thread_util.cpp" />
     <ClCompile Include="TimerQueue.muduo\Timer.cpp" />
     <ClCompile Include="TimerQueue.muduo\TimerQueue.cpp" />
+    <ClCompile Include="TimerQueue.muduo\TimerQueue_test.cpp" />
     <ClCompile Include="TimerQueue.muduo\TimerQueue_unittest.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
