@@ -72,6 +72,7 @@
     <ClCompile Include="thread.muduo\tests\__thread__test\ThreadObject.cpp" />
     <ClCompile Include="thread.muduo\Thread.cpp" />
     <ClCompile Include="thread.muduo\thread_util.cpp" />
+    <ClCompile Include="TimerQueue.muduo\tests\timerfd_test.cpp" />
     <ClCompile Include="TimerQueue.muduo\Timer.cpp" />
     <ClCompile Include="TimerQueue.muduo\TimerQueue.cpp" />
     <ClCompile Include="TimerQueue.muduo\TimerQueue_test.cpp" />

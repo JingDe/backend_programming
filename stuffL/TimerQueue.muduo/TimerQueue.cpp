@@ -64,6 +64,7 @@ void resetTimerfd(int timerfd, time_t expiration)
 	bzero(&newValue, sizeof newValue);
 	bzero(&oldValue, sizeof oldValue);
 	newValue.it_value = howMuchTimeFromNow(expiration); // 此刻距离expiration的timespec时间
+	LOG_DEBUG<< "resetTimerfd: "<<expiration;
 	int ret = timerfd_settime(timerfd, 0, &newValue, &oldValue);
 	if (ret)
 		LOG_FATAL << "timerfd_settime()";
@@ -75,12 +76,12 @@ TimerQueue::TimerQueue(EventLoop* loop)
 	timerfd_(createTimerfd()), // 创建一个timer对象
 	timerfdChannel_(loop, timerfd_), // 创建一个channel，关注timerfd_
 	timers_(),
-	callingExpiredTimers_(false),
-	expired_() // 默认构造一个空vector
+	expired_(), // 默认构造一个空vector
+	callingExpiredTimers_(false)
 {
 	// 设置timerfdChannel_的read回调函数
 	// 将timerfdChannel_注册到loop的poller_
-	timerfdChannel_.setReadCallback(std::bind(&TimerQueue::handleRead, this));
+	timerfdChannel_.setReadCallback(std::bind(&TimerQueue::handleRead, this, std::placeholders::_1));
 	timerfdChannel_.enableReading();
 }
 
@@ -94,7 +95,8 @@ TimerQueue::~TimerQueue()
 		delete it->second; // TODO : unique_ptr
 }
 
-TimerId TimerQueue::addTimer(const TimerCallback& cb, time_t when, int interval)
+
+TimerId TimerQueue::addTimer(const TimerCallback& cb, time_t when, long interval)
 {
 	Timer* timer = new Timer(cb, when, interval);
 	// TimerPtr timer(new Timer());
@@ -107,7 +109,7 @@ void TimerQueue::addTimerInLoop(Timer* timer)
 	loop_->assertInLoopThread();
 	bool earliestChanged = insert(timer);
 
-	if (earliestChanged)
+	if (earliestChanged) // 当添加一个更早expire的Timer，更新timerfd的expire时间
 		resetTimerfd(timerfd_, timer->expiration());
 }
 
@@ -121,7 +123,7 @@ bool TimerQueue::insert(Timer* timer)
 	TimerList::iterator it = timers_.begin();
 	if (it == timers_.end() || when < it->first)
 	{
-		earliestChanged = false;
+		earliestChanged = true;
 	}
 	{
 		std::pair<TimerList::iterator, bool> result = timers_.insert(Entry(when, timer)); 
@@ -173,6 +175,9 @@ std::vector<TimerQueue::Entry> TimerQueue::getExpired(time_t now)
 	TimerList::iterator end = timers_.lower_bound(sentry); // 查找大于等于sentry的迭代器，end指向第一个未到期的定时器
 	assert(end == timers_.end() || now < end->first);
 	std::copy(timers_.begin(), end, back_inserter(expired_));
+
+	LOG_DEBUG << timers_.size() << "个timer, " << expired_.size() << "个过期timer";
+
 	// template<class Container>
 	// std::back_inserter_iterator<Container> back_inserter(Container& c);
 	timers_.erase(timers_.begin(), end);
@@ -187,17 +192,20 @@ std::vector<TimerQueue::Entry> TimerQueue::getExpired(time_t now)
 	return expired_;
 }
 
-void TimerQueue::handleRead()
-{
+void TimerQueue::handleRead(time_t pollReturnTime)
+{	
 	loop_->assertInLoopThread();
 	time_t now = time(NULL);
-	readTimerfd(timerfd_, now); // ?? 内核往timerfd_里写？？
+	LOG_DEBUG << "pollReturnTime: " << pollReturnTime << ", " << now;
 
-	//std::vector<Entry> expired = getExpired(now);
-	getExpired(now);
+	readTimerfd(timerfd_, now); // 内核往timerfd_里写
+
+	//getExpired(now);
+	getExpired(pollReturnTime);
 
 	callingExpiredTimers_ = true;
 	cancelingTimers_.clear();
+	LOG_DEBUG << "expred: " << expired_.size();
 	for (std::vector<Entry>::iterator it = expired_.begin(); it != expired_.end(); ++it)
 		it->second->run();
 	callingExpiredTimers_ = false;

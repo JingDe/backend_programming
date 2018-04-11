@@ -9,7 +9,7 @@ time_t addTime(time_t ts, int seconds)
 	return ts + seconds;
 }
 
-void Timer::restart(time_t now)
+void Timer::restart(time_t now) // time_t «long int¿‡–Õ
 {
 	if (repeat_)
 	{

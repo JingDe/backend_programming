@@ -139,7 +139,11 @@ void EventLoop::removeChannel(Channel* c)
 
 void EventLoop::printActiveChannels() const 
 {
-
+	for (ChannelList::const_iterator it = activeChannels_.begin(); it != activeChannels_.end(); it++)
+	{
+		const Channel* ch = *it;
+		LOG_INFO << "{" << ch->reventsToString() << "}";
+	}
 }
 
 void EventLoop::doPendingFunctors()
@@ -197,6 +201,13 @@ TimerId EventLoop::runAfter(long delay, const TimerCallback& cb)
 	time_t now = time(NULL);
 	time_t time(addTime(now, delay));
 	return runAt(time, cb);
+}
+
+TimerId EventLoop::runEvery(long interval, const TimerCallback& cb)
+{
+	time_t now = time(NULL);
+	time_t time(addTime(now, interval));
+	return timerQueue_->addTimer(cb, time, interval);
 }
 
 void EventLoop::wakeup()

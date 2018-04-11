@@ -35,8 +35,9 @@ public:
 	void queueInLoop(const Functor& cb);
 
 	// 定时器功能
-	TimerId runAfter(long delay, const TimerCallback& cb);
 	TimerId runAt(const time_t& time, const TimerCallback& cb);
+	TimerId runAfter(long delay, const TimerCallback& cb);
+	TimerId runEvery(long interval, const TimerCallback& cb);
 
 	void wakeup();
 	void handleRead();

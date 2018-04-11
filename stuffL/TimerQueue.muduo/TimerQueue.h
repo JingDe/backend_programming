@@ -18,7 +18,7 @@ public:
 	explicit TimerQueue(EventLoop* loop);
 	~TimerQueue();
 
-	TimerId addTimer(const TimerCallback& cb, time_t when, int interval);
+	TimerId addTimer(const TimerCallback& cb, time_t when, long interval);
 
 	void cancel(TimerId timerId);
 
@@ -33,7 +33,7 @@ private:
 	void cancelInLoop(TimerId timer);
 	bool insert(Timer*);
 	std::vector<TimerQueue::Entry> getExpired(time_t now);
-	void handleRead();
+	void handleRead(time_t pollReturnTime);
 	//void reset(const std::vector<Entry>& expired, time_t now);
 	void reset(time_t now);
 

@@ -11,7 +11,7 @@ class Timer {
 public:
 	typedef std::function<void(void)> TimerCallback;
 
-	Timer(const TimerCallback& cb, time_t when, int interval)
+	Timer(const TimerCallback& cb, time_t when, long interval)
 		:callback_(cb),
 		expiration_(when),
 		interval_(interval),
@@ -44,13 +44,13 @@ public:
 
 	static int numCreated()
 	{
-		return reinterpret_cast<long>(s_numCreated_.Acquire_Load());
+		return reinterpret_cast<intptr_t>(s_numCreated_.Acquire_Load());
 	}
 
 private:
 	TimerCallback callback_;
 	time_t expiration_;
-	const int interval_;
+	const long interval_;
 	const bool repeat_;
 	const long sequence_;
 
