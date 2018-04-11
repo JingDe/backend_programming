@@ -18,12 +18,12 @@
 __thread EventLoop* t_loopInThisThread = 0;
 
 const int kPollTimeMs = 10000; // poll×èÈûÊ±¼ä10Ãë
-static const int kMicroSecondsPerSecond = 1000 * 1000;
+
 
 inline time_t addTime(time_t t, long seconds)
 {
-	int64_t delta = static_cast<int64_t>(seconds * kMicroSecondsPerSecond); // int64_t = long long
-	time_t result = t + delta;
+	// int64_t = long long
+	time_t result = t + seconds;
 	return result;
 }
 
@@ -73,8 +73,12 @@ EventLoop::EventLoop()
 
 EventLoop::~EventLoop()
 {
+	LOG_DEBUG << "EventLoop " << this << " of thread " << pid_ << " destructs in thread " << tid();
 	assert(!looping_);
 	t_loopInThisThread = 0;
+	wakeupChannel_->disableAll();
+	wakeupChannel_->remove();
+	close(wakeupFd_);
 }
 
 void EventLoop::loop()
@@ -139,6 +143,7 @@ void EventLoop::removeChannel(Channel* c)
 
 void EventLoop::printActiveChannels() const 
 {
+	LOG_DEBUG << "timerQueue.timerfd = " << timerQueue_->timerfd();
 	for (ChannelList::const_iterator it = activeChannels_.begin(); it != activeChannels_.end(); it++)
 	{
 		const Channel* ch = *it;
@@ -199,15 +204,17 @@ TimerId EventLoop::runAt(const time_t& time, const TimerCallback& cb)
 TimerId EventLoop::runAfter(long delay, const TimerCallback& cb)
 {
 	time_t now = time(NULL);
-	time_t time(addTime(now, delay));
-	return runAt(time, cb);
+	time_t when(addTime(now, delay));
+	LOG_WARN << "runAfter: when=" << when;
+	return runAt(when, cb);
 }
 
 TimerId EventLoop::runEvery(long interval, const TimerCallback& cb)
 {
 	time_t now = time(NULL);
-	time_t time(addTime(now, interval));
-	return timerQueue_->addTimer(cb, time, interval);
+	time_t when(addTime(now, interval));
+	LOG_WARN << "runEvery: when=" << when << ", interval=" << interval;
+	return timerQueue_->addTimer(cb, when, interval);
 }
 
 void EventLoop::wakeup()

@@ -33,6 +33,8 @@ EPollPoller::EPollPoller(EventLoop* loop)
 	ASSERT_TRUE(EPOLLRDHUP == POLLRDHUP);
 	ASSERT_TRUE(EPOLLERR == POLLERR);
 	ASSERT_TRUE(EPOLLHUP == POLLHUP);*/
+	if (epollfd_ < 0)
+		LOG_FATAL << "EPollPoller::EPollPoller";
 }
 
 /*

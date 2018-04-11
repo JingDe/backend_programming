@@ -3,6 +3,7 @@
 #include"TimerId.h"
 #include"Timer.h"
 
+//#include<iostream>
 #include<cassert>
 #include<cstdio>
 
@@ -59,12 +60,13 @@ flags：等于0表示相对定时器，等于TFD_TIMER_ABSTIME表示绝对定时器
 
 void resetTimerfd(int timerfd, time_t expiration)
 {
+	LOG_DEBUG << "resetTimerfd: " << expiration;
+
 	struct itimerspec newValue;
 	struct itimerspec oldValue;
 	bzero(&newValue, sizeof newValue);
 	bzero(&oldValue, sizeof oldValue);
-	newValue.it_value = howMuchTimeFromNow(expiration); // 此刻距离expiration的timespec时间
-	LOG_DEBUG<< "resetTimerfd: "<<expiration;
+	newValue.it_value = howMuchTimeFromNow(expiration); // 此刻距离expiration的timespec时间	
 	int ret = timerfd_settime(timerfd, 0, &newValue, &oldValue);
 	if (ret)
 		LOG_FATAL << "timerfd_settime()";
@@ -169,6 +171,13 @@ void TimerQueue::cancelInLoop(TimerId timerId)
 
 std::vector<TimerQueue::Entry> TimerQueue::getExpired(time_t now)
 {
+	// 打印timers列表
+	/*for (TimerList::const_iterator cit = timers_.begin(); cit != timers_.end(); cit++)
+	{
+		std::cout << cit->first<<", ";
+	}
+	std::cout << "now : "<<now << std::endl;*/
+
 	assert(timers_.size() == activeTimers_.size());
 	expired_.clear();
 	Entry sentry(now, reinterpret_cast<Timer*>(UINTPTR_MAX));
@@ -176,10 +185,9 @@ std::vector<TimerQueue::Entry> TimerQueue::getExpired(time_t now)
 	assert(end == timers_.end() || now < end->first);
 	std::copy(timers_.begin(), end, back_inserter(expired_));
 
-	LOG_DEBUG << timers_.size() << "个timer, " << expired_.size() << "个过期timer";
+	LOG_DEBUG << timers_.size() << " timers, " << expired_.size() << " expired timers";
 
-	// template<class Container>
-	// std::back_inserter_iterator<Container> back_inserter(Container& c);
+	// template<class Container> std::back_inserter_iterator<Container> back_inserter(Container& c);
 	timers_.erase(timers_.begin(), end);
 
 	for (std::vector<Entry>::iterator it = expired_.begin(); it != expired_.end(); it++)
@@ -196,7 +204,7 @@ void TimerQueue::handleRead(time_t pollReturnTime)
 {	
 	loop_->assertInLoopThread();
 	time_t now = time(NULL);
-	LOG_DEBUG << "pollReturnTime: " << pollReturnTime << ", " << now;
+	LOG_DEBUG << "pollReturnTime: " << pollReturnTime << ", now: " << now;
 
 	readTimerfd(timerfd_, now); // 内核往timerfd_里写
 
@@ -205,7 +213,7 @@ void TimerQueue::handleRead(time_t pollReturnTime)
 
 	callingExpiredTimers_ = true;
 	cancelingTimers_.clear();
-	LOG_DEBUG << "expred: " << expired_.size();
+	
 	for (std::vector<Entry>::iterator it = expired_.begin(); it != expired_.end(); ++it)
 		it->second->run();
 	callingExpiredTimers_ = false;
@@ -223,7 +231,7 @@ void TimerQueue::reset(time_t now)
 		if (it->second->repeat() && cancelingTimers_.find(timer) == cancelingTimers_.end())
 		{
 			it->second->restart(now);
-			insert(it->second);
+			insert(it->second); // 插入周期性的timer
 		}
 		else
 			delete it->second;
@@ -232,6 +240,6 @@ void TimerQueue::reset(time_t now)
 	if (!timers_.empty())
 		nextExpire = timers_.begin()->second->expiration();
 	
-	if(nextExpire>0)
-		resetTimerfd(timerfd_, nextExpire);
+	if(nextExpire>now)
+		resetTimerfd(timerfd_, nextExpire); // 设置timerfd的expire时间为第一个timer的expire时间
 }

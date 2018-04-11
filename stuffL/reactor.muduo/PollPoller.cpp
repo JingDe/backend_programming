@@ -44,7 +44,7 @@ time_t PollPoller::poll(int timeoutMs, ChannelList* activeChannels)
 // std::vector<struct pollfd> --->> std::vector<Channel*>
 void PollPoller::fillActiveChannels(int numEvents, ChannelList* activeChannels)
 {
-	for (PollFdList::const_iterator pfd = pollfds_.begin(); pfd != pollfds_.end() && numEvents > 0; ++pfd)
+	for (PollFdList::iterator pfd = pollfds_.begin(); pfd != pollfds_.end() && numEvents > 0; ++pfd)
 	{
 		if (pfd->revents > 0)
 		{
@@ -55,6 +55,8 @@ void PollPoller::fillActiveChannels(int numEvents, ChannelList* activeChannels)
 			Channel* channel = it->second;
 			channel->set_revents(pfd->revents);
 			activeChannels->push_back(channel);
+
+			pfd->revents = 0; // ??
 		}
 	}
 }

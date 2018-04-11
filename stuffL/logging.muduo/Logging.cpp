@@ -9,6 +9,7 @@
 #include<ctime>
 #include<cassert>
 
+#include<sys/time.h>
 
 namespace {
 	void defaultOutput(const char* msg, int len)
@@ -23,13 +24,22 @@ namespace {
 
 	std::string formatTime()
 	{
+		char buf[256];
+		int len;
+
+		struct timeval tv; // Ãë¡¢Î¢Ãë
+		gettimeofday(&tv, NULL);
+		long usec = tv.tv_usec;
+
 		time_t t = time(NULL);
 		struct tm* lt = localtime(&t);
-		char buf[256];
-		int len=snprintf(buf, sizeof buf, "%4d%02d%02d_%02d:%02d:%02d", lt->tm_year + 1900, lt->tm_mon + 1, lt->tm_mday, lt->tm_hour, lt->tm_min, lt->tm_sec);
-		assert(len == 17);
+		len=snprintf(buf, sizeof buf, "%4d%02d%02d_%02d:%02d:%02d:%06d", 
+			lt->tm_year + 1900, lt->tm_mon + 1, lt->tm_mday, lt->tm_hour, lt->tm_min, lt->tm_sec, usec);
+		assert(len == 24);
+
 		return std::string(buf, len);
 	}
+	
 }
 
 Logger::SourceFile::SourceFile(const char* name)

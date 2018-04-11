@@ -22,6 +22,8 @@ public:
 
 	void cancel(TimerId timerId);
 
+	int timerfd() const { return timerfd_;  }
+
 private:
 	typedef std::pair<time_t, Timer*> Entry; // TODO: unique_ptr
 	typedef std::set<Entry> TimerList;
