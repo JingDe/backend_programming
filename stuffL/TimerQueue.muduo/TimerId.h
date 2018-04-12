@@ -15,6 +15,7 @@ public:
 
 private:
 	Timer * timer_;
+	
 	long sequence_;
 };
 

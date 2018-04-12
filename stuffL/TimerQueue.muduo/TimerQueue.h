@@ -29,7 +29,7 @@ private:
 	typedef std::pair<time_t, TimerPtr> Entry; 
 	typedef std::set<Entry> TimerList;
 
-	typedef std::pair<Timer*, int> ActiveTimer; // <Timer*, sequence>
+	typedef std::pair<TimerPtr, int> ActiveTimer; // sequence
 	typedef std::set<ActiveTimer> ActiveTimerSet;
 
 	void addTimerInLoop(Timer* timer);
@@ -45,10 +45,11 @@ private:
 	Channel timerfdChannel_;
 	TimerList timers_; // 所有定时器
 
+	bool callingExpiredTimers_;
 	std::vector<Entry> expired_;
 
 	ActiveTimerSet activeTimers_; // activeTimers_和TimerList的Timer*相同
-	bool callingExpiredTimers_;
+	
 	ActiveTimerSet cancelingTimers_; // 取消了的Timer
 };
 

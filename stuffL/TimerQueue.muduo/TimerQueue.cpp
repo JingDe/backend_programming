@@ -94,15 +94,15 @@ TimerQueue::~TimerQueue()
 	timerfdChannel_.remove();
 	close(timerfd_);
 
-	for (TimerList::iterator it = timers_.begin(); it != timers_.end(); ++it)
-		delete it->second; // TODO : unique_ptr
+	/*for (TimerList::iterator it = timers_.begin(); it != timers_.end(); ++it)
+		delete it->second; */
 }
 
 
 TimerId TimerQueue::addTimer(const TimerCallback& cb, time_t when, long interval)
 {
 	Timer* timer = new Timer(cb, when, interval);
-	// TimerPtr timer(new Timer());
+	//TimerPtr timer(new Timer(cb, when, interval));
 	loop_->runInLoop(std::bind(&TimerQueue::addTimerInLoop, this, timer));
 	return TimerId(timer, timer->sequence());
 }
@@ -129,7 +129,8 @@ bool TimerQueue::insert(Timer* timer)
 		earliestChanged = true;
 	}
 	{
-		std::pair<TimerList::iterator, bool> result = timers_.insert(Entry(when, timer)); 
+		TimerPtr timerP(timer);
+		std::pair<TimerList::iterator, bool> result = timers_.insert(Entry(when, timerP));
 			// std::pair<iterator, bool> insert(const value_type& value);
 		assert(result.second);
 	}
@@ -158,27 +159,20 @@ void TimerQueue::cancelInLoop(TimerId timerId)
 	assert(timers_.size() == activeTimers_.size());
 	ActiveTimer timer(timerId.timer_, timerId.sequence_);
 	ActiveTimerSet::iterator it = activeTimers_.find(timer); // 寻找ActiveTimer
-	if (it != activeTimers_.end())
+	if (it != activeTimers_.end()) // cancel未到期的timer
 	{
 		size_t n = timers_.erase(Entry(it->first->expiration(), it->first));
 		assert(n == 1);
 		delete it->first;
 		activeTimers_.erase(it);
 	}
-	else if (callingExpiredTimers_)
+	else if (callingExpiredTimers_) // cancel到期的timer
 		cancelingTimers_.insert(timer);
 	assert(timers_.size() == activeTimers_.size());
 }
 
 std::vector<TimerQueue::Entry> TimerQueue::getExpired(time_t now)
 {
-	// 打印timers列表
-	/*for (TimerList::const_iterator cit = timers_.begin(); cit != timers_.end(); cit++)
-	{
-		std::cout << cit->first<<", ";
-	}
-	std::cout << "now : "<<now << std::endl;*/
-
 	assert(timers_.size() == activeTimers_.size());
 	expired_.clear();
 	Entry sentry(now, reinterpret_cast<Timer*>(UINTPTR_MAX));
@@ -210,16 +204,16 @@ void TimerQueue::handleRead(time_t pollReturnTime)
 	readTimerfd(timerfd_, now); // 内核往timerfd_里写
 
 	//getExpired(now);
-	getExpired(pollReturnTime);
+	getExpired(pollReturnTime); // 获得所有过期timer
 
 	callingExpiredTimers_ = true;
-	cancelingTimers_.clear();
+	cancelingTimers_.clear(); // 清空取消的timer
 	
-	for (std::vector<Entry>::iterator it = expired_.begin(); it != expired_.end(); ++it)
+	for (std::vector<Entry>::iterator it = expired_.begin(); it != expired_.end(); ++it) // 调用过期timer的回调函数
 		it->second->run();
 	callingExpiredTimers_ = false;
 
-	reset(now);
+	reset(now); // 插入周期性的timer，删除过期timer，重置timerfd的过期时间
 }
 
 void TimerQueue::reset(time_t now)
