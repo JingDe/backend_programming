@@ -9,6 +9,8 @@ public:
 
 	TimerId(Timer* timer, long seq) :timer_(timer), sequence_(seq) {}
 
+	Timer* timer() const { return timer_; }
+
 	friend class TimerQueue;
 
 private:

@@ -1,7 +1,8 @@
 #ifndef TIMERQUEUE_H_
 #define TIMERQUEUE_H_
 
-#include"reactor.muduo/Channel.h"
+#include"Channel_TS.h"
+#include"TimerQueue.muduo/Timestamp.h"
 
 #include<set>
 #include<vector>
@@ -18,15 +19,14 @@ public:
 	explicit TimerQueue(EventLoop* loop);
 	~TimerQueue();
 
-	TimerId addTimer(const TimerCallback& cb, time_t when, long interval);
+	TimerId addTimer(const TimerCallback& cb, Timestamp when, double interval);
 
 	void cancel(TimerId timerId);
 
 	int timerfd() const { return timerfd_;  }
 
 private:
-	typedef std::unique_ptr<Timer> TimerPtr;
-	typedef std::pair<time_t, TimerPtr> Entry; 
+	typedef std::pair<Timestamp, Timer*> Entry; // TODO: unique_ptr
 	typedef std::set<Entry> TimerList;
 
 	typedef std::pair<Timer*, int> ActiveTimer; // <Timer*, sequence>
@@ -35,10 +35,10 @@ private:
 	void addTimerInLoop(Timer* timer);
 	void cancelInLoop(TimerId timer);
 	bool insert(Timer*);
-	std::vector<TimerQueue::Entry> getExpired(time_t now);
-	void handleRead(time_t pollReturnTime);
+	std::vector<TimerQueue::Entry> getExpired(Timestamp now);
+	void handleRead(Timestamp pollReturnTime);
 	//void reset(const std::vector<Entry>& expired, time_t now);
-	void reset(time_t now);
+	void reset(Timestamp now);
 
 	EventLoop * loop_;
 	const int timerfd_;

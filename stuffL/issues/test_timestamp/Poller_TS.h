@@ -6,6 +6,7 @@
 
 class EventLoop;
 class Channel;
+class Timestamp;
 
 class Poller {
 public:
@@ -19,7 +20,7 @@ public:
 	virtual void updateChannel(Channel*) = 0;
 	virtual void removeChannel(Channel*) = 0;
 	virtual bool hasChannel(Channel* channel) const;
-	virtual time_t poll(int timeoutMs, ChannelList* activeChannels) = 0;
+	virtual Timestamp poll(int timeoutMs, ChannelList* activeChannels) = 0;
 
 	void assertInLoopThread() const;
 

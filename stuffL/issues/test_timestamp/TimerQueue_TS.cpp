@@ -1,7 +1,7 @@
-#include"TimerQueue.h"
-#include"reactor.muduo/EventLoop.h"
-#include"TimerId.h"
-#include"Timer.h"
+#include"TimerQueue_TS.h"
+#include"EventLoop_TS.h"
+#include"TimerQueue.muduo/TimerId.h"
+#include"Timer_TS.h"
 
 //#include<iostream>
 #include<cassert>
@@ -22,22 +22,23 @@ int createTimerfd()
 	return timerfd;
 }
 
-// 计算此时距离when的时间，用timespec结构体表示（秒、纳秒）
-struct timespec howMuchTimeFromNow(time_t when)
+struct timespec howMuchTimeFromNow(Timestamp when)
 {
-	time_t now = time(NULL);
-	int64_t seconds = when - now;
+	int64_t microseconds = when.microSecondsSinceEpoch()
+		- Timestamp::now().microSecondsSinceEpoch();
+	if (microseconds < 100)
+		microseconds = 100;
 	struct timespec ts;
-	ts.tv_sec = seconds;
-	ts.tv_nsec = 0;
+	ts.tv_sec = static_cast<time_t>(microseconds/kMicroSecondsPerSecond);
+	ts.tv_nsec = static_cast<long>((microseconds % kMicroSecondsPerSecond)*1000);
 	return ts;
 }
 
-void readTimerfd(int timerfd, time_t now)
+void readTimerfd(int timerfd, Timestamp now)
 {
 	uint64_t howmany;
 	ssize_t n = read(timerfd, &howmany, sizeof howmany);
-	LOG_INFO << "TimerQueue::handleRead() " << howmany << " at " << now;
+	LOG_INFO << "TimerQueue::handleRead() " << howmany << " at " << now.toString();
 	if (n != sizeof howmany)
 		LOG_ERROR << "TimerQueue::handleRead() reads " << n << " bytes instead of 8";
 }
@@ -57,17 +58,15 @@ int timerfd_settime(int fd, int flags, const struct itimerspec *new_value, struc
 flags：等于0表示相对定时器，等于TFD_TIMER_ABSTIME表示绝对定时器
 */
 
-// 重置timerfd的expire时间为expiration
-void resetTimerfd(int timerfd, time_t expiration)
+void resetTimerfd(int timerfd, Timestamp expiration)
 {
-	LOG_DEBUG << "resetTimerfd: " << expiration;
+	LOG_DEBUG << "resetTimerfd: " << expiration.toString();
 
 	struct itimerspec newValue;
 	struct itimerspec oldValue;
 	bzero(&newValue, sizeof newValue);
 	bzero(&oldValue, sizeof oldValue);
 	newValue.it_value = howMuchTimeFromNow(expiration); // 此刻距离expiration的timespec时间	
-	
 	int ret = timerfd_settime(timerfd, 0, &newValue, &oldValue);
 	if (ret)
 		LOG_FATAL << "timerfd_settime()";
@@ -99,7 +98,7 @@ TimerQueue::~TimerQueue()
 }
 
 
-TimerId TimerQueue::addTimer(const TimerCallback& cb, time_t when, long interval)
+TimerId TimerQueue::addTimer(const TimerCallback& cb, Timestamp when, double interval)
 {
 	Timer* timer = new Timer(cb, when, interval);
 	// TimerPtr timer(new Timer());
@@ -122,7 +121,7 @@ bool TimerQueue::insert(Timer* timer)
 	loop_->assertInLoopThread();
 	assert(timers_.size() == activeTimers_.size());
 	bool earliestChanged = false;
-	time_t when = timer->expiration();
+	Timestamp when = timer->expiration();
 	TimerList::iterator it = timers_.begin();
 	if (it == timers_.end() || when < it->first)
 	{
@@ -170,7 +169,7 @@ void TimerQueue::cancelInLoop(TimerId timerId)
 	assert(timers_.size() == activeTimers_.size());
 }
 
-std::vector<TimerQueue::Entry> TimerQueue::getExpired(time_t now)
+std::vector<TimerQueue::Entry> TimerQueue::getExpired(Timestamp now)
 {
 	// 打印timers列表
 	/*for (TimerList::const_iterator cit = timers_.begin(); cit != timers_.end(); cit++)
@@ -201,11 +200,11 @@ std::vector<TimerQueue::Entry> TimerQueue::getExpired(time_t now)
 	return expired_;
 }
 
-void TimerQueue::handleRead(time_t pollReturnTime)
+void TimerQueue::handleRead(Timestamp pollReturnTime)
 {	
 	loop_->assertInLoopThread();
-	time_t now = time(NULL);
-	LOG_DEBUG << "pollReturnTime: " << pollReturnTime << ", now: " << now;
+	Timestamp now(Timestamp::now());
+	LOG_DEBUG << "pollReturnTime: " << pollReturnTime.toString() << ", now: " << now.toString();
 
 	readTimerfd(timerfd_, now); // 内核往timerfd_里写
 
@@ -222,9 +221,9 @@ void TimerQueue::handleRead(time_t pollReturnTime)
 	reset(now);
 }
 
-void TimerQueue::reset(time_t now)
+void TimerQueue::reset(Timestamp now)
 {
-	time_t nextExpire;
+	Timestamp nextExpire;
 
 	for (std::vector<Entry>::const_iterator it = expired_.begin(); it != expired_.end(); ++it)
 	{
@@ -241,6 +240,6 @@ void TimerQueue::reset(time_t now)
 	if (!timers_.empty())
 		nextExpire = timers_.begin()->second->expiration();
 	
-	if(nextExpire>now)
+	if(nextExpire.valid())
 		resetTimerfd(timerfd_, nextExpire); // 设置timerfd的expire时间为第一个timer的expire时间
 }

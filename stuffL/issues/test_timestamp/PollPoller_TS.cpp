@@ -1,12 +1,15 @@
-#include"PollPoller.h"
-#include"logging.muduo/Logging.h"
-#include"Channel.h"
+#include"PollPoller_TS.h"
+#include"Channel_TS.h"
+#include"TimerQueue.muduo/Timestamp.h"
 
 #include<algorithm>
 #include<cassert>
 #include<functional>
 
 #include<poll.h>
+
+#include"logging.muduo/Logging.h"
+
 
 PollPoller::PollPoller(EventLoop* loop)
 	:Poller(loop) // 调用基类的构造函数
@@ -17,11 +20,11 @@ PollPoller::PollPoller(EventLoop* loop)
 PollPoller::~PollPoller()
 {}
 
-time_t PollPoller::poll(int timeoutMs, ChannelList* activeChannels)
+Timestamp PollPoller::poll(int timeoutMs, ChannelList* activeChannels)
 {
 	int numEvents=::poll(&*pollfds_.begin(), pollfds_.size(), timeoutMs);
 	int savedErrno = errno;
-	time_t now = time(NULL);
+	Timestamp now(Timestamp::now());
 	if (numEvents > 0)
 	{
 		LOG_INFO << numEvents << " events happened";

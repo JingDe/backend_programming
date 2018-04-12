@@ -1,8 +1,9 @@
-#include"EventLoop.h"
-#include"Channel.h"
-#include"Poller.h"
+#include"EventLoop_TS.h"
+#include"Channel_TS.h"
+#include"Poller_TS.h"
 #include"TimerQueue.muduo/TimerId.h"
-#include"TimerQueue.muduo/TimerQueue.h"
+#include"TimerQueue_TS.h"
+#include"TimerQueue.muduo/Timestamp.h"
 
 #include<cassert>
 #include<algorithm>
@@ -210,24 +211,20 @@ void EventLoop::queueInLoop(const Functor& cb)
 		wakeup();
 }
 
-TimerId EventLoop::runAt(const time_t& time, const TimerCallback& cb)
+TimerId EventLoop::runAt(const Timestamp& time, const TimerCallback& cb)
 {
-	return timerQueue_->addTimer(cb, time, 0);
+	return timerQueue_->addTimer(cb, time, 0.0);
 }
 
-TimerId EventLoop::runAfter(long delay, const TimerCallback& cb)
+TimerId EventLoop::runAfter(double delay, const TimerCallback& cb)
 {
-	time_t now = time(NULL);
-	time_t when(addTime(now, delay));
-	
+	Timestamp when(addTime(Timestamp::now(), delay));
 	return runAt(when, cb);
 }
 
-TimerId EventLoop::runEvery(long interval, const TimerCallback& cb)
+TimerId EventLoop::runEvery(double interval, const TimerCallback& cb)
 {
-	time_t now = time(NULL);
-	time_t when(addTime(now, interval));
-	
+	Timestamp when(addTime(Timestamp::now(), interval));
 	return timerQueue_->addTimer(cb, when, interval);
 }
 
