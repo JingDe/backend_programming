@@ -9,6 +9,7 @@
 class Logger {
 public:
 	enum LOG_LEVEL {
+		TRACE,
 		DEBUG,
 		INFO,
 		WARN,
@@ -30,7 +31,8 @@ public:
 	};
 
 public:
-	Logger(SourceFile file, int line, LOG_LEVEL level=INFO); // 产生日志的文件和行号，
+	Logger(SourceFile file, int line, LOG_LEVEL level = INFO); // 产生日志的文件和行号
+	Logger(SourceFile file, int line, LOG_LEVEL level, const char* func);
 	~Logger(); // 输出LogStream（到日志文件中）,调用输出函数
 
 	typedef void (*OutputFunc)(const char* msg, int len);
@@ -58,8 +60,10 @@ private:
 
 extern Logger::LOG_LEVEL g_loglevel; // 全局的日志级别
 
+#define LOG_TRACE if(Logger::logLevel()<=Logger::TRACE) \
+	Logger(__FILE__, __LINE__, Logger::TRACE, __FUNCTION__).stream()
 #define LOG_DEBUG if(Logger::logLevel() <= Logger::DEBUG) \
-	Logger(__FILE__, __LINE__, Logger::DEBUG).stream()
+	Logger(__FILE__, __LINE__, Logger::DEBUG, __FUNCTION__).stream()
 #define LOG_INFO if(Logger::logLevel() <= Logger::INFO) \
 	Logger(__FILE__, __LINE__, Logger::LOG_LEVEL::INFO).stream()
 #define LOG_WARN if(Logger::logLevel() <= Logger::WARN) \

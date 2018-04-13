@@ -32,6 +32,7 @@
     <ClInclude Include="common\FixedBuffer.h" />
     <ClInclude Include="common\MutexLock.h" />
     <ClInclude Include="common\noncopyable.h" />
+    <ClInclude Include="common\Slice.h" />
     <ClInclude Include="dummy.h" />
     <ClInclude Include="logging.muduo\LogFile.h" />
     <ClInclude Include="logging.muduo\Logging.h" />
@@ -45,6 +46,11 @@
     <ClInclude Include="reactor.muduo\EventLoopThreadPool.h" />
     <ClInclude Include="reactor.muduo\Poller.h" />
     <ClInclude Include="reactor.muduo\PollPoller.h" />
+    <ClInclude Include="socket.muduo\Endian.h" />
+    <ClInclude Include="socket.muduo\InetAddress.h" />
+    <ClInclude Include="socket.muduo\Socket.h" />
+    <ClInclude Include="socket.muduo\SocketsOps.h" />
+    <ClInclude Include="tcp.muduo\Acceptor.h" />
     <ClInclude Include="testharness.leveldb\testharness.h" />
     <ClInclude Include="thread.muduo\CurrentThread.h" />
     <ClInclude Include="thread.muduo\tests\__thread__test\ThreadObject.h" />
@@ -68,10 +74,13 @@
     <ClCompile Include="reactor.muduo\EPollPoller.cpp" />
     <ClCompile Include="reactor.muduo\EventLoop.cpp" />
     <ClCompile Include="reactor.muduo\EventLoopThread.cpp" />
+    <ClCompile Include="reactor.muduo\EventLoopThreadPool_test.cpp" />
     <ClCompile Include="reactor.muduo\EventLoopThreadPool.cpp" />
-    <ClCompile Include="reactor.muduo\EventLoopThread_test.cpp" />
     <ClCompile Include="reactor.muduo\Poller.cpp" />
     <ClCompile Include="reactor.muduo\PollPoller.cpp" />
+    <ClCompile Include="socket.muduo\InetAddress.cpp" />
+    <ClCompile Include="socket.muduo\Socket.cpp" />
+    <ClCompile Include="socket.muduo\SocketsOps.cpp" />
     <ClCompile Include="testharness.leveldb\testharness.cpp" />
     <ClCompile Include="thread.muduo\CurrentThread.cpp" />
     <ClCompile Include="thread.muduo\tests\__thread__test\ThreadObject.cpp" />

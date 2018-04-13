@@ -4,6 +4,6 @@
 
 Poller* Poller::newDefaultPoller(EventLoop* loop)
 {
-	return new PollPoller(loop);
-	//return new EPollPoller(loop);
+	//return new PollPoller(loop);
+	return new EPollPoller(loop);
 }

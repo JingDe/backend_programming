@@ -84,18 +84,27 @@ Logger::OutputFunc g_output=defaultOutput; // 必须初始化，否则异常？？
 Logger::FlushFunc g_flush=defaultFlush;
 
 const char* levelStr[Logger::NUM_LEVELS] = {
-	"DEBUG",
-	"INFO",
-	"WARN",
-	"ERROR",
-	"FATAL"
+	"TRACE ",
+	"DEBUG ",
+	"INFO  ",
+	"WARN  ",
+	"ERROR ",
+	"FATAL "
 };
+
 
 Logger::Logger(SourceFile file, int line, LOG_LEVEL level)
 	:file_(file),line_(line),level_(level)
 {
-	// 日志格式：时间、线程id、日志级别、文件名、行号、日志信息
+	// 日志格式：时间、线程id、日志级别、日志信息、文件名、行号
 	logStream_ << formatTime()<<' ' << static_cast<int>(gettid()) <<' ' << levelStr[level_]<<' ';
+}
+
+Logger::Logger(SourceFile file, int line, LOG_LEVEL level, const char* func)
+	: file_(file), line_(line), level_(level)
+{
+	// 日志格式：时间、线程id、日志级别、函数名、日志信息、文件名、行号、
+	logStream_ << formatTime() << ' ' << static_cast<int>(gettid()) << ' ' << levelStr[level_] << ' '<<func<<" ";
 }
 
 Logger::~Logger()
