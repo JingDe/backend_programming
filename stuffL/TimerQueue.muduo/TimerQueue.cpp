@@ -94,8 +94,8 @@ TimerQueue::~TimerQueue()
 	timerfdChannel_.remove();
 	close(timerfd_);
 
-	/*for (TimerList::iterator it = timers_.begin(); it != timers_.end(); ++it)
-		delete it->second; */
+	for (TimerList::iterator it = timers_.begin(); it != timers_.end(); ++it)
+		delete it->second; 
 }
 
 
@@ -129,8 +129,8 @@ bool TimerQueue::insert(Timer* timer)
 		earliestChanged = true;
 	}
 	{
-		TimerPtr timerP(timer);
-		std::pair<TimerList::iterator, bool> result = timers_.insert(Entry(when, timerP));
+		//TimerPtr timerP(timer);
+		std::pair<TimerList::iterator, bool> result = timers_.insert(Entry(when, timer));
 			// std::pair<iterator, bool> insert(const value_type& value);
 		assert(result.second);
 	}

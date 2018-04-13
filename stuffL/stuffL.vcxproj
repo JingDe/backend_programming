@@ -41,6 +41,8 @@
     <ClInclude Include="reactor.muduo\Channel.h" />
     <ClInclude Include="reactor.muduo\EPollPoller.h" />
     <ClInclude Include="reactor.muduo\EventLoop.h" />
+    <ClInclude Include="reactor.muduo\EventLoopThread.h" />
+    <ClInclude Include="reactor.muduo\EventLoopThreadPool.h" />
     <ClInclude Include="reactor.muduo\Poller.h" />
     <ClInclude Include="reactor.muduo\PollPoller.h" />
     <ClInclude Include="testharness.leveldb\testharness.h" />
@@ -65,6 +67,9 @@
     <ClCompile Include="reactor.muduo\DefaultPoller.cpp" />
     <ClCompile Include="reactor.muduo\EPollPoller.cpp" />
     <ClCompile Include="reactor.muduo\EventLoop.cpp" />
+    <ClCompile Include="reactor.muduo\EventLoopThread.cpp" />
+    <ClCompile Include="reactor.muduo\EventLoopThreadPool.cpp" />
+    <ClCompile Include="reactor.muduo\EventLoopThread_test.cpp" />
     <ClCompile Include="reactor.muduo\Poller.cpp" />
     <ClCompile Include="reactor.muduo\PollPoller.cpp" />
     <ClCompile Include="testharness.leveldb\testharness.cpp" />
@@ -75,7 +80,6 @@
     <ClCompile Include="TimerQueue.muduo\tests\timerfd_test.cpp" />
     <ClCompile Include="TimerQueue.muduo\Timer.cpp" />
     <ClCompile Include="TimerQueue.muduo\TimerQueue.cpp" />
-    <ClCompile Include="TimerQueue.muduo\TimerQueue_test.cpp" />
     <ClCompile Include="TimerQueue.muduo\Timestamp.cc" />
   </ItemGroup>
   <PropertyGroup Label="Globals">

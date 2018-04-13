@@ -2,6 +2,7 @@
 #define TIMERQUEUE_H_
 
 #include"reactor.muduo/Channel.h"
+#include"common/noncopyable.h"
 
 #include<set>
 #include<vector>
@@ -11,7 +12,7 @@ class EventLoop;
 class TimerId;
 class Timer;
 
-class TimerQueue {
+class TimerQueue : public noncopyable {
 public:
 	typedef std::function<void(void)> TimerCallback;
 
@@ -25,11 +26,11 @@ public:
 	int timerfd() const { return timerfd_;  }
 
 private:
-	typedef std::unique_ptr<Timer> TimerPtr;
-	typedef std::pair<time_t, TimerPtr> Entry; 
+	//typedef std::unique_ptr<Timer> TimerPtr;
+	typedef std::pair<time_t, Timer*> Entry; 
 	typedef std::set<Entry> TimerList;
 
-	typedef std::pair<TimerPtr, int> ActiveTimer; // sequence
+	typedef std::pair<Timer*, int> ActiveTimer; // sequence
 	typedef std::set<ActiveTimer> ActiveTimerSet;
 
 	void addTimerInLoop(Timer* timer);

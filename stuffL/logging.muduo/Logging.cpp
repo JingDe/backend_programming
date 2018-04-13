@@ -95,12 +95,12 @@ Logger::Logger(SourceFile file, int line, LOG_LEVEL level)
 	:file_(file),line_(line),level_(level)
 {
 	// 日志格式：时间、线程id、日志级别、文件名、行号、日志信息
-	logStream_ << formatTime()<<' ' << static_cast<int>(gettid()) <<' ' << levelStr[level_]<<' '<<file_.fileName() <<' '<<line_<<' ';
+	logStream_ << formatTime()<<' ' << static_cast<int>(gettid()) <<' ' << levelStr[level_]<<' ';
 }
 
 Logger::~Logger()
 {
-	logStream_ << '\n';
+	logStream_ << "  - " << file_.fileName() << ":" << line_ << '\n';
 	const LogStream::Buffer& buf = stream().buffer();
 	g_output(buf.data(), buf.length());
 	if (level_ >= LOG_LEVEL::FATAL)

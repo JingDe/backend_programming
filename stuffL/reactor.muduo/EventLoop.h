@@ -15,7 +15,7 @@ class TimerQueue;
 class TimerId;
 
 
-class EventLoop : noncopyable
+class EventLoop : public noncopyable
 {
 public:
 	typedef std::function<void()> Functor;
