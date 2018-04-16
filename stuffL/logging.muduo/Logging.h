@@ -72,4 +72,16 @@ extern Logger::LOG_LEVEL g_loglevel; // 全局的日志级别
 	Logger(__FILE__, __LINE__, Logger::LOG_LEVEL::ERRORL).stream()
 #define LOG_FATAL if(Logger::logLevel() <= Logger::FATAL) \
 	Logger(__FILE__, __LINE__, Logger::FATAL).stream()
+
+
+template<typename T>
+T* CheckNotNull(Logger::SourceFile file, int line, const char* names, T* ptr)
+{
+	if (ptr == NULL)
+		Logger(file, line, Logger::FATAL).stream() << names;
+	return ptr;
+}
+
+#define CHECK_NOTNULL(val) CheckNotNull(__FILE__, __LINE__, "'" #val "' Must be non NULL", (val))
+
 #endif

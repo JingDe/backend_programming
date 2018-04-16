@@ -17,7 +17,15 @@ namespace sockets {
 	void toIpPort(char* buf, size_t size, const struct sockaddr* add);
 	void toIp(char* buf, size_t size, const struct sockaddr* addr);
 
+	int createNonblockingOrDie(sa_family_t family);
 	void close(int sockfd);
+	void bindOrDie(int sockfd, const struct sockaddr* addr);
+	void listenOrDie(int sockfd);
+	int accept(int sockfd, struct sockaddr_in6* addr);
+
+	void shutdownWrite(int sockfd);
+
+	struct sockaddr_in6 getLocalAddr(int sockfd);
 }
 
 #endif

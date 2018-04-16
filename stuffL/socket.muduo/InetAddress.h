@@ -35,7 +35,7 @@ private:
 };
 
 /*
-struct sockaddr_in //INET_ADDRSTRLEN 16字节大小
+struct sockaddr_in //固定INET_ADDRSTRLEN 16字节大小
 {
 	__SOCKADDR_COMMON (sin_);   // 地址族 sa_family_t sin_family; typedef unsigned short int sa_family_t;
 	in_port_t sin_port;			//端口号 typedef uint16_t in_port_t;
@@ -48,19 +48,19 @@ struct sockaddr_in //INET_ADDRSTRLEN 16字节大小
 
 		
 
-struct sockaddr_in6
+struct sockaddr_in6 // 固定28字节
 {
-	__SOCKADDR_COMMON (sin6_);  // sa_family_t sin6_family;
-	in_port_t sin6_port;	    //传输层端口 
-	uint32_t sin6_flowinfo;	    // IPV6流信息
-	struct in6_addr sin6_addr;	// IPV6地址
-	uint32_t sin6_scope_id;	
+	__SOCKADDR_COMMON (sin6_);  // sa_family_t sin6_family; 长度和地址族供2字节
+	in_port_t sin6_port;	    //传输层端口 2个字节
+	uint32_t sin6_flowinfo;	    // IPV6流信息 4个字节
+	struct in6_addr sin6_addr;	// IPV6地址 128位 16字节
+	uint32_t sin6_scope_id;	    // 范围id 4字节
 };
 
 
-struct sockaddr
+struct sockaddr // 固定16字节
 {
-	__SOCKADDR_COMMON (sa_);	//地址族和长度
+	__SOCKADDR_COMMON (sa_);	//地址族和长度 2个字节
 	char sa_data[14];		    //地址
 };
 */

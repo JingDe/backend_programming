@@ -78,8 +78,120 @@ void sockets::toIp(char* buf, size_t size, const struct sockaddr* addr)
 	}
 }
 
+int sockets::createNonblockingOrDie(sa_family_t family)
+{
+#if VALGRIND
+	int sockfd = ::socket(family, SOCK_STREAM, IPPROTO_TCP);
+	if (sockfd < 0)
+		LOG_FATAL << "sockets::createNonblockingOrDie";
+
+	setNonBlockAndCloseOnExec(sockfd);
+#else
+	int sockfd = ::socket(family, SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC, IPPROTO_TCP);
+	if (sockfd < 0)
+		LOG_FATAL << "sockets::createNonblockingOrDie";
+#endif
+	return sockfd;
+}
+
 void sockets::close(int sockfd)
 {
 	if (::close(sockfd) < 0)
 		LOG_ERROR << "sockets::close";
+}
+
+void sockets::bindOrDie(int sockfd, const struct sockaddr* addr)
+{
+	int ret = ::bind(sockfd, addr, static_cast<socklen_t>(sizeof(struct sockaddr_in6))); // !!
+	if (ret < 0)
+		LOG_ERROR << "sockets::bindOrDie";
+}
+
+void sockets::listenOrDie(int sockfd)
+{
+	int ret = ::listen(sockfd, SOMAXCONN); // 128
+	if (ret < 0)
+		LOG_FATAL << "sockets::listenOrDie";
+}
+
+namespace
+{
+#if VALGRIND  ||  defined(NO_ACCEPT4)
+	void setNonBlockAndCloseOnExec(int sockfd)
+	{
+		int flags = ::fcntl(sockfd, F_GETFL, 0);
+		flags |= O_NONBLOCK;
+		int ret = ::fcntl(sockfd, F_SETFL, flags); 
+		// 设置文件状态标识：O_APPEND, O_ASYNC, O_DIRECT, O_NOATIME, O_NONBLOCK,不包括文件访问模式、文件创建标志
+
+		flags = ::fcntl(sockfd, F_GETFD, 0);
+		flags |= FD_CLOEXEC;
+		ret = ::fcntl(sockfd, F_SETFD, flags); // 设置文件描述符标识
+
+	}
+#endif
+
+}
+
+// int accept(int sockfd, struct sockaddr* addr, socklen_t *addrlen);
+// int accept4(int sockfd, struct sockaddr* addr, socklen_t *addrlen, int flags);
+int sockets::accept(int sockfd, struct sockaddr_in6* addr)
+{
+	socklen_t addrlen = static_cast<socklen_t>(sizeof *addr);
+
+#if VALGRIND  ||  defined(NO_ACCEPT4)
+	int connfd = ::accept(sockfd, sockaddr_cast(addr), &addrlen);
+	setNonBlockAndCloseOnExec(connfd);
+#else
+	int connfd = ::accept4(sockfd, sockaddr_cast(addr), &addrlen, SOCK_NONBLOCK | SOCK_CLOEXEC);
+#endif
+
+	if(connfd < 0)
+	{
+		int savedErrno = errno;
+		LOG_ERROR << "Socket::accept";
+		switch (savedErrno)
+		{
+		case EAGAIN:
+		case ECONNABORTED:
+		case EINTR:
+		case EPROTO: // ???
+		case EPERM:
+		case EMFILE: // per-process lmit of open file desctiptor ???
+					 // expected errors
+			errno = savedErrno;
+			break;
+		case EBADF:
+		case EFAULT:
+		case EINVAL:
+		case ENFILE:
+		case ENOBUFS:
+		case ENOMEM:
+		case ENOTSOCK:
+		case EOPNOTSUPP:
+			// unexpected errors
+			LOG_FATAL << "unexpected error of ::accept " << savedErrno;
+			break;
+		default:
+			LOG_FATAL << "unknown error of ::accept " << savedErrno;
+			break;
+		}
+	}
+	return connfd;
+}
+
+void sockets::shutdownWrite(int sockfd)
+{
+	if (::shutdown(sockfd, SHUT_WR) < 0) // 关闭发送端
+		LOG_ERROR << "sockets::shutdownWrite";
+}
+
+struct sockaddr_in6 sockets::getLocalAddr(int sockfd)
+{
+	struct sockaddr_in6 localaddr;
+	bzero(&localaddr, sizeof localaddr);
+	socklen_t addrlen = static_cast<socklen_t>(sizeof localaddr);
+	if (::getsockname(sockfd, sockaddr_cast(&localaddr), &addrlen) < 0)
+		LOG_ERROR << "sockets::getLocalAddr";
+	return localaddr;
 }
