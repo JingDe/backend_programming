@@ -1,6 +1,8 @@
 #ifndef SOCKET_H_
 #define SOCKET_H_
 
+
+struct tcp_info;
 class InetAddress;
 
 class Socket {

@@ -18,7 +18,8 @@ public:
 	std::string toIpPort() const;
 	uint16_t toPort() const;
 
-	const struct sockaddr* getSockAddr() const { return sockaddr_cast(&addr6_); }
+	// 转变成sockaddr地址
+	const struct sockaddr* getSockAddr() const { return sockets::sockaddr_cast(&addr6_); }
 	void setSockAddrInet6(const struct sockaddr_in6& addr6) { addr6_ = addr6; }
 
 	uint32_t ipNetEndian() const;
@@ -28,13 +29,13 @@ public:
 
 private:
 	union {
-		struct sockaddr_in addr_;
+		struct sockaddr_in addr_; // 填充到struct sockaddr大小
 		struct sockaddr_in6 addr6_;
 	};
 };
 
 /*
-struct sockaddr_in
+struct sockaddr_in //INET_ADDRSTRLEN 16字节大小
 {
 	__SOCKADDR_COMMON (sin_);   // 地址族 sa_family_t sin_family; typedef unsigned short int sa_family_t;
 	in_port_t sin_port;			//端口号 typedef uint16_t in_port_t;
@@ -57,7 +58,11 @@ struct sockaddr_in6
 };
 
 
-
+struct sockaddr
+{
+	__SOCKADDR_COMMON (sa_);	//地址族和长度
+	char sa_data[14];		    //地址
+};
 */
 
 #endif
