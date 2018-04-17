@@ -34,6 +34,7 @@ public:
 private:
 	// 供acceptor_在连接到达时回调,创建TcpConnection对象，加入ConnectionMap
 	void newConnection(int sockfd, const InetAddress& peerAddr);
+	void removeConnection(const TcpConnectionPtr& conn);
 
 	typedef std::map<std::string, TcpConnectionPtr> ConnectionMap;
 

@@ -121,13 +121,15 @@ void PollPoller::removeChannel(Channel* channel)
 	size_t n=channels_.erase(channel->fd());
 	assert(n == 1);
 
-	// pollfds_.erase(pollfds_.begin()+channel->index());
+
+	// pollfds_.erase(pollfds_.begin()+channel->index()); // vector::erase复杂度O(n)
 	if (idx == pollfds_.size() - 1)
 		pollfds_.pop_back();
 	else
 	{
 		int channelAtEnd = pollfds_.back().fd;
-		iter_swap(pollfds_.begin() + idx, pollfds_.end() - 1); // 交换两个迭代器指向的值
+		// 删除idx位置元素复杂度O(1):交换两个迭代器指向的值，再删除最后一个元素
+		iter_swap(pollfds_.begin() + idx, pollfds_.end() - 1); 
 		if (channelAtEnd < 0)
 			channelAtEnd = -channelAtEnd - 1;
 		channels_[channelAtEnd]->set_index(idx); // ???

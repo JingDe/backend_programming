@@ -44,7 +44,7 @@ void Channel::handleEvent(time_t receiveTime)
 	std::shared_ptr<void> guard;
 	if (tied_)
 	{
-		guard = tie_.lock(); // guard对象延长Channel对象或其owner对象的生命期，使其长过handleEvent函数
+		guard = tie_.lock(); // guard对象延长Channel对象或其owner对象的生命期，使其长过handleEventWithGuard函数
 		if (guard)
 			handleEventWithGuard(receiveTime);
 	}

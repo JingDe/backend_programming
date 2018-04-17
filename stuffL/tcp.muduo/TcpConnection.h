@@ -37,7 +37,8 @@ public:
 		closeCallback_ = cb;
 	}
 
-	void connectEstablished(); // 供TcpServer::newConnection调用
+	void connectEstablished(); // 当TcpServer::newConnection调用
+	void connectDestroyed(); // 当TcpServer删除本连接调用
 
 private:
 	enum StateE{ kConnecting, kConnected, kDisconnected, };
@@ -55,7 +56,7 @@ private:
 	std::unique_ptr<Channel> channel_; // 管理socket_的IO事件
 	InetAddress localAddr_;
 	InetAddress peerAddr_;
-	ConnectionCallback connectionCallback_;
+	ConnectionCallback connectionCallback_; // connectEstablished()和connectDestroyed()均调用
 	MessageCallback messageCallback_;
 	CloseCallback closeCallback_;
 };

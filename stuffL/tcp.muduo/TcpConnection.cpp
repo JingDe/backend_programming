@@ -24,7 +24,8 @@ TcpConnection::TcpConnection(EventLoop* loop,
 	peerAddr_(peerAddr)
 {
 	LOG_DEBUG << "TcpConnection::ctor[" << name_ << "] at " << this << " fd=" << sockfd;
-	channel_->setReadCallback(std::bind(&TcpConnection::handleRead, this));
+	// ?? handleRead无参数，ReadCallback有参数
+	channel_->setReadCallback(std::bind(&TcpConnection::handleRead, this)); 
 	channel_->setCloseCallback(std::bind(&TcpConnection::handleClose, this));
 	channel_->setErrorCallback(std::bind(&TcpConnection::handleError, this));
 }
@@ -70,4 +71,17 @@ void TcpConnection::handleError()
 {
 	int err = sockets::getSocketError(channel_->fd());
 	LOG_ERROR << "TcpConnection::handleError[" << name_ << "] - SO_ERROR = " << err << " " << strerror(err);
+}
+
+void TcpConnection::connectDestroyed()
+{
+	loop_->assertInLoopThread();
+	assert(state_ == kConnected);
+	setState(kDisconnected);
+	channel_->disableAll();
+
+	connectionCallback_(shared_from_this());
+
+	//loop_->removeChannel(channel_.get());
+	channel_->remove();// 间接调用loop_->removeChannel()
 }
