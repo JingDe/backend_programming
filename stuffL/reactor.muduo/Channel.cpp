@@ -27,7 +27,8 @@ Channel::Channel(EventLoop* loop, int fd)
 
 Channel::~Channel()
 {
-	assert(!addedToLoop_);
+	assert(!addedToLoop_); // 保证在析构之前已从loop移除
+	assert(!eventHandling_); // 保证在事件处理handleEvent期间不会析构
 }
 
 // handleEvent()在回调用户onClose函数时，有可能析构Channel对象自身

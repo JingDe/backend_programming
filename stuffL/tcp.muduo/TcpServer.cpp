@@ -33,6 +33,7 @@ void TcpServer::start()
 	}
 }
 
+// 创建TcpConnection对象，加入ConnectionMap，设置好回调，调用TcpConnection::connectionEstablished()
 void TcpServer::newConnection(int sockfd, const InetAddress& peerAddr)
 {
 	loop_->assertInLoopThread();
@@ -47,6 +48,7 @@ void TcpServer::newConnection(int sockfd, const InetAddress& peerAddr)
 	InetAddress localAddr(sockets::getLocalAddr(sockfd));
 	
 	TcpConnectionPtr conn(new TcpConnection(loop_, connName, sockfd, localAddr, peerAddr));
+	// 使用acceptor loop同时观察新连接的IO事件
 	connections_[connName] = conn;
 	conn->setConnectionCallback(connectionCallback_);
 	conn->setMessageCallback(messageCallback_);

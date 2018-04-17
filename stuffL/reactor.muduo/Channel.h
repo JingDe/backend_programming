@@ -38,7 +38,9 @@ public:
 	std::string eventsToString() const;
 	std::string reventsToString() const;
 
-	void setReadCallback(ReadEventCallback cb) { readCallback_ = cb;  }
+	void setReadCallback(const ReadEventCallback& cb) { readCallback_ = cb;  }
+	void setCloseCallback(const EventCallback& cb) { closeCallback_ = cb; }
+	void setErrorCallback(const EventCallback& cb) { errorCallback_ = cb; }
 
 	void remove();
 
@@ -65,8 +67,8 @@ private:
 
 	ReadEventCallback readCallback_;
 	EventCallback writeCallback_;
-	EventCallback closeCallback_;
-	EventCallback errorCallback_;
+	EventCallback closeCallback_; // TcpConnection::handleClose()
+	EventCallback errorCallback_; // TcpConnection::handleError()
 	
 
 	static const int kReadEvent; //  ‰»Î ¬º˛ POLLIN |  POLLPRI

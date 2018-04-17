@@ -51,6 +51,7 @@ void sockets::fromIpPort(const char* ip, uint16_t port, struct sockaddr_in6* add
 		LOG_ERROR << "fromIpPort";
 }
 
+// 获得地址的字符串表示，注意转成主机序
 void sockets::toIpPort(char* buf, size_t size, const struct sockaddr* addr)
 {
 	toIp(buf, size, addr);
@@ -61,6 +62,7 @@ void sockets::toIpPort(char* buf, size_t size, const struct sockaddr* addr)
 	snprintf(buf + end, size - end, ":%u", port);
 }
 
+// 使用inet_ntop转换二进制IP到字符串形式
 void sockets::toIp(char* buf, size_t size, const struct sockaddr* addr)
 {
 	if (addr ->sa_family == AF_INET)
@@ -194,4 +196,18 @@ struct sockaddr_in6 sockets::getLocalAddr(int sockfd)
 	if (::getsockname(sockfd, sockaddr_cast(&localaddr), &addrlen) < 0)
 		LOG_ERROR << "sockets::getLocalAddr";
 	return localaddr;
+}
+
+int sockets::getSocketError(int sockfd)
+{
+	int optval;
+	socklen_t optlen = sizeof optval;
+
+	// 获得错误状态，并清除
+	if (::getsockopt(sockfd, SOL_SOCKET, SO_ERROR, &optval, &optlen) < 0)
+	{
+		return errno;
+	}
+	else
+		return optval;
 }

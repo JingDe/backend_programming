@@ -33,23 +33,31 @@ public:
 		messageCallback_ = cb;
 	}
 
+	void setCloseCallback(const CloseCallback& cb) {
+		closeCallback_ = cb;
+	}
+
 	void connectEstablished(); // 供TcpServer::newConnection调用
 
 private:
-	enum StateE{ kConnecting, kConnected, };
+	enum StateE{ kConnecting, kConnected, kDisconnected, };
 
 	void setState(StateE s) { state_ = s; }
+
 	void handleRead(); // 供channel_在readable事件时回调
+	void handleClose();
+	void handleError();
 
 	EventLoop* loop_;
-	std::string name_;
-	StateE state_; 
+	std::string name_; // 连接名称
+	StateE state_; // 连接状态
 	std::unique_ptr<Socket> socket_; // 拥有连接的socket，负责close
 	std::unique_ptr<Channel> channel_; // 管理socket_的IO事件
 	InetAddress localAddr_;
 	InetAddress peerAddr_;
 	ConnectionCallback connectionCallback_;
 	MessageCallback messageCallback_;
+	CloseCallback closeCallback_;
 };
 
 #endif

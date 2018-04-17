@@ -3,8 +3,10 @@
 
 #include<stdint.h>
 
+#include"common/noncopyable.h"
+
 template<typename T>
-class AtomicIntegerT : boost::noncopyable
+class AtomicIntegerT : public noncopyable
 {
 public:
 	AtomicIntegerT()

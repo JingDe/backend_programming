@@ -32,15 +32,15 @@ public:
 	}
 
 private:
-	// 供acceptor_在连接到达时回调
+	// 供acceptor_在连接到达时回调,创建TcpConnection对象，加入ConnectionMap
 	void newConnection(int sockfd, const InetAddress& peerAddr);
 
 	typedef std::map<std::string, TcpConnectionPtr> ConnectionMap;
 
-	EventLoop* loop_;  // the acceptor loop
+	EventLoop* loop_;  // // 将Acceptor::acceptChannel_和TcpConnection::channel_都注册到loop
 	const std::string name_;
-	std::unique_ptr<Acceptor> acceptor_; // avoid revealing Acceptor	
-	ConnectionCallback connectionCallback_;
+	std::unique_ptr<Acceptor> acceptor_; // 用于accept新TCP连接	
+	ConnectionCallback connectionCallback_; // 连接回调函数，由用户设置，TcpServer赋值给TcpConnection
 	MessageCallback messageCallback_;	
 	bool started_;	
 	int nextConnId_;// always in loop thread

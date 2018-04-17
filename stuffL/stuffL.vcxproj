@@ -85,8 +85,8 @@
     <ClCompile Include="socket.muduo\Socket.cpp" />
     <ClCompile Include="socket.muduo\SocketsOps.cpp" />
     <ClCompile Include="tcp.muduo\Acceptor.cpp" />
-    <ClCompile Include="tcp.muduo\Acceptor_test.cpp" />
     <ClCompile Include="tcp.muduo\TcpConnection.cpp" />
+    <ClCompile Include="tcp.muduo\TcpConnection_test1.cpp" />
     <ClCompile Include="tcp.muduo\TcpServer.cpp" />
     <ClCompile Include="testharness.leveldb\testharness.cpp" />
     <ClCompile Include="thread.muduo\CurrentThread.cpp" />

@@ -26,6 +26,8 @@ namespace sockets {
 	void shutdownWrite(int sockfd);
 
 	struct sockaddr_in6 getLocalAddr(int sockfd);
+
+	int getSocketError(int sockfd);
 }
 
 #endif
