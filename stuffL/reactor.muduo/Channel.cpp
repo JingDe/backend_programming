@@ -1,6 +1,7 @@
 #include"Channel.h"
 #include"logging.muduo/Logging.h"
 #include"EventLoop.h"
+#include"TimerQueue.muduo/Timestamp.h"
 
 #include<sstream>
 #include<cassert>
@@ -39,7 +40,7 @@ void Channel::tie(const std::shared_ptr<void>& obj)
 	tied_ = true;
 }
 
-void Channel::handleEvent(time_t receiveTime)
+void Channel::handleEvent(Timestamp receiveTime)
 {
 	std::shared_ptr<void> guard;
 	if (tied_)
@@ -52,10 +53,10 @@ void Channel::handleEvent(time_t receiveTime)
 		handleEventWithGuard(receiveTime);
 }
 
-void Channel::handleEventWithGuard(time_t receiveTime)
+void Channel::handleEventWithGuard(Timestamp receiveTime)
 {
 	eventHandling_ = true;
-	if ((revents_ & POLLHUP) && !(revents_ & POLLIN)) // socket正常关闭返回POLLHUP，连接异常断开返回POLLI并且read返回0??
+	if ((revents_ & POLLHUP) && !(revents_ & POLLIN)) // socket正常关闭返回POLLHUP，连接异常断开返回POLLIN并且read返回0??
 	{
 		LOG_WARN << "fd = " << fd_ << " Channel::handle_event() POLLHUP";
 		if (closeCallback_)

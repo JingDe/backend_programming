@@ -30,11 +30,13 @@
     <ClInclude Include="common\AppendFile.h" />
     <ClInclude Include="common\Atomic.h" />
     <ClInclude Include="common\atomic_pointer.h" />
+    <ClInclude Include="common\copyable.h" />
     <ClInclude Include="common\FixedBuffer.h" />
     <ClInclude Include="common\MutexLock.h" />
     <ClInclude Include="common\noncopyable.h" />
     <ClInclude Include="common\Slice.h" />
     <ClInclude Include="dummy.h" />
+    <ClInclude Include="logging.muduo\AsyncLogging.h" />
     <ClInclude Include="logging.muduo\LogFile.h" />
     <ClInclude Include="logging.muduo\Logging.h" />
     <ClInclude Include="logging.muduo\LogStream.h" />
@@ -52,6 +54,7 @@
     <ClInclude Include="socket.muduo\Socket.h" />
     <ClInclude Include="socket.muduo\SocketsOps.h" />
     <ClInclude Include="tcp.muduo\Acceptor.h" />
+    <ClInclude Include="tcp.muduo\Buffer.h" />
     <ClInclude Include="tcp.muduo\Callbacks.h" />
     <ClInclude Include="tcp.muduo\TcpConnection.h" />
     <ClInclude Include="tcp.muduo\TcpServer.h" />
@@ -69,6 +72,7 @@
   <ItemGroup>
     <ClCompile Include="common\AppendFile.cpp" />
     <ClCompile Include="dummy.cpp" />
+    <ClCompile Include="logging.muduo\AsyncLogging.cpp" />
     <ClCompile Include="logging.muduo\LogFile.cpp" />
     <ClCompile Include="logging.muduo\Logging.cpp" />
     <ClCompile Include="logging.muduo\LogStream.cpp" />
@@ -85,8 +89,9 @@
     <ClCompile Include="socket.muduo\Socket.cpp" />
     <ClCompile Include="socket.muduo\SocketsOps.cpp" />
     <ClCompile Include="tcp.muduo\Acceptor.cpp" />
+    <ClCompile Include="tcp.muduo\Buffer.cpp" />
     <ClCompile Include="tcp.muduo\TcpConnection.cpp" />
-    <ClCompile Include="tcp.muduo\TcpConnection_test1.cpp" />
+    <ClCompile Include="tcp.muduo\TcpConnection_test2.cpp" />
     <ClCompile Include="tcp.muduo\TcpServer.cpp" />
     <ClCompile Include="testharness.leveldb\testharness.cpp" />
     <ClCompile Include="thread.muduo\CurrentThread.cpp" />

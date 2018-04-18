@@ -102,6 +102,12 @@ void sockets::close(int sockfd)
 		LOG_ERROR << "sockets::close";
 }
 
+void sockets::shutdownWrite(int sockfd)
+{
+	if (::shutdown(sockfd, SHUT_WR) < 0) // 关闭发送端
+		LOG_ERROR << "sockets::shutdownWrite";
+}
+
 void sockets::bindOrDie(int sockfd, const struct sockaddr* addr)
 {
 	int ret = ::bind(sockfd, addr, static_cast<socklen_t>(sizeof(struct sockaddr_in6))); // !!
@@ -182,11 +188,15 @@ int sockets::accept(int sockfd, struct sockaddr_in6* addr)
 	return connfd;
 }
 
-void sockets::shutdownWrite(int sockfd)
+ssize_t sockets::readv(int sockfd, const struct iovec* iov, int iovcnt)
 {
-	if (::shutdown(sockfd, SHUT_WR) < 0) // 关闭发送端
-		LOG_ERROR << "sockets::shutdownWrite";
+	return ::readv(sockfd, iov, iovcnt); // 返回成功读取的字节数或-1
 }
+// 读到多个buffer中
+// struct iovec{
+//     void *iov_base;
+//     size_t iov_len;
+// };
 
 struct sockaddr_in6 sockets::getLocalAddr(int sockfd)
 {

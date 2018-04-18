@@ -6,6 +6,7 @@
 
 #include"Callbacks.h"
 #include"socket.muduo/InetAddress.h"
+#include"Buffer.h"
 
 class EventLoop;
 class Socket;
@@ -45,7 +46,7 @@ private:
 
 	void setState(StateE s) { state_ = s; }
 
-	void handleRead(); // 供channel_在readable事件时回调
+	void handleRead(Timestamp receiveTime); // 供channel_在readable事件时回调
 	void handleClose();
 	void handleError();
 
@@ -59,6 +60,8 @@ private:
 	ConnectionCallback connectionCallback_; // connectEstablished()和connectDestroyed()均调用
 	MessageCallback messageCallback_;
 	CloseCallback closeCallback_;
+
+	Buffer inputBuffer_;
 };
 
 #endif

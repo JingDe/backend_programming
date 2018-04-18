@@ -3,6 +3,7 @@
 
 //#include"common/atomic_pointer.h"
 #include"AtomicPointer_temp.h"
+#include"TimerQueue.muduo/Timestamp.h"
 
 #include<ctime>
 #include<functional>
@@ -11,7 +12,7 @@ class Timer {
 public:
 	typedef std::function<void(void)> TimerCallback;
 
-	Timer(const TimerCallback& cb, time_t when, long interval)
+	Timer(const TimerCallback& cb, Timestamp when, double interval)
 		:callback_(cb),
 		expiration_(when),
 		interval_(interval),
@@ -25,7 +26,7 @@ public:
 		callback_();
 	}
 
-	time_t expiration() const
+	Timestamp expiration() const
 	{
 		return expiration_;
 	}
@@ -40,7 +41,7 @@ public:
 		return sequence_;
 	}
 
-	void restart(time_t now);
+	void restart(Timestamp now);
 
 	static long numCreated()
 	{
@@ -49,8 +50,8 @@ public:
 
 private:
 	TimerCallback callback_;
-	time_t expiration_;
-	const long interval_;
+	Timestamp expiration_;
+	const double interval_;
 	const bool repeat_;
 	const long sequence_;
 

@@ -10,7 +10,7 @@ public:
 	EPollPoller(EventLoop* loop);
 	virtual ~EPollPoller();
 
-	virtual time_t poll(int timeoutMs, ChannelList* activeChannels);
+	virtual Timestamp poll(int timeoutMs, ChannelList* activeChannels);
 	virtual void updateChannel(Channel* channel);
 	virtual void removeChannel(Channel* channel);
 

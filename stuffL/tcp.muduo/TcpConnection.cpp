@@ -25,7 +25,7 @@ TcpConnection::TcpConnection(EventLoop* loop,
 {
 	LOG_DEBUG << "TcpConnection::ctor[" << name_ << "] at " << this << " fd=" << sockfd;
 	// ?? handleRead无参数，ReadCallback有参数
-	channel_->setReadCallback(std::bind(&TcpConnection::handleRead, this)); 
+	channel_->setReadCallback(std::bind(&TcpConnection::handleRead, this, std::placeholders::_1)); 
 	channel_->setCloseCallback(std::bind(&TcpConnection::handleClose, this));
 	channel_->setErrorCallback(std::bind(&TcpConnection::handleError, this));
 }
@@ -46,16 +46,21 @@ void TcpConnection::connectEstablished()
 }
 
 // 处理可readable事件
-void TcpConnection::handleRead()
+void TcpConnection::handleRead(Timestamp receiveTime)
 {
-	char buf[65535];
-	ssize_t n = read(channel_->fd(), buf, sizeof buf); // socket_.fd()
+	//char buf[65535];
+	//ssize_t n = read(channel_->fd(), buf, sizeof buf); // socket_.fd()
+	int savedErrno;
+	ssize_t n = inputBuffer_.readFd(channel_->fd(), &savedErrno);
 	if (n > 0)
-		messageCallback_(shared_from_this(), buf, n);
+		messageCallback_(shared_from_this(), &inputBuffer_, receiveTime);
 	else if (n == 0)
 		handleClose();
 	else
+	{
+		errno = savedErrno;
 		handleError();
+	}
 }
 
 void TcpConnection::handleClose()

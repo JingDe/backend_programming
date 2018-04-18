@@ -63,6 +63,6 @@ void TcpServer::removeConnection(const TcpConnectionPtr& conn)
 	size_t n = connections_.erase(conn->name()); // conn的引用计数降为1
 	assert(n == 1);
 	loop_->queueInLoop(std::bind(&TcpConnection::connectDestroyed, conn));
-		// std::bind让TcpConnection的生命期长到调用connectDestroyed的时刻
+		// std::bind让TcpConnection conn的生命期长到调用connectDestroyed的时刻
 		// queueInLoop:
 }

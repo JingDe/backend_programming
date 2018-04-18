@@ -3,6 +3,7 @@
 
 #include"port/port.h"
 #include"common/noncopyable.h"
+#include"TimerQueue.muduo/Timestamp.h"
 
 #include<memory>
 #include<vector>
@@ -38,9 +39,9 @@ public:
 	void queueInLoop(const Functor& cb);
 
 	// 定时器功能
-	TimerId runAt(const time_t& time, const TimerCallback& cb);
-	TimerId runAfter(long delay, const TimerCallback& cb);
-	TimerId runEvery(long interval, const TimerCallback& cb);
+	TimerId runAt(const Timestamp& time, const TimerCallback& cb);
+	TimerId runAfter(double delay, const TimerCallback& cb);
+	TimerId runEvery(double interval, const TimerCallback& cb);
 
 	void cancel(TimerId timerId);
 
@@ -59,7 +60,7 @@ private:
 	bool eventHandling_;
 
 	std::auto_ptr<Poller> poller_;
-	time_t pollReturnTime_;
+	Timestamp pollReturnTime_;
 
 	typedef std::vector<Channel*> ChannelList;
 	ChannelList activeChannels_;

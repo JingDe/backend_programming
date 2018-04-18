@@ -1,6 +1,8 @@
 #ifndef CHANNEL_H_
 #define CHANNEL_H_
 
+#include"TimerQueue.muduo/Timestamp.h"
+
 #include<ctime>
 #include<memory>
 #include<string>
@@ -11,7 +13,7 @@ class EventLoop;
 class Channel {
 public:
 	typedef std::function<void()> EventCallback;
-	typedef std::function<void(time_t)> ReadEventCallback;
+	typedef std::function<void(Timestamp)> ReadEventCallback;
 
 	Channel(EventLoop* loop, int fd);
 	~Channel();
@@ -20,7 +22,7 @@ public:
 	void set_revents(int revt) { revents_ = revt; }
 	void set_index(int index) { index_ = index;  }
 
-	void handleEvent(time_t receiveTime);
+	void handleEvent(Timestamp receiveTime);
 
 	void update();
 	void enableReading() { events_ |= kReadEvent; update(); }
@@ -45,7 +47,7 @@ public:
 	void remove();
 
 private:
-	void handleEventWithGuard(time_t receiveTime);
+	void handleEventWithGuard(Timestamp receiveTime);
 	std::string eventsToString(int fd, int ev) const;
 
 	EventLoop* loop_;

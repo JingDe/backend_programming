@@ -32,7 +32,7 @@ int main()
 	TcpServer server(&loop, listenAddr);
 	server.setConnectionCallback(onConnection);
 	server.setMessageCallback(onMessage);
-	server.start();
+	server.start(); // acceptor::listen
 
 	loop.loop();
 }

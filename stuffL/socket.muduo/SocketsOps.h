@@ -19,14 +19,15 @@ namespace sockets {
 
 	int createNonblockingOrDie(sa_family_t family);
 	void close(int sockfd);
-	void bindOrDie(int sockfd, const struct sockaddr* addr);
-	void listenOrDie(int sockfd);
-	int accept(int sockfd, struct sockaddr_in6* addr);
-
 	void shutdownWrite(int sockfd);
 
-	struct sockaddr_in6 getLocalAddr(int sockfd);
+	void bindOrDie(int sockfd, const struct sockaddr* addr);
+	void listenOrDie(int sockfd);
+	int accept(int sockfd, struct sockaddr_in6* addr);	
 
+	ssize_t readv(int sockfd, const struct iovec* iov, int iovcnt);
+
+	struct sockaddr_in6 getLocalAddr(int sockfd);
 	int getSocketError(int sockfd);
 }
 

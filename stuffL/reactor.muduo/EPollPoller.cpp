@@ -1,7 +1,7 @@
 #include"EPollPoller.h"
 #include"logging.muduo/Logging.h"
 #include"Channel.h"
-#include"test.leveldb/testharness.h"
+#include"testharness.leveldb/testharness.h"
 
 #include<cassert>
 
@@ -47,12 +47,12 @@ EPollPoller::~EPollPoller()
 	close(epollfd_);
 }
 
-time_t EPollPoller::poll(int timeoutMs, ChannelList* activeChannels)
+Timestamp EPollPoller::poll(int timeoutMs, ChannelList* activeChannels)
 {
 	LOG_INFO << "fd total count " << channels_.size();
 	int numEvents = epoll_wait(epollfd_, &*events_.begin(), static_cast<int>(events_.size()), timeoutMs);
 	int savedErrno = errno;
-	time_t now = time(NULL);
+	Timestamp now(Timestamp::now());
 	if (numEvents > 0)
 	{
 		LOG_INFO << numEvents << " events happended";

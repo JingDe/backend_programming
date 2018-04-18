@@ -8,7 +8,7 @@ public:
 	PollPoller(EventLoop* loop);
 	virtual ~PollPoller();
 
-	virtual time_t poll(int timeoutMs, ChannelList* activeChannels);
+	virtual Timestamp poll(int timeoutMs, ChannelList* activeChannels);
 
 	virtual void updateChannel(Channel* c);
 	virtual void removeChannel(Channel* c);

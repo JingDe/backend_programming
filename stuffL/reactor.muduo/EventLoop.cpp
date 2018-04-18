@@ -3,6 +3,7 @@
 #include"Poller.h"
 #include"TimerQueue.muduo/TimerId.h"
 #include"TimerQueue.muduo/TimerQueue.h"
+#include"TimerQueue.muduo/Timestamp.h"
 
 #include<cassert>
 #include<algorithm>
@@ -21,12 +22,12 @@ __thread EventLoop* t_loopInThisThread = 0;
 const int kPollTimeMs = 10000; // poll×èÈûÊ±¼ä10Ãë
 
 
-inline time_t addTime(time_t t, long seconds)
-{
-	// int64_t = long long
-	time_t result = t + seconds;
-	return result;
-}
+//inline time_t addTime(time_t t, long seconds)
+//{
+//	// int64_t = long long
+//	time_t result = t + seconds;
+//	return result;
+//}
 
 
 /*
@@ -210,24 +211,20 @@ void EventLoop::queueInLoop(const Functor& cb)
 		wakeup();
 }
 
-TimerId EventLoop::runAt(const time_t& time, const TimerCallback& cb)
+TimerId EventLoop::runAt(const Timestamp& time, const TimerCallback& cb)
 {
-	return timerQueue_->addTimer(cb, time, 0);
+	return timerQueue_->addTimer(cb, time, 0.0);
 }
 
-TimerId EventLoop::runAfter(long delay, const TimerCallback& cb)
+TimerId EventLoop::runAfter(double delay, const TimerCallback& cb)
 {
-	time_t now = time(NULL);
-	time_t when(addTime(now, delay));
-	
+	Timestamp when(addTime(Timestamp::now(), delay));	
 	return runAt(when, cb);
 }
 
-TimerId EventLoop::runEvery(long interval, const TimerCallback& cb)
+TimerId EventLoop::runEvery(double interval, const TimerCallback& cb)
 {
-	time_t now = time(NULL);
-	time_t when(addTime(now, interval));
-	
+	Timestamp when(addTime(Timestamp::now(), interval));	
 	return timerQueue_->addTimer(cb, when, interval);
 }
 
