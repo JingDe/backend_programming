@@ -91,8 +91,8 @@
     <ClCompile Include="tcp.muduo\Acceptor.cpp" />
     <ClCompile Include="tcp.muduo\Buffer.cpp" />
     <ClCompile Include="tcp.muduo\TcpConnection.cpp" />
-    <ClCompile Include="tcp.muduo\TcpConnection_test3.cpp" />
     <ClCompile Include="tcp.muduo\TcpServer.cpp" />
+    <ClCompile Include="tcp.muduo\TcpServer_test1.cpp" />
     <ClCompile Include="testharness.leveldb\testharness.cpp" />
     <ClCompile Include="thread.muduo\CurrentThread.cpp" />
     <ClCompile Include="thread.muduo\tests\__thread__test\ThreadObject.cpp" />

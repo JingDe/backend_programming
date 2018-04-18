@@ -3,13 +3,15 @@
 
 #include<functional>
 
+#include"reactor.muduo/EventLoopThreadPool.h"
 #include"logging.muduo/Logging.h"
 
 TcpServer::TcpServer(EventLoop* loop, const InetAddress& listenAddr)
 	: loop_(CHECK_NOTNULL(loop)),
 	name_(listenAddr.toIpPort()),
+	ipPort_(listenAddr.toIpPort()),
 	acceptor_(new Acceptor(loop, listenAddr)),
-	started_(false),
+	threadPool_(new EventLoopThreadPool(loop)),
 	nextConnId_(1)
 {
 	acceptor_->setNewConnectionCallback(
@@ -20,15 +22,19 @@ TcpServer::~TcpServer()
 {
 }
 
+void TcpServer::setThreadNum(int numThreads)
+{
+	assert(0 <= numThreads);
+	threadPool_->setThreadNum(numThreads);
+}
+
 void TcpServer::start()
 {
-	if (!started_)
+	if (started_.getAndSet(1) == 0)
 	{
-		started_ = true;
-	}
+		threadPool_->start(threadInitCallback_);
 
-	if (!acceptor_->listenning())
-	{
+		assert(!acceptor_->listenning());
 		loop_->runInLoop(std::bind(&Acceptor::listen, acceptor_.get()));
 	}
 }
@@ -37,8 +43,9 @@ void TcpServer::start()
 void TcpServer::newConnection(int sockfd, const InetAddress& peerAddr)
 {
 	loop_->assertInLoopThread();
-	char buf[32];
-	snprintf(buf, sizeof buf, "#%d", nextConnId_);
+	EventLoop* ioLoop = threadPool_->getNextLoop();
+	char buf[64];
+	snprintf(buf, sizeof buf, "-%s#%d", ipPort_.c_str(), nextConnId_);
 	++nextConnId_;
 	std::string connName = name_ + buf;
 
@@ -47,22 +54,33 @@ void TcpServer::newConnection(int sockfd, const InetAddress& peerAddr)
 		<< "] from " << peerAddr.toIpPort();
 	InetAddress localAddr(sockets::getLocalAddr(sockfd));
 	
-	TcpConnectionPtr conn(new TcpConnection(loop_, connName, sockfd, localAddr, peerAddr));
-	// 使用acceptor loop同时观察新连接的IO事件
+	TcpConnectionPtr conn(new TcpConnection(ioLoop, connName, sockfd, localAddr, peerAddr));
+	// 单线程TcpServer使用acceptor loop同时观察新连接的IO事件
 	connections_[connName] = conn;
 	conn->setConnectionCallback(connectionCallback_);
 	conn->setMessageCallback(messageCallback_);
 	conn->setCloseCallback(std::bind(&TcpServer::removeConnection, this, std::placeholders::_1));
-	conn->connectEstablished();
+	//conn->connectEstablished();
+	ioLoop->runInLoop(std::bind(&TcpConnection::connectEstablished, conn));
 }
 
+// removeConnection会在TcpConnection的ioLoop线程调用，而TcpServer是无锁的，所以需要把removeConnection
+// 移到loop_线程调用
 void TcpServer::removeConnection(const TcpConnectionPtr& conn)
+{
+	loop_->runInLoop(std::bind(&TcpServer::removeConnectionInLoop, this, conn));
+}
+
+// 把TcpConnection::connectDestroyed移到TcpConnection的ioLoop线程调用，
+// 是为了保证TcpConnection的connectionCallback_始终在其ioLoop回调，方便代码的编写
+void TcpServer::removeConnectionInLoop(const TcpConnectionPtr& conn)
 {
 	loop_->assertInLoopThread();
 	LOG_INFO << "TcpServer::removeConnection [" << name_ << "] - connection " << conn->name();
 	size_t n = connections_.erase(conn->name()); // conn的引用计数降为1
 	assert(n == 1);
-	loop_->queueInLoop(std::bind(&TcpConnection::connectDestroyed, conn));
+	EventLoop* ioLoop = conn->getLoop();
+	ioLoop->queueInLoop(std::bind(&TcpConnection::connectDestroyed, conn));
 		// std::bind让TcpConnection conn的生命期长到调用connectDestroyed的时刻
 		// queueInLoop:
 }
