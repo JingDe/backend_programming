@@ -11,6 +11,7 @@ const char Buffer::kCRLF[] = "\r\n";
 const size_t Buffer::kCheapPrepend;
 const size_t Buffer::kInitialSize;
 
+// leveldb，分两次读，第一次不分配，第二次动态分配空间
 ssize_t Buffer::readFd(int fd, int* savedErrno)
 {
 	// saved an ioctl()/FIONREAD call to tell how much to read

@@ -24,6 +24,9 @@ public:
 	const InetAddress& peerAddress() { return peerAddr_; }
 	bool connected() const { return state_ == kConnected; }
 
+	void send(const std::string& message);
+	void shutdown();
+
 	void setConnectionCallback(const ConnectionCallback& cb)
 	{
 		connectionCallback_ = cb;
@@ -42,13 +45,17 @@ public:
 	void connectDestroyed(); // 当TcpServer删除本连接调用
 
 private:
-	enum StateE{ kConnecting, kConnected, kDisconnected, };
+	enum StateE{ kConnecting, kConnected, kDisconnecting, kDisconnected, };
 
 	void setState(StateE s) { state_ = s; }
 
 	void handleRead(Timestamp receiveTime); // 供channel_在readable事件时回调
+	void handleWrite();
 	void handleClose();
 	void handleError();
+
+	void sendInLoop(const std::string& message);
+	void shutdownInLoop();
 
 	EventLoop* loop_;
 	std::string name_; // 连接名称
@@ -62,6 +69,7 @@ private:
 	CloseCallback closeCallback_;
 
 	Buffer inputBuffer_;
+	Buffer outputBuffer_;
 };
 
 #endif

@@ -27,8 +27,11 @@ public:
 	void update();
 	void enableReading() { events_ |= kReadEvent; update(); }
 	void enableWriting() { events_ |= kWriteEvent; update(); }
+	void disableReading() { events_ |= ~kReadEvent; update(); }
+	void disableWriting() { events_ |= ~kWriteEvent; update(); }
 	void disableAll() { events_ = kNoneEvent; update(); }
 
+	bool isWriting() const { return events_ & kWriteEvent; }
 	bool isNoneEvent() const { return events_ == kNoneEvent;  }
 
 	int fd() const { return fd_;  }

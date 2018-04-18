@@ -35,6 +35,8 @@ public:
 	void removeChannel(Channel* c);
 	bool hasChannel(Channel* channel);
 
+	bool isInLoopThread();
+
 	void runInLoop(const Functor& cb);
 	void queueInLoop(const Functor& cb);
 
@@ -51,9 +53,7 @@ public:
 private:	
 	void printActiveChannels() const;
 	void doPendingFunctors();
-	bool isInLoopThread();
-
-
+	
 	const pid_t pid_;
 	bool looping_;
 	bool quit_;	
