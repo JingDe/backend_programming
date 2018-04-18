@@ -27,6 +27,9 @@ public:
 	void send(const std::string& message);
 	void shutdown();
 
+	void setTcpNoDelay(bool on); // 禁用Nagle算法
+	void setKeepAlive(bool on);
+
 	void setConnectionCallback(const ConnectionCallback& cb)
 	{
 		connectionCallback_ = cb;
@@ -35,6 +38,16 @@ public:
 	void setMessageCallback(const MessageCallback& cb)
 	{
 		messageCallback_ = cb;
+	}
+
+	void setWriteCompleteCallback(const WriteCompleteCallback& cb)
+	{
+		writeCompleteCallback_ = cb;
+	}
+
+	void setHighWaterMarkCallback(const HighWaterMarkCallback& cb, size_t highWaterMark)
+	{
+		highWaterMarkCallback_ = cb; highWaterMark_ = highWaterMark;
 	}
 
 	void setCloseCallback(const CloseCallback& cb) {
@@ -66,8 +79,10 @@ private:
 	InetAddress peerAddr_;
 	ConnectionCallback connectionCallback_; // connectEstablished()和connectDestroyed()均调用
 	MessageCallback messageCallback_;
+	WriteCompleteCallback writeCompleteCallback_;
+	HighWaterMarkCallback highWaterMarkCallback_;
 	CloseCallback closeCallback_;
-
+	size_t highWaterMark_;
 	Buffer inputBuffer_;
 	Buffer outputBuffer_;
 };

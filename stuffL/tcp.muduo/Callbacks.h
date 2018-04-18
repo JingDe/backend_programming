@@ -16,4 +16,8 @@ typedef std::function<void(const TcpConnectionPtr&)> CloseCallback; // s06
 
 typedef std::function<void(const TcpConnectionPtr&, Buffer*, Timestamp)> MessageCallback; // s07
 
+typedef std::function<void(const TcpConnectionPtr&)> CloseCallback;
+typedef std::function<void(const TcpConnectionPtr&)> WriteCompleteCallback;
+typedef std::function<void(const TcpConnectionPtr&, size_t)> HighWaterMarkCallback;
+
 #endif

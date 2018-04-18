@@ -90,6 +90,10 @@ void TcpConnection::handleWrite()
 			if (outputBuffer_.readableBytes() == 0)
 			{
 				channel_->disableWriting(); // 避免busy loop
+				if (writeCompleteCallback_)
+				{
+					loop_->queueInLoop(std::bind(writeCompleteCallback_, shared_from_this()));
+				}
 				if (state_ == kDisconnecting) // 继续关闭连接
 					shutdownInLoop(); // 已在IO线程
 			}
@@ -138,15 +142,21 @@ void TcpConnection::sendInLoop(const std::string& message)
 {
 	loop_->assertInLoopThread();
 	ssize_t nwrote = 0;
+	size_t remaining = message.size();
 	if (!channel_->isWriting() && outputBuffer_.readableBytes() == 0)
 	{
 		nwrote = write(channel_->fd(), message.data(), message.size());
 		if (nwrote >= 0)
 		{
+			remaining = remaining - nwrote;
 			if (static_cast<size_t>(nwrote) < message.size())
 			{
 				LOG_TRACE << "I am going to write more data";
-			}			
+			}	
+			else if(writeCompleteCallback_)
+			{
+				loop_->queueInLoop(std::bind(writeCompleteCallback_, shared_from_this()));
+			}
 		}
 		else
 		{
@@ -159,7 +169,14 @@ void TcpConnection::sendInLoop(const std::string& message)
 	assert(nwrote >= 0);
 	if (static_cast<size_t>(nwrote) < message.size())
 	{
-		outputBuffer_.append(message.data() + nwrote, message.size() - nwrote);
+		size_t oldLen = outputBuffer_.readableBytes();
+		if (oldLen + remaining >= highWaterMark_
+			&& oldLen < highWaterMark_
+			&& highWaterMarkCallback_)
+		{
+			loop_->queueInLoop(std::bind(highWaterMarkCallback_, shared_from_this(), oldLen + remaining));
+		}
+		outputBuffer_.append(message.data() + nwrote, message.size() - nwrote); // remaining
 		if (!channel_->isWriting())
 			channel_->enableWriting();
 	}
@@ -179,4 +196,14 @@ void TcpConnection::shutdownInLoop()
 	loop_->assertInLoopThread();
 	if (!channel_->isWriting())
 		socket_->shutdownWrite();
+}
+
+void TcpConnection::setTcpNoDelay(bool on)
+{
+	socket_->setTcpNoDelay(on);
+}
+
+void TcpConnection::setKeepAlive(bool on)
+{
+	socket_->setKeepAlive(on);
 }

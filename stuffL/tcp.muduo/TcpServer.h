@@ -31,6 +31,11 @@ public:
 		messageCallback_ = cb;
 	}
 
+	void setWriteCompleteCallback(const WriteCompleteCallback& cb)
+	{
+		writeCompleteCallback_ = cb;
+	}
+
 private:
 	// 供acceptor_在连接到达时回调,创建TcpConnection对象，加入ConnectionMap
 	void newConnection(int sockfd, const InetAddress& peerAddr);
@@ -43,6 +48,7 @@ private:
 	std::unique_ptr<Acceptor> acceptor_; // 用于accept新TCP连接	
 	ConnectionCallback connectionCallback_; // 连接回调函数，由用户设置，TcpServer赋值给TcpConnection
 	MessageCallback messageCallback_;	
+	WriteCompleteCallback writeCompleteCallback_;
 	bool started_;	
 	int nextConnId_;// always in loop thread
 	ConnectionMap connections_; // 管理所有连接，连接名-连接

@@ -11,6 +11,7 @@
 #include<unistd.h>
 #include<poll.h>
 #include<sys/eventfd.h>
+#include<signal.h>
 
 #include"logging.muduo/Logging.h"
 #include"thread.muduo/CurrentThread.h"
@@ -22,13 +23,15 @@ __thread EventLoop* t_loopInThisThread = 0;
 const int kPollTimeMs = 10000; // poll×èÈûÊ±¼ä10Ãë
 
 
-//inline time_t addTime(time_t t, long seconds)
-//{
-//	// int64_t = long long
-//	time_t result = t + seconds;
-//	return result;
-//}
+class IgnorePipe {
+public:
+	IgnorePipe()
+	{
+		signal(SIGPIPE, SIG_IGN);
+	}
+};
 
+IgnorePipe initObj;
 
 /*
 int eventfd(unsigned int initval, int flags);
