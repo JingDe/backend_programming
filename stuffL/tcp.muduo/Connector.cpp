@@ -125,6 +125,7 @@ void Connector::connecting(int sockfd)
 	channel_->enableWriting();
 }
 
+// 取消关注channel，删除channel
 void Connector::removeAndResetChannel()
 {
 	channel_->disableAll();
@@ -138,7 +139,7 @@ void Connector::resetChannel()
 	channel_.reset();
 }
 
-// socket可写，不意味着连接已成功建立
+
 void Connector::handleWrite()
 {
 	LOG_TRACE << "Connector::handleWrite " << state_;
@@ -146,14 +147,14 @@ void Connector::handleWrite()
 	if (state_ == kConnecting)
 	{
 		removeAndResetChannel();
-		int err = sockets::getSocketError(sockfd_); 
+		int err = sockets::getSocketError(sockfd_); // socket可写，不意味着连接已成功建立
 		if (err)
 		{
 			LOG_WARN << "Connector::handleWrite - SO_ERROR = "
 				<< err << " " << strerror(err);
 			retry(sockfd_);
 		}
-		else if (sockets::isSelfConnect(sockfd_))
+		else if (sockets::isSelfConnect(sockfd_)) // 自连接
 		{
 			LOG_WARN << "Connector::handleWrite - Self connect";
 			retry(sockfd_);
@@ -200,7 +201,9 @@ void Connector::retry(int sockfd)
 			<< " in " << retryDelayMs_ << " milliseconds. ";
 		loop_->runAfter(retryDelayMs_ / 1000.0,
 			std::bind(&Connector::startInLoop, shared_from_this()));
-		retryDelayMs_ = std::min(retryDelayMs_ * 2, kMaxRetryDelayMs);
+		// shared_from_this延长本Connector对象生命期，在startInLoop期间有效
+		// 方式2：Connector在stop和析构函数中注销该定时器
+		retryDelayMs_ = std::min(retryDelayMs_ * 2, kMaxRetryDelayMs); // 重试的时间逐渐延长
 	}
 	else
 	{

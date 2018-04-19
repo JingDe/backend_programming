@@ -38,7 +38,7 @@ private:
 	void connecting(int sockfd);
 	void handleWrite();
 	void handleError();
-	void retry(int sockfd);
+	void retry(int sockfd); // 断开sockfd连接，稍后重试
 	void removeAndResetChannel();
 	void resetChannel();
 
@@ -49,7 +49,7 @@ private:
 	int sockfd_; // 作为客户端，不需Socket的复杂功能
 	std::unique_ptr<Channel> channel_; // sockfd_和channel_是一次性的
 	NewConnectionCallback newConnectionCallback_;
-	int retryDelayMs_;
+	int retryDelayMs_; // 在多少毫秒后重试
 };
 
 typedef std::shared_ptr<Connector> ConnectorPtr;

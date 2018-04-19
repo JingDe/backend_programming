@@ -57,6 +57,7 @@
     <ClInclude Include="tcp.muduo\Buffer.h" />
     <ClInclude Include="tcp.muduo\Callbacks.h" />
     <ClInclude Include="tcp.muduo\Connector.h" />
+    <ClInclude Include="tcp.muduo\TcpClient.h" />
     <ClInclude Include="tcp.muduo\TcpConnection.h" />
     <ClInclude Include="tcp.muduo\TcpServer.h" />
     <ClInclude Include="testharness.leveldb\testharness.h" />
@@ -92,7 +93,7 @@
     <ClCompile Include="tcp.muduo\Acceptor.cpp" />
     <ClCompile Include="tcp.muduo\Buffer.cpp" />
     <ClCompile Include="tcp.muduo\Connector.cpp" />
-    <ClCompile Include="tcp.muduo\Connector_test.cpp" />
+    <ClCompile Include="tcp.muduo\TcpClient.cc" />
     <ClCompile Include="tcp.muduo\TcpConnection.cpp" />
     <ClCompile Include="tcp.muduo\TcpServer.cpp" />
     <ClCompile Include="testharness.leveldb\testharness.cpp" />

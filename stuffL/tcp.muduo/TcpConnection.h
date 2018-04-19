@@ -26,6 +26,7 @@ public:
 
 	void send(const std::string& message);
 	void shutdown();
+	void forceClose();
 
 	void setTcpNoDelay(bool on); // 禁用Nagle算法
 	void setKeepAlive(bool on);
@@ -69,6 +70,7 @@ private:
 
 	void sendInLoop(const std::string& message);
 	void shutdownInLoop();
+	void forceCloseInLoop();
 
 	EventLoop* loop_;
 	std::string name_; // 连接名称

@@ -10,6 +10,19 @@
 
 #include"logging.muduo/Logging.h"
 
+void defaultConnectionCallback(const TcpConnectionPtr& conn)
+{
+	LOG_TRACE << conn->localAddress().toIpPort() << " -> "
+		<< conn->peerAddress().toIpPort() << " is "
+		<< (conn->connected() ? "UP" : "DOWN");
+}
+
+void defaultMessageCallback(const TcpConnectionPtr&, Buffer* buf, Timestamp)
+{
+	buf->retrieveAll();
+}
+
+
 TcpConnection::TcpConnection(EventLoop* loop,
 	const std::string& nameArg,
 	int sockfd,
@@ -196,6 +209,24 @@ void TcpConnection::shutdownInLoop()
 	loop_->assertInLoopThread();
 	if (!channel_->isWriting())
 		socket_->shutdownWrite();
+}
+
+void TcpConnection::forceClose()
+{
+	if (state_ == kConnected || state_ == kDisconnecting)
+	{
+		setState(kDisconnecting);
+		loop_->queueInLoop(std::bind(&TcpConnection::forceCloseInLoop, shared_from_this()));
+	}
+}
+
+void TcpConnection::forceCloseInLoop()
+{
+	loop_->assertInLoopThread();
+	if (state_ == kConnected || state_ == kDisconnecting)
+	{
+		handleClose();
+	}
 }
 
 void TcpConnection::setTcpNoDelay(bool on)
