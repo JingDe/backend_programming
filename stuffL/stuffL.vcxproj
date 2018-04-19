@@ -56,6 +56,7 @@
     <ClInclude Include="tcp.muduo\Acceptor.h" />
     <ClInclude Include="tcp.muduo\Buffer.h" />
     <ClInclude Include="tcp.muduo\Callbacks.h" />
+    <ClInclude Include="tcp.muduo\Connector.h" />
     <ClInclude Include="tcp.muduo\TcpConnection.h" />
     <ClInclude Include="tcp.muduo\TcpServer.h" />
     <ClInclude Include="testharness.leveldb\testharness.h" />
@@ -90,15 +91,15 @@
     <ClCompile Include="socket.muduo\SocketsOps.cpp" />
     <ClCompile Include="tcp.muduo\Acceptor.cpp" />
     <ClCompile Include="tcp.muduo\Buffer.cpp" />
+    <ClCompile Include="tcp.muduo\Connector.cpp" />
+    <ClCompile Include="tcp.muduo\Connector_test.cpp" />
     <ClCompile Include="tcp.muduo\TcpConnection.cpp" />
     <ClCompile Include="tcp.muduo\TcpServer.cpp" />
-    <ClCompile Include="tcp.muduo\TcpServer_test1.cpp" />
     <ClCompile Include="testharness.leveldb\testharness.cpp" />
     <ClCompile Include="thread.muduo\CurrentThread.cpp" />
     <ClCompile Include="thread.muduo\tests\__thread__test\ThreadObject.cpp" />
     <ClCompile Include="thread.muduo\Thread.cpp" />
     <ClCompile Include="thread.muduo\thread_util.cpp" />
-    <ClCompile Include="TimerQueue.muduo\tests\timerfd_test.cpp" />
     <ClCompile Include="TimerQueue.muduo\Timer.cpp" />
     <ClCompile Include="TimerQueue.muduo\TimerQueue.cpp" />
     <ClCompile Include="TimerQueue.muduo\Timestamp.cc" />

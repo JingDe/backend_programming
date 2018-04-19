@@ -21,6 +21,7 @@ private:
 	
 	static const int kInitEventListSize = 16;
 
+	// ChannelMap channels_; 在EPollPoller中，channel.index被用为标记channel是否在epoll的关注列表中
 	int epollfd_;
 	typedef std::vector<struct epoll_event> EventList;
 	EventList events_;

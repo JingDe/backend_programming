@@ -57,6 +57,9 @@ Timestamp EPollPoller::poll(int timeoutMs, ChannelList* activeChannels)
 	{
 		LOG_INFO << numEvents << " events happended";
 		fillActiveChannels(numEvents, activeChannels);
+		if (static_cast<size_t>(numEvents) == events_.size())
+			events_.resize(events_.size() * 2); // 动态适应活动id的数目
+
 	}
 	else if (numEvents == 0)
 	{
@@ -75,7 +78,8 @@ Timestamp EPollPoller::poll(int timeoutMs, ChannelList* activeChannels)
 
 /*
 int epoll_wait(int epfd, struct epoll_event* events, int maxevents, int timeout);
-等待epfd上的事件，maxevents必须大于0，timeout等于-1时无限阻塞，等于0时立即返回
+等待epfd上的事件，将存储在events中，最多返回maxevents，
+maxevents必须大于0，timeout等于-1时无限阻塞，等于0时立即返回
 返回值：关注IO事件准备好的文件描述符的个数，或0，出错时-1
 
 strutct epoll_event{
@@ -129,7 +133,7 @@ void EPollPoller::updateChannel(Channel* channel)
 		}
 
 		channel->set_index(kAdded); // 更新channel的状态
-		update(EPOLL_CTL_ADD, channel);
+		update(EPOLL_CTL_ADD, channel); // epoll是有状态的，维护内核里的fd状态与应用程序的状态相同
 	}
 	else // kAdded的channel存在epollfd_中，使用EPOLL_CTL_MOD或EPOLL_CTL_DEL修改或删除
 	{
@@ -147,6 +151,7 @@ void EPollPoller::updateChannel(Channel* channel)
 	}
 }
 
+// epoll是有状态的，维护内核里的fd状态与应用程序的状态相同
 void EPollPoller::update(int operation, Channel* channel)
 {
 	struct epoll_event event;

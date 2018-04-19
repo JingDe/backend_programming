@@ -44,6 +44,7 @@ public:
 	std::string reventsToString() const;
 
 	void setReadCallback(const ReadEventCallback& cb) { readCallback_ = cb;  }
+	void setWriteCallback(const EventCallback& cb) { writeCallback_ = cb; }
 	void setCloseCallback(const EventCallback& cb) { closeCallback_ = cb; }
 	void setErrorCallback(const EventCallback& cb) { errorCallback_ = cb; }
 
@@ -60,7 +61,7 @@ private:
 	int revents_; // epoll或poll接受的事件
 
 	int index_; // 在PollPoller类中表示该Channel在PollPoller类pollfd_中的下标
-				// 在EPollPoller类中表示kNew kAdded kDeleted
+				// 在EPollPoller类中，取值kNew kAdded kDeleted，被用为标记channel是否在epoll的关注列表中
 
 	
 	bool tied_;

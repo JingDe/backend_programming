@@ -25,9 +25,14 @@ namespace sockets {
 	void listenOrDie(int sockfd);
 	int accept(int sockfd, struct sockaddr_in6* addr);	
 
+	int connect(int sockfd, const struct sockaddr* addr);
+
 	ssize_t readv(int sockfd, const struct iovec* iov, int iovcnt);
 
 	struct sockaddr_in6 getLocalAddr(int sockfd);
+	struct sockaddr_in6 getPeerAddr(int sockfd);
+	bool isSelfConnect(int sockfd);
+
 	int getSocketError(int sockfd);
 }
 

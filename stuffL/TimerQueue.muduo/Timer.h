@@ -55,7 +55,7 @@ private:
 	const bool repeat_;
 	const long sequence_;
 
-	static AtomicPointer s_numCreated_; // 创建的定时器的数目，序号sequence
+	static AtomicPointer s_numCreated_; // 定时器的序号sequence
 };
 
 #endif 

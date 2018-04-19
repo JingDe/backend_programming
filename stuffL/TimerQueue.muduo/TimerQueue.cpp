@@ -159,11 +159,6 @@ void TimerQueue::cancel(TimerId timerId)
 	loop_->runInLoop(std::bind(&TimerQueue::cancelInLoop, this, timerId));
 }
 
-/*
-ActiveTimer:       <Timer*, sequence>
-	TimerId:           Timer*, sequence
-TimerList::Entry:  <time_t, Timer*> 
-*/
 // 同时从activeTimers_和timers_中删除，插入到cancelingTimers_中
 void TimerQueue::cancelInLoop(TimerId timerId)
 {
@@ -178,12 +173,13 @@ void TimerQueue::cancelInLoop(TimerId timerId)
 		delete it->first;
 		activeTimers_.erase(it);
 	}
-	else if (callingExpiredTimers_) // cancel到期的timer
-		cancelingTimers_.insert(timer);
+	// cancel到期的timer，自cancel/自注销
+	else if (callingExpiredTimers_) // 正在调用到期timer回调期间，记录有哪些cancel请求
+		cancelingTimers_.insert(timer); 
 	assert(timers_.size() == activeTimers_.size());
 }
 
-std::vector<TimerQueue::Entry> TimerQueue::getExpired(Timestamp now)
+void TimerQueue::getExpired(Timestamp now)
 {
 	assert(timers_.size() == activeTimers_.size());
 	expired_.clear();
@@ -204,7 +200,6 @@ std::vector<TimerQueue::Entry> TimerQueue::getExpired(Timestamp now)
 		assert(n == 1);
 	}
 	assert(timers_.size() == activeTimers_.size());
-	return expired_;
 }
 
 void TimerQueue::handleRead(Timestamp pollReturnTime)
@@ -219,10 +214,11 @@ void TimerQueue::handleRead(Timestamp pollReturnTime)
 	getExpired(pollReturnTime); // 获得所有过期timer
 
 	callingExpiredTimers_ = true;
-	cancelingTimers_.clear(); // 清空取消的timer
+	cancelingTimers_.clear(); // 正在调用所有到期timer期间，记录有哪些cancel请求
 	
-	for (std::vector<Entry>::iterator it = expired_.begin(); it != expired_.end(); ++it) // 调用过期timer的回调函数
-		it->second->run();
+	// 调用过期timer的回调函数,有可能自注销，即回调中cancel当前timer
+	for (std::vector<Entry>::iterator it = expired_.begin(); it != expired_.end(); ++it) 
+		it->second->run(); 
 	callingExpiredTimers_ = false;
 
 	reset(now); // 插入周期性的timer，删除过期timer，重置timerfd的过期时间
@@ -235,7 +231,7 @@ void TimerQueue::reset(Timestamp now)
 	for (std::vector<Entry>::const_iterator it = expired_.begin(); it != expired_.end(); ++it)
 	{
 		ActiveTimer timer(it->second, it->second->sequence());
-		if (it->second->repeat() && cancelingTimers_.find(timer) == cancelingTimers_.end())
+		if (it->second->repeat() && cancelingTimers_.find(timer) == cancelingTimers_.end()) // 不把已cancel的timer添加回timers_和activeTimers_中
 		{
 			it->second->restart(now);
 			insert(it->second); // 插入周期性的timer
