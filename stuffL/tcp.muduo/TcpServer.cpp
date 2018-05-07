@@ -72,7 +72,7 @@ void TcpServer::removeConnection(const TcpConnectionPtr& conn)
 }
 
 // 把TcpConnection::connectDestroyed移到TcpConnection的ioLoop线程调用，
-// 是为了保证TcpConnection的connectionCallback_始终在其ioLoop回调，方便代码的编写
+// 是为了保证TcpConnection的connectionCallback_始终在其ioLoop回调，方便客户端代码(connectionCallback_)的编写
 void TcpServer::removeConnectionInLoop(const TcpConnectionPtr& conn)
 {
 	loop_->assertInLoopThread();
@@ -82,5 +82,5 @@ void TcpServer::removeConnectionInLoop(const TcpConnectionPtr& conn)
 	EventLoop* ioLoop = conn->getLoop();
 	ioLoop->queueInLoop(std::bind(&TcpConnection::connectDestroyed, conn));
 		// std::bind让TcpConnection conn的生命期长到调用connectDestroyed的时刻
-		// queueInLoop:
+		// queueInLoop:在连接断开时，实现线程切换
 }
