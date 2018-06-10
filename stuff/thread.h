@@ -8,6 +8,7 @@
 
 class Thread{
 private:
+	int no;
 	pthread_t tid;
 	int pipefd;
 	
@@ -22,6 +23,7 @@ public:
 	Thread();
 	~Thread();
 	
+	void setNo(int n){no=n; }
 	void setPipefd(int fd){ pipefd=fd; }
 	bool isbusy(){ return busy; }
 	void setbusy(bool b) {busy=b; }

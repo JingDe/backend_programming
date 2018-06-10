@@ -34,12 +34,22 @@ int setNonBlocking(int fd)
 	return oldoption;
 }
 
-void addfd(int epfd, int fd)
+void addfd(int epfd, int fd, uint32_t evttype)
 {
 	struct epoll_event evt;
-	evt.events=EPOLLIN;
+	evt.events=evttype;
 	evt.data.fd=fd;
 	epoll_ctl(epfd, EPOLL_CTL_ADD, fd, &evt);
+	
+	setNonBlocking(fd);
+}
+
+void modfd(int epfd, int fd, uint32_t evttype)
+{
+	struct epoll_event evt;
+	evt.events=evttype;
+	evt.data.fd=fd;
+	epoll_ctl(epfd, EPOLL_CTL_MOD, fd, &evt);
 	
 	setNonBlocking(fd);
 }
