@@ -14,7 +14,7 @@ private:
 	
 	bool busy;
 	int connfd;
-	char res[512];
+	char res[255];
 	//void (*work)();
 		
 	//void* work(void* arg);

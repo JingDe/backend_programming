@@ -2,6 +2,7 @@
 
 // 在写到EAGAIN时，才注册EPOLLOUT
 // 为避免网络延迟带来的的数据发送接收延迟，异步设置EPOLLIN和EOLLOUT
+// 错误示例：接收到数据，关注EPOLLOUT，接收到连接关闭，不关注EPOLLOUT，接收到延迟的数据，关注EPOLLOUT，出错
 
 #include"thread.h"
 #include"threadmodel.h"
@@ -17,6 +18,10 @@
 #include<sys/socket.h>
 #include<pthread.h>
 #include<pthread.h>
+
+#define MAXEVENTS 20
+#define TIMEOUTMS 5*1000
+#define BUFSZ 200
 
 Thread::Thread()
 	:busy(false)
@@ -49,19 +54,15 @@ void* work(void* arg)
 {	
 	Thread *thread=(Thread*)arg;
 	//(void)arg;
-	//printf("thread->pipefd = %d\n", thread->pipefd);
-
-	
-	int epfd=epoll_create(50);
-	
-	//printf("epfd = %d\n", epfd);
+	char buf[BUFSZ];
+	int epfd=epoll_create(MAXEVENTS);
 
 	addfd(epfd, thread->pipefd, EPOLLIN);
-	struct epoll_event evts[50];
+	struct epoll_event evts[MAXEVENTS];
 	
 	while(true)
 	{
-		int tmout=5*1000;// 5秒钟
+		int tmout=TIMEOUTMS;// 5秒钟
 		int nEvents=epoll_wait(epfd, evts, sizeof(evts), tmout);
 		// TODO: 断开不活跃的客户端连接
 		
@@ -71,7 +72,7 @@ void* work(void* arg)
 		}
 		else if(nEvents==0)
 		{
-			printf("worker timeout\n");
+			printf("worker timeout, state is %d\n", thread->busy);
 			continue;
 		}
 		
@@ -82,18 +83,15 @@ void* work(void* arg)
 			
 			
 			if(fd==thread->pipefd)
-			{
-				char buf[20];
+			{				
 				int nrecv=recv(thread->pipefd, buf, sizeof buf, 0);
 				if(nrecv<=0)
 				{
 					printf("recv(pipefd) error: %s\n", strerror(errno));
 					break;
-				}
-								
+				}								
 				
-				thread->connfd=atoi(buf);
-				
+				thread->connfd=atoi(buf);				
 				
 				addfd(epfd, thread->connfd, EPOLLIN);
 				thread->busy=true;
@@ -109,48 +107,38 @@ void* work(void* arg)
 				if(event & EPOLLIN)
 				{
 					// 处理客户请求，使用计算线程池完成计算，
-					char buf[512];
 					int nrecv=recv(thread->connfd, buf, sizeof buf, 0);
-					if(nrecv<0)
+					if(nrecv<=0)
 					{
-						printf("recv(connfd) failed: %s\n", strerror(errno));
 						close(thread->connfd);
+						thread->connfd=-1;
 						thread->busy=false;
 						
-						modfd(epfd, thread->connfd, EPOLLIN);
+						delfd(epfd, thread->connfd, EPOLLIN);
 					}
-					else if(nrecv==0)
+					else
 					{
-						printf("client disconnect\n");
-						close(thread->connfd);
-						thread->busy=false;
+						// TODO:将请求交给计算线程处理
+						buf[nrecv]=0;
+						printf("RECV '%s'\n", buf);
 						
-						modfd(epfd, thread->connfd, EPOLLIN);
-					}
-					
-									
-					// TODO:将请求交给计算线程处理
-					
-					
-					printf("RECV '%s'\n", buf);
-					
-					send(thread->connfd, buf, nrecv, 0);
-					
-					//addfd(epfd, thread->connfd, EPOLLOUT);
-					modfd(epfd, thread->connfd, EPOLLIN  | EPOLLOUT);
-					printf("mod EPOLLOUT\n");
+						send(thread->connfd, buf, nrecv, 0);
+						
+						//addfd(epfd, thread->connfd, EPOLLOUT);
+						modfd(epfd, thread->connfd, EPOLLIN  | EPOLLOUT);
+					}					
 				}
 			
 				if(event & EPOLLOUT)
 				{
-					printf("fake result\n");
-					//并将计算结果发送给客户连接
+					//计算结果发送给客户连接
 					snprintf(thread->res, sizeof(thread->res), "fake result");
 					int nsend=send(thread->connfd, thread->res, strlen(thread->res), 0);
 					if(nsend<0)
 					{
 						printf("send(connfd) failed: %s\n", strerror(errno));
 						close(thread->connfd);
+						thread->connfd=-1;
 						delfd(epfd, thread->connfd, EPOLLOUT);
 						break;
 					}
@@ -164,8 +152,6 @@ void* work(void* arg)
 			}
 		}
 	}
-	
-	//close(thread->connfd);
 	// 通知主线程
 	
 	return (void*)0;

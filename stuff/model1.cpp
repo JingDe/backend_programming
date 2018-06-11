@@ -33,7 +33,7 @@
 #define PORT 1880
 #define IP "127.0.0.1"
 const static int MAXQ=100;
-const static int WORKERS=8;
+const static int WORKERS=1;
 
 int sigfd[2];
 
@@ -48,6 +48,11 @@ void sighandler(int signo)
 	write(sigfd[1], (char*)&msg, 1);
 	//write(sigfd[1], tmp, strlen(tmp));
 	errno=save_errno;
+}
+
+void printstate()
+{
+	
 }
 
 void main_reactor()
@@ -115,6 +120,10 @@ void main_reactor()
 		{
 			printf("epoll_wait failed: %s\n", strerror(EINTR));
 			break;
+		}
+		else if(nEvents==0)
+		{
+			printstate();
 		}
 		
 		printf("%d events happened\n", nEvents);
