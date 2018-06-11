@@ -13,4 +13,6 @@ void addfd(int epfd, int fd, uint32_t evttype);
 
 void modfd(int epfd, int fd, uint32_t evttype);
 
+void delfd(int epfd, int fd, uint32_t evttype);
+
 #endif

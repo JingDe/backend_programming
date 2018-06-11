@@ -53,3 +53,11 @@ void modfd(int epfd, int fd, uint32_t evttype)
 	
 	setNonBlocking(fd);
 }
+
+void delfd(int epfd, int fd, uint32_t evttype)
+{
+	struct epoll_event evt;
+	evt.events=evttype;
+	evt.data.fd=fd;
+	epoll_ctl(epfd, EPOLL_CTL_DEL, fd, &evt); // evt被忽略。linux 2.6.9后，evt可以为NULL
+}

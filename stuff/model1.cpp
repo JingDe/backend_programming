@@ -111,7 +111,7 @@ void main_reactor()
 	while(true)
 	{
 		int nEvents=epoll_wait(epfd, evts, sizeof(evts), -1);
-		if(nEvents<0  &&  errno!=EINTR)
+		if(nEvents<0  &&  errno!=EINTR)//EINTR:系统调用阻塞期间被任意信号打断
 		{
 			printf("epoll_wait failed: %s\n", strerror(EINTR));
 			break;

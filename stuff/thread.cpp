@@ -1,6 +1,7 @@
 
 
-// 在写到EAGAIN时，才注册OUT
+// 在写到EAGAIN时，才注册EPOLLOUT
+// 为避免网络延迟带来的的数据发送接收延迟，异步设置EPOLLIN和EOLLOUT
 
 #include"thread.h"
 #include"threadmodel.h"
@@ -115,12 +116,16 @@ void* work(void* arg)
 						printf("recv(connfd) failed: %s\n", strerror(errno));
 						close(thread->connfd);
 						thread->busy=false;
+						
+						modfd(epfd, thread->connfd, EPOLLIN);
 					}
 					else if(nrecv==0)
 					{
 						printf("client disconnect\n");
 						close(thread->connfd);
 						thread->busy=false;
+						
+						modfd(epfd, thread->connfd, EPOLLIN);
 					}
 					
 									
@@ -146,6 +151,7 @@ void* work(void* arg)
 					{
 						printf("send(connfd) failed: %s\n", strerror(errno));
 						close(thread->connfd);
+						delfd(epfd, thread->connfd, EPOLLOUT);
 						break;
 					}
 					else if(nsend==strlen(thread->res))

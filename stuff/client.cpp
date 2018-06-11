@@ -6,6 +6,8 @@
 
 // sizeof返回字节数
 
+// 只在需要发送数据的时候关注EPOLLOUT事件
+
 #include<stdio.h>
 #include<string.h>
 
@@ -126,7 +128,7 @@ void client()
 					else
 					{
 						printf("connect failed: %s\n", strerror(errno));
-						break;
+						//break;
 					}
 				}
 				else// 接受数据
@@ -145,6 +147,8 @@ void client()
 					else
 					{
 						printf("RECV %s\n", buf);
+						if(memcmp(buf, "fake result", n)==0)
+							ok=true;
 					}
 				}				
 			}
@@ -153,7 +157,9 @@ void client()
 				printf("EPOLLOUT\n");
 				sendmsg(sockfd);
 				printf("CLIENT sendmsg ok\n");
-				ok=true;
+				modfd(epfd, sockfd, EPOLLIN);
+				//ok=true;
+				continue;
 			}
 			
 			if(fd!=sockfd  ||  (!(evt & EPOLLIN)  &&  !(evt & EPOLLOUT)) )
@@ -163,6 +169,7 @@ void client()
 		}
 		
 	}
+	printf("exit while\n");
 	
 	close(sockfd);
 	close(epfd);
