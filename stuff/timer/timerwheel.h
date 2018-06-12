@@ -6,7 +6,7 @@
 // 共N个槽，每个槽是一个timer链表
 // 相邻槽的间隔时间si
 // 同一个槽里的timer的超时时间相差N*si的整数倍
-// 当前的槽是cs，新timer的超时时间ti，插入到第 (si+ti/si)%N 槽。[si+(ti+si-1)/si]%N
+// 当前的槽是cs，新timer的超时时间ti，插入到第 (slot_interval+ti/slot_interval)%N 槽。[slot_interval+(ti+slot_interval-1)/slot_interval]%N
 
 // 当ti不是si的整数倍，ti的timer被放置在稍小的slot中。
 // 所以，检查
@@ -37,16 +37,16 @@ public:
 	void tick();
 
 private:
-	int cs;// 当前槽，其中的timer最早超时时间是si（和相差N*si的整数倍的timer）
+	int cur_slot;// 当前槽，其中的timer最早超时时间是si（和相差N*si的整数倍的timer）
 	Timer* wheel[N];// 
 	const static N=6;// N个槽
-	const static si=2;// 相邻槽的时间间隔
+	const static slot_interval=2;// 相邻槽的时间间隔
 	
 	int hash(int);
 };
 
 TimerWheel::TimerWheel()
-	:cs(0)
+	:cur_slot(0)
 {
 	for(int i=0; i<N; i++)
 		wheel[i]=0;
@@ -75,7 +75,7 @@ void TimerWheel::getExipred(time_t t, std::vector<Timer*>& expired)
 	time_t interval=t-now;
 	bool oneloop=true;//少于一圈
 	int slots;// 需要遍历多少个slots
-	if(interval>N*si)
+	if(interval>N*slot_interval)
 	{
 		oneloop=false;
 		slots=N;//需要遍历一圈，从cs开始
@@ -83,7 +83,7 @@ void TimerWheel::getExipred(time_t t, std::vector<Timer*>& expired)
 	else
 	{
 		// 从cs遍历到idx
-		slots=(idx-cs+N)%N;
+		slots=(idx-cur_slot+N)%N;
 	}
 	
 	// expired.clear();
@@ -91,7 +91,7 @@ void TimerWheel::getExipred(time_t t, std::vector<Timer*>& expired)
 	int idx=hash(t);
 	int c=0;
 	
-	for(int i=cs; c<slots/*i<=(idx+N)%N*/; i=(i+1)%N, c++)
+	for(int i=cur_slot; c<slots/*i<=(idx+N)%N*/; i=(i+1)%N, c++)
 	{
 		Timer* p=wheel[i];
 		Timer* cur=p;
@@ -118,8 +118,8 @@ void TimerWheel::getExipred(time_t t, std::vector<Timer*>& expired)
 
 int TimerWheel::hash(int x)
 {
-	return (cs+(x+si-1)/si-1) % N;//稍大一个槽
-	// return (cs+(x)/si-1) % N;//稍小一个槽
+	return (cur_slot+(x+slot_interval-1)/slot_interval-1) % N;//稍大一个槽
+	// return (cur_slot+(x)/slot_interval-1) % N;//稍小一个槽
 }
 
 void TimerWheel::insertTimer(Timer* timer)
