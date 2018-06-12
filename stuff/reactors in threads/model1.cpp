@@ -2,9 +2,11 @@
 // 多线程模型
 // reactors in threads
 
+
 // socketpair，全双工管道，套接字管道。
-// AF_UNIX/AF_LOCAL, pipefd[2]
+// AF_UNIX/AF_LOCAL
 // 父子进程通信
+
 
 // g++ model1.cpp thread.cpp threadmodel.cpp -o model1.out -pthread -g -Wall
 // -std=c++11
@@ -14,6 +16,29 @@
 // ctrl+c  SIGINT  终止当前程序
 // kill    SIGTERM  终止
 // ctrl+\  SIGTERM  终止所有前台进程组
+
+
+// 唤醒reactor的方法：
+// 通过eventfd系统调用创建evtfd,关注evtfd。
+// （也可以使用pipe或者socketpair）
+// 其他线程，想要唤醒reactor执行某些函数，将函数压人队列，只需往evtfd写数据。
+// reactor从阻塞中返回执行函数队列
+
+// 为什么需要唤醒功能？
+// reactor所在的while循环，既处理epoll_wait的事件，也处理其他任务
+// epoll_wait的timeout参数为-1时一直阻塞，为0立即返回，为正数设置超时时间
+// 如果设置为0，当服务器空闲（既没有epoll事件也其他任务处理）时，reactor空转
+// 如果设置为正数，当服务器没有epoll事件、但要处理其他任务时，处理其他任务需要等待timeout延迟。
+// 所以需要唤醒reactor，同时设置timeout时间
+
+
+// IO事件、定时器事件、信号事件
+
+
+// 多进程：连接之间无交互
+// 多线程：连接之间有交互
+// 主线程可以将多个connfd分配给同一个线程
+
 
 #include"thread.h"
 #include"threadmodel.h"
@@ -213,6 +238,9 @@ void main_reactor()
 				printf("other events happend: %d\n", fd);
 			}
 		}
+		
+		// 处理其他任务，如定时器事件
+		
 	}
 	
 	close(listenFd);
