@@ -3,9 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 VisualStudioVersion = 15.0.27130.2010
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "stuffW", "stuffW\stuffW.vcxproj", "{BCE50781-461D-4038-A0CB-7322A1EA761B}"
-EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "stuffL", "stuffL\stuffL.vcxproj", "{660EEE2D-B659-4DF6-90AC-19693A654A9C}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ComponentsW", "ComponentsW\ComponentsW.vcxproj", "{BCE50781-461D-4038-A0CB-7322A1EA761B}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
