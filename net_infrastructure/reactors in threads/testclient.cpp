@@ -4,6 +4,9 @@
 
 // nc ip port
 
+// connect连接建立产生可写事件！！！
+// 远端连接断开产生可读事件
+
 // sizeof返回字节数
 
 // 只在需要发送数据的时候关注EPOLLOUT事件
@@ -110,7 +113,7 @@ void client()
 			return ;
 		}
 
-		addfd(epfd, sockfd, EPOLLIN);
+		addfd(epfd, sockfd, EPOLLOUT);
 	}
 	else if(rc==0)
 	{
@@ -140,12 +143,40 @@ void client()
 			
 			if(fd==sockfd)
 			{
-				if(evt & EPOLLIN)// 连接建立或数据到达
+				if(evt & EPOLLIN)
 				{
 					printf("EPOLLIN\n");
+					
+					// 接受数据
+					{						
+						int n=recv(sockfd, buf, sizeof(buf), 0);
+						if(n<0)
+						{
+							printf("recv failed: %s\n", strerror(errno));
+							break;
+						}
+						else if(n==0)
+						{
+							break;
+						}
+						else
+						{
+							buf[n]=0;
+							printf("RECV %s\n", buf);
+							if(memcmp(buf, "fake result", n)==0)
+							{
+								printf("recv result ok\n");
+								// delmd(epfd, sockfd, EPOLLIN);
+								ok=true;
+							}
+						}
+					}				
+				}
+				else if(evt & EPOLLOUT) // 连接建立或数据可写
+				{
 					if(connected==false)
 					{
-						connected=connected1(sockfd);
+						connected=connected1(sockfd);// 连接建立??
 						if(connected)
 						{
 							printf("connected\n");							
@@ -172,37 +203,14 @@ void client()
 							return;
 						}
 					}
-					else// 接受数据
-					{						
-						int n=recv(sockfd, buf, sizeof(buf), 0);
-						if(n<0)
-						{
-							printf("recv failed: %s\n", strerror(errno));
-							break;
-						}
-						else if(n==0)
-						{
-							break;
-						}
-						else
-						{
-							buf[n]=0;
-							printf("RECV %s\n", buf);
-							if(memcmp(buf, "fake result", n)==0)
-							{
-								printf("recv result ok\n");
-								// delmd(epfd, sockfd, EPOLLIN);
-								ok=true;
-							}
-						}
-					}				
-				}
-				else if(evt & EPOLLOUT)
-				{
-					// TODO : 发送buffer剩余数据，继续关注OUT
-					printf("EPOLLOUT\n");
-					sendreq(sockfd);					
-					modfd(epfd, sockfd, EPOLLIN);
+					else // 发送数据
+					{
+						// TODO : 发送buffer剩余数据，继续关注OUT
+						printf("EPOLLOUT\n");
+						sendreq(sockfd);					
+						modfd(epfd, sockfd, EPOLLIN);
+					}
+					
 				}
 			}					
 			else//if(fd!=sockfd  ||  (!(evt & EPOLLIN)  &&  !(evt & EPOLLOUT)) )

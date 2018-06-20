@@ -51,8 +51,8 @@ private:
 	int sigfd[2];
 	
 	//与工作线程通信管道,pipe[MaxThreadNum][2]
-	int pipes[1][2];// 弹性数组？？
-	int **pipes;// new int[workersNum][2]
+	//int pipes[1][2];// 弹性数组？？
+	//int **pipes;// new int[workersNum][2]
 	struct pipe_t{
 		int pipe[2];
 	};
