@@ -27,19 +27,19 @@ namespace {
 		char buf[256];
 		int len;
 
-		struct timeval tv; // Ãë¡¢Î¢Ãë
+		struct timeval tv; // ï¿½ë¡¢Î¢ï¿½ï¿½
 		gettimeofday(&tv, NULL);
 		long usec = tv.tv_usec;
 
 		time_t t = time(NULL);
 		struct tm* lt = localtime(&t);
-		len=snprintf(buf, sizeof buf, "%4d%02d%02d_%02d:%02d:%02d:%06ld", 
+		len=snprintf(buf, sizeof buf, "%4d%02d%02d_%02d:%02d:%02d:%06ld",
 			lt->tm_year + 1900, lt->tm_mon + 1, lt->tm_mday, lt->tm_hour, lt->tm_min, lt->tm_sec, usec);
 		assert(len == 24);
 
 		return std::string(buf, len);
 	}
-	
+
 }
 
 Logger::SourceFile::SourceFile(const char* name)
@@ -67,9 +67,9 @@ Logger::SourceFile::SourceFile(const char (&arr)[N])
 
 Logger::LOG_LEVEL initLogLevel()
 {
-	// ¸ù¾Ý»·¾³±äÁ¿ÉèÖÃ
+	// ï¿½ï¿½ï¿½Ý»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 #if defined(__GNUG__)
-	
+
 		if (::getenv("MUDUO_LOG_DEBUG"))
 			return Logger::DEBUG;
 		else
@@ -78,9 +78,9 @@ Logger::LOG_LEVEL initLogLevel()
 
 	return Logger::DEBUG;
 }
-Logger::LOG_LEVEL g_loglevel = initLogLevel(); // È«¾ÖµÄÈÕÖ¾¼¶±ð
+Logger::LOG_LEVEL g_loglevel = initLogLevel(); // È«ï¿½Öµï¿½ï¿½ï¿½Ö¾ï¿½ï¿½ï¿½ï¿½
 
-Logger::OutputFunc g_output=defaultOutput; // ±ØÐë³õÊ¼»¯£¬·ñÔòÒì³££¿£¿
+Logger::OutputFunc g_output=defaultOutput; // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ì³£ï¿½ï¿½ï¿½ï¿½
 Logger::FlushFunc g_flush=defaultFlush;
 
 const char* levelStr[Logger::NUM_LEVELS] = {
@@ -96,14 +96,14 @@ const char* levelStr[Logger::NUM_LEVELS] = {
 Logger::Logger(SourceFile file, int line, LOG_LEVEL level)
 	:file_(file),line_(line),level_(level)
 {
-	// ÈÕÖ¾¸ñÊ½£ºÊ±¼ä¡¢Ïß³Ìid¡¢ÈÕÖ¾¼¶±ð¡¢ÈÕÖ¾ÐÅÏ¢¡¢ÎÄ¼þÃû¡¢ÐÐºÅ
+	// ï¿½ï¿½Ö¾ï¿½ï¿½Ê½ï¿½ï¿½Ê±ï¿½ä¡¢ï¿½ß³ï¿½idï¿½ï¿½ï¿½ï¿½Ö¾ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö¾ï¿½ï¿½Ï¢ï¿½ï¿½ï¿½Ä¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ðºï¿½
 	logStream_ << formatTime()<<' ' << static_cast<int>(gettid()) <<' ' << levelStr[level_]<<' ';
 }
 
 Logger::Logger(SourceFile file, int line, LOG_LEVEL level, const char* func)
 	: file_(file), line_(line), level_(level)
 {
-	// ÈÕÖ¾¸ñÊ½£ºÊ±¼ä¡¢Ïß³Ìid¡¢ÈÕÖ¾¼¶±ð¡¢º¯ÊýÃû¡¢ÈÕÖ¾ÐÅÏ¢¡¢ÎÄ¼þÃû¡¢ÐÐºÅ¡¢
+	// ï¿½ï¿½Ö¾ï¿½ï¿½Ê½ï¿½ï¿½Ê±ï¿½ä¡¢ï¿½ß³ï¿½idï¿½ï¿½ï¿½ï¿½Ö¾ï¿½ï¿½ï¿½ð¡¢ºï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö¾ï¿½ï¿½Ï¢ï¿½ï¿½ï¿½Ä¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ÐºÅ¡ï¿½
 	logStream_ << formatTime() << ' ' << static_cast<int>(gettid()) << ' ' << levelStr[level_] << ' '<<func<<" ";
 }
 
@@ -112,7 +112,7 @@ Logger::~Logger()
 	logStream_ << "  - " << file_.fileName() << ":" << line_ << '\n';
 	const LogStream::Buffer& buf = stream().buffer();
 	g_output(buf.data(), buf.length());
-	if (level_ >= LOG_LEVEL::FATAL)
+	if (level_ >= Logger::FATAL)
 	{
 		g_flush();
 		abort();

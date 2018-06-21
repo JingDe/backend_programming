@@ -1,6 +1,7 @@
 #include"LogStream.h"
 #include<algorithm>
 #include<cassert>
+#include<cstdint>
 
 const char digits[] = "9876543210123456789";
 const char* zero = digits + 9;

@@ -9,10 +9,27 @@ DONE：
 
 
 
-TODO: 
-# 定时器两种使用方式，几种数据结构
-	将logging编译成动态库
-	
+TODO:
+# 定时器两种使用方式，测试timerlist/timertree
+
+# 定时器，wheel的实现方式
+
+# 定时器，堆的实现方式，参考libev的4-heap
+# muduo的make_heap示例
+
+# 将logging编译成动态库
+
+	编译动态库：
+	g++ Logging.cpp LogStream.cpp ../thread.muduo/thread_util.cpp -I/home/jing/myworkspace/GitSpace/practice/ -fPIC -shared -o liblogging.so -std=c++11
+		# -std=c++11 或者-std=gnu++11
+
+	编译测试so的测试文件：
+	g++ testloggingSO.cpp -L. -llogging  -I/home/jing/myworkspace/GitSpace/practice/ -o test.out
+		# -L. -llogging指明链接时的so
+	加载时：
+	export LD_LIBRARY_PATH=/home/jing/myworkspace/GitSpace/practice/lib:$LD_LIBRARY_PATH
+	./test.out
+
 # 使用timewheel踢掉空闲连接；查找应用层心跳协议资料
 # 线程封装、线程池封装总结，将workerthread.h拆分出线程封装
 # protobuf
@@ -20,6 +37,3 @@ TODO:
 
 # 将workerthread2.h，实现出一个工作线程处理多个连接
 # 封装reactor函数
-
-
-
