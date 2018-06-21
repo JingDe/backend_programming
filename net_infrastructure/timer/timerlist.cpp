@@ -3,6 +3,9 @@
 
 #include<functional>
 #include<algorithm>
+#include<sstream>
+
+#include"logging.muduo/Logging.h"
 
 TimerList::TimerList()
 {}
@@ -124,4 +127,14 @@ void TimerList::addTimer(Timer* timer)
 void TimerList::delTimer(Timer* timer)
 {
 	timers.remove(timer);
+}
+
+void TimerList::debugPrint()
+{
+	std::ostringstream os;
+	for(std::list<Timer*>::iterator it=timers.begin(); it!=timers.end(); it++)
+	{
+		os<<(*it)->getDue()<<", ";
+	}
+	LOG_DEBUG<<os.str();
 }

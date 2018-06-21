@@ -35,6 +35,7 @@ TEST(timerlistTest, testAddDel)
 	
 	Timer timer2(now+200, timerRoutine);
 	tl.addTimer(&timer2);	
+	tl.debugPrint();
 	ASSERT_EQ(tl.getMinExpired(), now+100);
 	
 	tl.delTimer(&timer1);
@@ -47,11 +48,35 @@ TEST(timerlistTest, testAddDel)
 
 TEST(timerlistTest, testHandleExpired)
 {
-	
+	TimerList tl;
+	time_t now=time(NULL);
+
+	Timer timer1(now+100, timerRoutine);
+	Timer timer2(now+200, timerRoutine);
+	Timer timer3(now+300, timerRoutine);
+
+	tl.addTimer(&timer1);
+	tl.addTimer(&timer2);
+	tl.addTimer(&timer3);
+
+	tl.debugPrint();
+	ASSERT_EQ(tl.getMinExpired(), now+100);
+
+	// 50s passed
+	tl.handleExpired(now+50);
+	tl.debugPrint();
+	ASSERT_EQ(tl.getMinExpired(), now+100);
+
+	tl.handleExpired(now+150);
+	tl.debugPrint();
+	ASSERT_EQ(tl.getMinExpired(), now+200);
+
 }
 
 int main()
 {
+	Logger::setLogLevel(Logger::DEBUG);
+
 	test::RunAllTests();
 	
 	return 0;

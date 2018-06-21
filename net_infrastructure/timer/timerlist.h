@@ -30,6 +30,7 @@ public:
 	void addTimer(Timer* t);
 	void delTimer(Timer* t);
 	
+	void debugPrint();
 	
 private:
 	std::list<Timer*> timers;
