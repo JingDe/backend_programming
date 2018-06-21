@@ -5,6 +5,7 @@
 #include"common/FixedBuffer.h"
 #include<string>
 
+const int kSmallBuffer = 4000;
 
 // ´ýÐ´Êý¾ÝÁ÷
 class LogStream : noncopyable

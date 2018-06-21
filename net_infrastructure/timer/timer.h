@@ -7,7 +7,7 @@
 #ifndef TIMER_H_
 #define TIMER_H_
 
-#include<functional>
+#include<functional> // c++11
 #include<time.h>
 
 typedef std::function<void()> TimerCallback;
@@ -18,11 +18,19 @@ private:
 	TimerCallback tcb;
 	
 public:
-	Timer(time_t d, const TimerCallback& cb)
-		:due(d), tcb(cb)
-	{}
+	Timer(time_t d, const TimerCallback& cb);
 	
 	~Timer();
+
+	time_t getDue() const {
+		return due;
+	}
+
+	void run() // TODO: thread safe??
+	{
+		tcb();
+	}
+
 };
 
 #endif

@@ -33,7 +33,7 @@ namespace {
 
 		time_t t = time(NULL);
 		struct tm* lt = localtime(&t);
-		len=snprintf(buf, sizeof buf, "%4d%02d%02d_%02d:%02d:%02d:%06d", 
+		len=snprintf(buf, sizeof buf, "%4d%02d%02d_%02d:%02d:%02d:%06ld", 
 			lt->tm_year + 1900, lt->tm_mon + 1, lt->tm_mday, lt->tm_hour, lt->tm_min, lt->tm_sec, usec);
 		assert(len == 24);
 

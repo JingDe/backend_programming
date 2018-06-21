@@ -1,7 +1,19 @@
+/*
+	g++ timerlist_test.cpp timerlist.cpp timer.cpp 
+		../../logging.muduo/Logging.cpp ../../logging.muduo/LogStream.cpp 
+		../../testharness.leveldb/testharness.cpp 
+		../../thread.muduo/thread_util.cpp 
+		-o timerlist_test.out 
+		-I/home/jing/myworkspace/GitSpace/practice 
+		-std=c++11 
+		-pthread
+
+*/
+
 
 #include"timerlist.h"
 
-#include"logging.muduo/logging.h"
+#include"logging.muduo/Logging.h"
 #include"testharness.leveldb/testharness.h"
 
 class timerlistTest{};
