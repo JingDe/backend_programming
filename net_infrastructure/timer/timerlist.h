@@ -1,6 +1,8 @@
 
 // vector:随机访问快
 // list:插入开销小
+//	list是双向迭代器，不是随机访问迭代器
+
 
 /*
 	定时器链表，按照定时器到期时间升序排列
@@ -11,6 +13,10 @@
 		addTimer();添加定时器
 		delTimer();删除定时器
 */
+
+
+#include<list>
+#include<time.h>
 
 #include"timer.h"
 
