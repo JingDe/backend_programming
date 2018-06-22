@@ -6,34 +6,41 @@ DONE：
 # 添加logging，异步日志
 # 如何使用muduo网络库，性能测试是怎么回事儿
 # 应用层缓存
-
-
-
-TODO:
-# 定时器两种使用方式，测试timerlist/timertree
-
-# 定时器，wheel的实现方式
-
-# 定时器，堆的实现方式，参考libev的4-heap
-# muduo的make_heap示例
-
-# 将logging编译成动态库
-
+# 将logging编译成动态库:
 	编译动态库：
 	g++ Logging.cpp LogStream.cpp ../thread.muduo/thread_util.cpp -I/home/jing/myworkspace/GitSpace/practice/ -fPIC -shared -o liblogging.so -std=c++11
 		# -std=c++11 或者-std=gnu++11
 
 	编译测试so的测试文件：
 	g++ testloggingSO.cpp -L. -llogging  -I/home/jing/myworkspace/GitSpace/practice/ -o test.out
-		# -L. -llogging指明链接时的so
+		# -L. -llogging指明链接时的so，加载时找不到
 	加载时：
+	# echo "/home/jing/myworkspace/GitSpace/practice/lib" >> /etc/ld.so.conf
+	# ldconfig
+	或者：
 	export LD_LIBRARY_PATH=/home/jing/myworkspace/GitSpace/practice/lib:$LD_LIBRARY_PATH
-	./test.out
+
+	再执行./test.out
+
+# 有一个编译选项，将链接时的库的路径信息，写到out文件里，供加载使用？？
+	用ldd <your_execute>看看是不有 ‘not found’在你链接的库后面
+	通过-Wl,rpath=<your_lib_dir>，使得execute记住链接库的位置。
+
+# 定时器两种使用方式，测试timerlist/timertree
+timertree测试通过
+
+
+TODO:
+
+# resetTimerfd，设置绝对时间失败？？
+
+# 定时器，wheel的实现方式
+# 定时器，堆的实现方式，参考libev的4-heap
+# muduo的make_heap示例
 
 # 使用timewheel踢掉空闲连接；查找应用层心跳协议资料
 # 线程封装、线程池封装总结，将workerthread.h拆分出线程封装
-# protobuf
-
+# protobuf示例
 
 # 将workerthread2.h，实现出一个工作线程处理多个连接
 # 封装reactor函数
