@@ -29,18 +29,17 @@ DONE：
 # 定时器两种使用方式，测试timerlist/timertree
 timertree测试通过
 
-
-TODO:
-
-# resetTimerfd，设置绝对时间失败？？
-
-# 定时器，wheel的实现方式
-# 定时器，堆的实现方式，参考libev的4-heap
+# 使用timewheel踢掉空闲连接；查找应用层心跳协议资料
 # muduo的make_heap示例
 
-# 使用timewheel踢掉空闲连接；查找应用层心跳协议资料
+
+
+TODO:
+# resetTimerfd，设置绝对时间失败？？
+# 定时器，wheel的实现方式
+# 定时器，堆的实现方式，参考libev的4-heap
+
 # 线程封装、线程池封装总结，将workerthread.h拆分出线程封装
 # protobuf示例
-
 # 将workerthread2.h，实现出一个工作线程处理多个连接
 # 封装reactor函数
