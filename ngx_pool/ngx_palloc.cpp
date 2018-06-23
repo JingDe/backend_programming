@@ -2,6 +2,9 @@
 #include"ngx_palloc.h"
 #include"ngx_alloc_unix.h"
 #include<unistd.h>
+#include<sys/types.h>
+#include<sys/stat.h>
+#include<fcntl.h>
 
 #include"logging.muduo/Logging.h"
 
@@ -228,4 +231,87 @@ void *ngx_pmemalign(ngx_pool_t *pool, size_t size, size_t alignment)
 int ngx_pfree(ngx_pool_t *pool, void *p)
 {
     return 0;
+}
+
+
+// 添加资源释放方法
+ngx_pool_cleanup_t *ngx_pool_cleanup_add(ngx_pool_t *p, size_t size)
+{
+    ngx_pool_cleanup_t *c;
+
+    c=(ngx_pool_cleanup_t *)ngx_palloc(p, sizeof(ngx_pool_cleanup_t));
+    if(c==NULL)
+        return NULL;
+
+    if(size)
+    {
+        c->data=ngx_palloc(p, size);
+        if(c->data==NULL)
+            return NULL;
+    }
+    else
+    {
+        c->data=NULL;
+    }
+    c->handler=NULL;
+    c->next=p->cleanup;
+    p->cleanup=c;
+    LOG_DEBUG<<"add cleanup "<<c;
+    return c;
+}
+
+void ngx_pool_run_cleanup_file(ngx_pool_t *p, int fd)
+{
+    ngx_pool_cleanup_t *c;
+    ngx_pool_cleanup_file_t *cf;
+
+    for(c=p->cleanup; c; c=c->next)
+    {
+        if(c->handler== ngx_pool_cleanup_file)
+        {
+            cf=(ngx_pool_cleanup_file_t *)c->data;
+            if(cf->fd==fd)
+            {
+                c->handler(cf);
+                c->handler=NULL;
+                return ;
+            }
+        }
+    }
+}
+
+// TODO 跨平台
+void ngx_pool_cleanup_file(void *data)
+{
+    ngx_pool_cleanup_file_t *c=(ngx_pool_cleanup_file_t *)data;
+
+    LOG_DEBUG<<"file cleanup "<<c->fd;
+
+    if(close(c->fd)==-1)
+    {
+        LOG_ERROR<<"close failed "<<c->name;
+    }
+}
+
+// unlink + close
+// TODO 跨平台
+void ngx_pool_delete_file(void *data)
+{
+    ngx_pool_cleanup_file_t *c=(ngx_pool_cleanup_file_t*)data;
+
+    int err;
+
+    LOG_DEBUG<<"file cleanup "<<c->fd<<", "<<c->name;
+
+    if(unlink((const char*)c->name)==-1) // 从文件系统删除文件名
+    {
+        err=errno;
+
+        if(err!=ENOENT)
+            LOG_ERROR<<"unlink "<<c->name<<" failed "<<strerror(errno);
+    }
+    // 文件名是最后一个连接，保留到最后一个close，之后被释放
+
+    if(close(c->fd)==-1)
+        LOG_DEBUG<<"close "<<c->name<<" failed "<<strerror(errno);
 }

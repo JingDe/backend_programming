@@ -6,3 +6,16 @@ fread // 读size个1字节，不添加\0，需要调用者根据返回值添加0
 
 p向右与a对齐：
 (p+a-1) & ~(a-1)
+
+
+
+//cft->name=new char[9]("FILE.txt");//不能括号初始化
+cft->name=new char[15];//字符数
+char name[]="FILE.txt";
+//<1>
+memcpy((void*)cft->name, (void*)name, sizeof(name));//拷贝的字节数
+//<2>
+//snprintf(cft->name, sizeof(name), "%s", name);//写arg2-1个字符
+
+// sizeof()返回值：字节数，包括0
+// strlen()返回值：0结尾的字符串的字符数，不包括0

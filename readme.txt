@@ -5,11 +5,10 @@
 
 
 TODO：
-
+# Nginx的内存池
+# nginx的信号
 # Nginx的epoll机制
 # Nginx的Windows平台select事件模块
-# nginx的信号
-# Nginx的内存池
 
 # Nginx的文件缓存模块
 # Nginx的slab共享内存
