@@ -12,10 +12,23 @@ p向右与a对齐：
 //cft->name=new char[9]("FILE.txt");//不能括号初始化
 cft->name=new char[15];//字符数
 char name[]="FILE.txt";
+
+
+
+
 //<1>
 memcpy((void*)cft->name, (void*)name, sizeof(name));//拷贝的字节数
 //<2>
 //snprintf(cft->name, sizeof(name), "%s", name);//写arg2-1个字符
 
+
+
+
 // sizeof()返回值：字节数，包括0
 // strlen()返回值：0结尾的字符串的字符数，不包括0
+
+
+两者的sizeof不同：
+char* p=new char[10];//sizeof是指针字节数
+char p[10];//sizeof是10个char的字节数
+            //长度sizeof(p)/sizeof(p[0])

@@ -310,8 +310,18 @@ void ngx_pool_delete_file(void *data)
         if(err!=ENOENT)
             LOG_ERROR<<"unlink "<<c->name<<" failed "<<strerror(errno);
     }
+    else
+    {
+        LOG_DEBUG<<"unlink ok "<<c->name;
+    }
     // 文件名是最后一个连接，保留到最后一个close，之后被释放
 
     if(close(c->fd)==-1)
+    {
         LOG_DEBUG<<"close "<<c->name<<" failed "<<strerror(errno);
+    }
+    else
+    {
+        LOG_DEBUG<<"close ok "<<c->name;
+    }
 }
