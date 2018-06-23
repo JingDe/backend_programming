@@ -1,0 +1,33 @@
+
+
+10.0.15063.0
+
+
+
+#找不到libboost_date_time-vc141-mt-gd-x32-1_67.lib？
+解决：在boost解压目录下，执行bjam编译lib库：
+bjam.exe --toolset=msvc-14.1 --with-date_time runtime-link=shared link=static stage  address-model=32
+将在stage目录下生成以上lib和libboost_date_time-vc141-mt-x32-1_67.lib（带gd的表示调试版本）
+http://www.cppblog.com/Robertxiao/archive/2013/01/06/197022.html
+link=static|shared决定使用静态库还是动态库。
+	static表示生成静态库开头libxxx.lib，否则xxx.lib
+runtime-link=static|shared决定是静态还是动态链接C/C++标准库。
+	sgd与gd的区别。
+	
+	
+	
+
+打开针对 x86 的 Visual Studio 2017 工具命令提示
+%comspec% /k "D:\visual studio 2017\VC\Auxiliary\Build\vcvars32.bat"
+bjam -j4 --debug-symbols=on --build-type=complete toolset=msvc-14.1 threading=multi runtime-link=shared address-model=32
+
+
+
+
+bjam.exe --toolset=msvc-10.0 --with-date_time runtime-link=static link=static stage 
+意思是要生静态库,该静态库静态链接C运行时库
+生成的文件名字是:libboost_date_time-vc100-mt-sgd-1_48.lib(debug version),libboost_date_time-vc100-mt-s-1_48.lib(release version) 两个文件.
+
+bjam.exe --toolset=msvc-10.0 --with-date_time runtime-link=shared link=static stage
+意思是要生静态库,该静态库动态链接C运行时库
+生成的文件名字是:libboost_date_time-vc100-mt-gd-1_48.lib(debug verion),libboost_date_time-vc100-mt-1_48.lib(release version) 两个文件.

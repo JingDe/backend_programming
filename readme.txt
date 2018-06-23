@@ -10,19 +10,19 @@ DONE:
 TODO：
 # rpc框架
 https://github.com/hjk41/tinyrpc
-# Nginx的epoll机制
-# Nginx的Windows平台select事件模块
-
 # Nginx的文件缓存模块
 # Nginx的slab共享内存
+
+
 # Nginx的定时器
-
+# Nginx的epoll机制
+# Nginx的Windows平台select事件模块
 # 比较Nginx的多进程与muduo的多线程，实现上细节的不同点
-
-
 # log(LOG_DEBUG, "", ...)形式的日志
-# extern C总结
-#makefile
+
+
+
+# makefile
 
 
 
@@ -37,8 +37,6 @@ runtime 主要功能是序列化和反序列化。每个目标语言各有一套
 
 
 # leveldb
-
-
 
 
 # chromium

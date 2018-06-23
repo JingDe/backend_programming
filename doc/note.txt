@@ -32,3 +32,15 @@ memcpy((void*)cft->name, (void*)name, sizeof(name));//拷贝的字节数
 char* p=new char[10];//sizeof是指针字节数
 char p[10];//sizeof是10个char的字节数
             //长度sizeof(p)/sizeof(p[0])
+
+			
+SourceFile(const char* file);
+
+template<int N> // 模板使得函数不局限于一个长度的数组
+SourceFile(const char (&arr)[N]); // 形参是数组的引用，维度是类型的一部分，具有N个char的数组的引用
+
+
+# extern C总结
+<1>在C++文件中，include C文件，使用extern "C"{}
+<2>希望C文件回调的C++访问，也放置在extern "C"{}中
+
