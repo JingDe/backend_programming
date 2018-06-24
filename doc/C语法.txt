@@ -1,0 +1,12 @@
+
+## 枚举
+enum Color {black, white, red};
+black, white, red等并没有属于Color这个枚举体的作用域，而是与Color在一个作用域中。
+
+
+enum class Color {black, white, red};
+auto white = false; // OK!
+引入了这样的语法后，black, white, red等则隶属于Color这个enum class的作用域
+
+
+

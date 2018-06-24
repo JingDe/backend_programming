@@ -1,0 +1,235 @@
+
+// start server
+// ...
+rpc.RegisterProtocol<int, int, int>(UniqueId("add"), 
+	[](int x, int y) { return x + y; });
+rpc.StartServing();
+
+// now, create a client
+AsioEP ep(asio::ip::address::from_string("127.0.0.1"), port);
+int result;
+rpc.RpcCall(ep, UniqueId("add"), result, 1, 2);
+std::cout << "1 + 2 = " << result << std::endl;
+
+
+
+template<uint64_t UID, typename... RequestTs>
+
+
+
+
+template <typename T>
+struct _identity {
+	typedef T type;
+};
+typename _identity<std::function<ResponseT(RequestTs&...)>>::type func
+	
+
+
+TINY_ABORT("Duplicate protocol id detected: %d for %s. " "Did you registered the same protocol multiple times?",
+                    UID, 
+					DecodeUniqueId(UID).c_str());
+
+OctopusLog(TINY_LOG_ERROR, (LOGGING_COMPONENT), (__FILE__), (__LINE__), TINY_LOG_LEVEL, (format), ##__VA_ARGS__);					
+					
+va_start(args, format);
+vfprintf(stdout, format, args);
+va_end(args);
+fprintf(stdout, "\n");
+fflush(stdout);
+
+
+using CallbackT = std::function<void(RequestTs&...)>;
+CallbackT* fp = new CallbackT(func);
+
+
+
+// 1字节对齐
+#pragma pack(push, 1)
+struct MessageHeader {
+	int64_t seq_num;
+	uint64_t protocol_id;
+	uint32_t is_async;
+};
+#pragma pack(pop)
+
+
+
+
+
+
+*************************************************************************
+
+
+## 1/3 Call ID映射。
+typedef std::map<uint64_t, ProtocolFactoryItem > ProtocolFactories;
+struct ProtocolFactoryItem {
+
+	ProtocolFactoryBase* factory;         // factory pointer
+	void* handler;                       // handler pointer
+	std::function<void(void)> handler_delete;    // handler free function
+};
+
+
+protocol_factory_[UID] = ProtocolFactoryItem(
+				new ProtocolFactory<AsyncProtocol<UID, RequestTs...>>(),
+					// CreateProtocol返回类型是AsyncProtocol<UID, RequestTs...>
+                (void*)fp,
+                [=]() {delete fp; });// std::function的构造
+
+这个ID在所有进程中都是唯一确定的。
+还需要在客户端和服务端分别维护一个 {函数 <--> Call ID} 的对应表。
+
+
+
+#2/3 序列化和反序列化
+(1)Serialize函数
+    template<typename T>
+    inline void Serialize(StreamBuffer & buf, const T & val) {
+        Serializer<T>::Serialize(buf, val);
+    }
+
+	
+	template<typename T>
+    class Serializer {
+    public:
+        /*
+        * If T has Serialize and Deserialize, then use them
+        */
+        template<typename T2 = T>
+        static typename std::enable_if<_has_serialize<T2>::value, void>::type 
+            Serialize(StreamBuffer& buf, const T2& d) {
+            d.Serialize(buf);
+        }
+
+        template<typename T2 = T>
+        static typename std::enable_if<_has_serialize<T2>::value, void>::type
+            Deserialize(StreamBuffer& buf, T2& d) {
+            d.Deserialize(buf);
+        }
+
+        /*
+        * Otherwise, use memcpy if applicable
+        */
+        template<typename T2 = T>
+        static typename std::enable_if<_should_do_memcpy<T2>::value, void>::type
+            Serialize(StreamBuffer & buf, const T2 & val) {
+            buf.Write(&val, sizeof(T));
+        }
+
+        template<typename T2 = T>
+        static typename std::enable_if<_should_do_memcpy<T2>::value, void>::type
+            Deserialize(StreamBuffer & buf, T2 & val) {
+            buf.Read(&val, sizeof(T));
+        }
+
+		// 用来assert false或者true
+		// 输入bool值，输出bool值
+        template <bool v, typename T_>
+        struct _AssertValue
+        {
+            static_assert(v, "Assertion failed <see below for more information>");
+            static bool const value = v;
+        };
+        
+        /*
+        * Else, raise an error
+        */
+        template<typename T2 = T>
+        static typename std::enable_if<!_has_serialize<T2>::value && !_should_do_memcpy<T2>::value, void>::type
+            Serialize(StreamBuffer & buf, const T2 & val) {
+            static_assert(_AssertValue<false, T2>::value,
+                "Serialize not defined for this type. You can define it by:\n"
+                "    1. define void Serialize(Streambuf&, const T&), or\n"
+                "    2. define T::Serialize(Streambuf&), or\n"
+                "    3. define Serializer<T>::Serialize(StreamBuf&, const T&)");
+        }
+
+        template<typename T2 = T>
+        static typename std::enable_if<!_has_serialize<T2>::value && !_should_do_memcpy<T2>::value, void>::type
+            Deserialize(StreamBuffer & buf, T2 & val) {
+            static_assert(_AssertValue<false, T2>::value,
+                "Deserialize not defined for this type. You can define it by:\n"
+                "    1. define void Deserialize(Streambuf&, T&), or\n"
+                "    2. define T::Deserialize(Streambuf&), or\n"
+                "    3. define Serializer<T>::Deserialize(StreamBuf&, T&)");
+        }
+    };//Serializer模板类
+	
+	
+	
+	解释typename std::enable_if<_has_serialize<T2>::value, void>::type：
+	// 根据T2的属性，决定提供的void是否可用	
+		std::enable_if<_has_serialize<T2>::value, void>
+		如果_has_serialize<T2>::value为true，结构体std::enable_if<_has_serialize<T2>::value, void>
+		才会有type类型的typedef，typedef T type，T是void。
+	
+	
+	
+	## _has_serialize属性判断：
+	_has_serialize<T2>::value要为true，要求T2是类或struct，
+	并且具有以StreamBuffer&为参数的（const或不是const的）成员函数
+	并且要求T2可以被反序列化
+	
+		//如果T是类或者struct，value是true
+		template<typename T, bool isClass = std::is_class<T>::value>
+		struct _has_serialize {
+			const static bool value =
+				(_has_serialize_<T, void(T::*)(StreamBuffer&)const>::value || 
+								// T可序列化，要求T具有以StreamBuffer&为参数的成员函数
+					_has_serialize_<T, void(T::*)(StreamBuffer&)>::value) 
+				&&
+				_has_deserialize_<T, void(T::*)(StreamBuffer&)>::value;
+		};
+
+		// 如果T不是类
+		template<typename T>
+		struct _has_serialize<T, false> {
+			const static bool value = false;
+		};
+
+		// 
+		#define ENABLE_IF_HAS_SERIALIZE(T, RT) typename std::enable_if<_has_serialize<T>::value, RT>::type
+	
+	
+	
+	##_should_do_memcpy属性判断：
+	需要内存拷贝，要求T可平凡复制，并且T不是指针，不能序列化。
+		template<typename T>
+		struct _should_do_memcpy {
+			const static bool value = TriviallyCopyable<T>::value
+				&& !std::is_pointer<T>::value // 检查T是不是指向对象或者函数的指针，不包括成员函数指针。
+				&& !_has_serialize<T>::value;
+		};
+
+	
+				template<typename T>
+				struct TriviallyCopyable {
+					static const bool value = std::is_trivially_copyable<T>::value;//如果T可平凡复制，value为true
+				};
+	
+(2)SerializeVariadic函数
+
+	
+	
+### 异步调用，直接返回，后台从信号获得返回结果
+同步调用，等待信号通知，获得结果
+所有同步、异步rpc调用的管理：
+std::unordered_map<EndPointT, std::set<int64_t>> ep_waiting_events_;//加锁同步访问
+远端——对该远端的所有调用的序号
+
+
+同步调用使用以下对象在timeout内等待结果：
+SleepingList<ProtocolBase> sleeping_list_;
+
+
+
+### 线程
+std::vector<std::thread> worker_threads_;
+
+
+
+
+##3/3 网络传输
+
+
