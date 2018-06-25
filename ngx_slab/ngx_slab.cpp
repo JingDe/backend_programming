@@ -10,7 +10,14 @@
 *	对linux
 *		nginx/auto目录
 *		定义uintptr_t，获得sizeof？？
+
+* 	超大内存的第一页，slab的钱3位设为NGX_SLAB_PAGE_START，
+*	其余位表示紧随其后相邻的同批页面数
+*	其他页的slab设为NGX_SLAB_BUSY
 */
+// 用于ngx_slab_page_t的slab成员
+#define NGX_SLAB_BUSY        0xffffffffffffffff
+
 #if (NGX_PTR_SIZE==4)
 #define NGX_SLAB_PAGE_START 0x80000000
 #else // NGX_PTR_SIZE==8
@@ -18,8 +25,14 @@
 #endif
 
 
+
 // 页类型，用于ngx_slab_page_t的prev成员，指明小块、中等、大块内存
-#define NGX_SLAB_PAGE        0
+#define NGX_SLAB_PAGE_MASK   3
+#define NGX_SLAB_PAGE        0 // 超大内存
+#define NGX_SLAB_BIG         1 // 大内存
+#define NGX_SLAB_EXACT       2 // 中等内存
+#define NGX_SLAB_SMALL       3 // 小内存
+
 
 
 // 存放多个内存块的页面中，允许的最大内存块大小为ngx_slab_max_size
@@ -43,6 +56,9 @@ static unsigned int ngx_slab_exact_shift;
 #define ngx_slab_page_addr(pool, page) \
 	( (((page) - (pool)->pages) << ngx_pagesize_shift) \
      + (uintptr_t) (pool)->start )
+
+#define ngx_slab_page_prev(page) \
+	(ngx_slab_page_t*) ((page)->prev  &  ~NGX_SLAB_PAGE_MASK)
 
 void ngx_slab_sizes_init()
 {
@@ -257,8 +273,123 @@ void* ngx_slab_alloc_locked(ngx_slab_pool_t *pool, size_t size)
 			
 			for(n=0; n<map; n++)
 			{
-				
+				// 通过用uintptr_t与NGX_SLAB_BUSY比较，快速排除掉全满的uintptr_t
+				if(bitmap[n]!=NGX_SLAB_BUSY)
+				{
+					//确认当前bitmap[n]上有空闲块
+					for(m=1, i=0; m; m<<=1, i++)
+					{
+						if(bitmap[n] & m)
+							continue;
+						
+						bitmap[n]|=m;
+
+						/*
+						当前的bit对应着该页面的第(n*8*sizeof(uintptr_t)+i)个内存块。
+						乘以shift得到该内存块在页面上的字节偏移量
+						*/
+						i=(n*8*sizeof(uintptr_t)+i) << shift;
+						
+						//p指向该空闲块的首地址
+						p=(uintptr_t)bitmap+i;
+						
+						// 当前uintptr_T表示的内存块已占用
+						if(bitmap[n]==NGX_SLAB_BUSY)
+						{
+							for(n=n+1; n<map; n++)
+								if(bitmap[n]!=NGX_SLAB_BUSY)
+									goto done;
+							
+							// 当前内存页已满，脱离半满页链表
+							prev=ngx_slab_page_prev(page);
+							prev->next=page->next;
+							page->next->prev=page->prev;
+							
+							page->next=NULL;
+							page->prev=NGX_SLAB_SMALL;
+						}
+						goto done;
+					}
+				}
 			}
 		}
+		else if(shift==ngx_slab_exact_shift)
+		{
+			// TODO
+		}
+		else
+		{}
+		
+		LOG_ERROR<<"ngx_slab_alloc() page is busy";
+		
 	}
+	
+	// 没有半满页
+	
+	page=ngx_slab_alloc_pages(pool, 1);
+	
+	if(page)
+	{
+		if(shift<ngx_slab_exact_shift)
+		{
+		/*
+		留心n和map的计算
+		*/
+			// 初始化新分配页面的bitmap
+			// bitmap既是页面的首地址，也是bitmap的起始
+			bitmap=(uintptr_t*)ngx_slab_page_addr(pool, page);
+			
+			// 新页面的块大小偏移量为shift，（ngx_pagesize >> shift)表示块个数，即需要的bit个数
+			// ((1<<shift)*8)表示一个块有多少比特
+			// n表示需要多少个内存块才能放得下整个bitmap
+			n=(ngx_pagesize >> shift) / ((1<<shift)*8);
+			
+			if(n==0)
+				n=1;
+			
+			/*因为前n个内存块已经用于bitmap了，不可以再被使用，
+			所以置这些内存块对应的bit位为1
+			
+			(n+1)/(8*sizeof(uintptr_t)  表示 用来表示放置bitmap的内存块 本身需要多少个uintptr_t来表示自身
+			(n+1)%(8*sizeof(uintptr_t)) （设为X）表示 剩余用不着整个uintptr_t表示的（未被表示的）内存块的个数
+			*/
+			for(i=0; i<(n+1)/(8*sizeof(uintptr_t); i++);
+				bitmap[i]=NGX_SLAB_BUSY;
+			
+			/* m = ( 1 << (    (n+1)%(8*sizeof(uintptr_t))  ) ) - 1; 
+			m表示剩余未被表示的内存块，用下一个uintptr_t的高X位设为1表示的值
+			*/
+			m= ((uintptr_t) 1 << ((n + 1) % (8 * sizeof(uintptr_t))) ) - 1;
+			bitmap[i]=m;
+			
+			// 设置剩下的uintptr_t的各个bit为0
+			// map表示需要多少个uintptr_t才能放得下整个bitmap
+			map = (ngx_pagesize >> shift) / (8 * sizeof(uintptr_t));
+			
+			// 设置剩余的bit位为0
+			for (i = i + 1; i < map; i++) {
+                bitmap[i] = 0;
+            }
+			
+			page->slab=shift;
+			page->next=&slots[slot];
+			page->prev=(uintptr_t)&slots[slot] | NGX_SLAB_SMALL;
+			
+			slots[slot].next=page;
+			
+			// 统计该slot的内存块的个数
+			pool->stats[slot].total+=(ngx_pagesize >> shift) -n;
+			
+			// TODO
+		}
+	}
+	
+	p=0;
+	
+	pool->stats[slot].fails++;
+	
+done:
+	LOG_DEBUG<<"slab alloc: "<<p;
+	
+	return (void*)p;
 }
