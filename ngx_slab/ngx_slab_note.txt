@@ -1,0 +1,56 @@
+Nginx slab共享内存
+
+
+
+first-fit和best-fit内存分配算法
+
+把请求分配的内存大小简化为极为有限的几种
+
+
+ngx_slab_page_s.slab就可以表示8*sizeof(uintptr_t)个内存块。
+
+
+中等大小内存块：
+ngx_slab_exact_size = ngx_pagesize / (8 * sizeof(uintptr_t));
+
+slab中可以恰好以bitmap的方式指明页面中所有内存块的使用状态。
+
+
+*** 如何使用位操作 ***
+对于中等内存、大内存页面，描述页面的结构体ngx_slab_page_t的slab成员，可以充当bitmap。
+对于小内存，slab不足以充当bitmap。bitmap需要占用页面内存块。
+
+
+
+分配小内存size字节的过程：
+1,由申请分配size字节内存，获得实际分配2的shift次方的内存块：
+ngx_uint_t shift=1;
+	// 从1开始，获得size向上等于2的shift次方。
+size_t s;
+for (s = size - 1; s >>= 1; shift++) { /* void */ }
+
+
+2,由shift偏移减去表达最小块的min_shift成员，获得该内存块页面的slots下标：
+ngx_uint_t slot = shift - pool->min_shift;
+	//减去min_shift，因为slots[0]可以表示2的非1次方内存块。
+以及，半满页的ngx_slab_page_t描述结构体的首地址：
+ngx_slab_page_t  *page = slots[slot].next;
+
+
+3,page减去pool.pages就可以得到该页面在整个slab中是第N个页面
+uintptr_t p = (page - pool->pages) << ngx_pagesize_shift;
+	// page-pool->pages得到N，乘以ngx_pagesize_shift
+
+4,start是对齐后slab第1个页面的起始地址，
+所以，start加上N*pagesize就可以得到该半满页的实际页面首地址，即bitmap位置：
+uintptr_t* bitmap = (uintptr_t *) (pool->start + p);
+
+5,多少个uintptr_t类型可以完整地表达该页面的bitmap？
+用页面大小除以块大小可以知道页面能存放多少个块，
+除以8就可以知道需要多少字节来存放bitmap，
+再除以sizeof(uintptr_t)就可以知道需要多少个uintptr_t来存放bitmap。
+ngx_uint_t  map = (1 << (ngx_pagesize_shift - shift))
+                          / (sizeof(uintptr_t) * 8);
+
+
+

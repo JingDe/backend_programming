@@ -1,21 +1,24 @@
 
+***
 fgets // 读到eof、读到256-1个字符、读到\n时，读取终止
         // 最后添加一个\0, 读到\n时，最后为\n\0，
 fread // 读size个1字节，不添加\0，需要调用者根据返回值添加0
         // 返回读到的对象个数
 
+		
+***		
 p向右与a对齐：
 (p+a-1) & ~(a-1)
 
 
-
+***
 //cft->name=new char[9]("FILE.txt");//不能括号初始化
 cft->name=new char[15];//字符数
 char name[]="FILE.txt";
 
 
 
-
+***
 //<1>
 memcpy((void*)cft->name, (void*)name, sizeof(name));//拷贝的字节数
 //<2>
@@ -23,7 +26,7 @@ memcpy((void*)cft->name, (void*)name, sizeof(name));//拷贝的字节数
 
 
 
-
+***
 // sizeof()返回值：字节数，包括0
 // strlen()返回值：0结尾的字符串的字符数，不包括0
 
@@ -33,14 +36,15 @@ char* p=new char[10];//sizeof是指针字节数
 char p[10];//sizeof是10个char的字节数
             //长度sizeof(p)/sizeof(p[0])
 
-			
+***			
 SourceFile(const char* file);
 
 template<int N> // 模板使得函数不局限于一个长度的数组
 SourceFile(const char (&arr)[N]); // 形参是数组的引用，维度是类型的一部分，具有N个char的数组的引用
 
 
-# extern C总结
+***
+extern C总结
 <1>在C++文件中，include C文件，使用extern "C"{}
 <2>希望C文件回调的C++访问，也放置在extern "C"{}中
 

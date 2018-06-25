@@ -22,7 +22,7 @@ DONE：
 
 	再执行./test.out
 
-# 有一个编译选项，将链接时的库的路径信息，写到out文件里，供加载使用？？
+# 编译选项，将链接时的库的路径信息，写到out文件里，供加载使用？？
 	用ldd <your_execute>看看是不有 ‘not found’在你链接的库后面
 	通过-Wl,rpath=<your_lib_dir>，使得execute记住链接库的位置。
 
@@ -39,7 +39,6 @@ TODO:
 # 定时器，wheel的实现方式
 # 定时器，堆的实现方式，参考libev的4-heap
 
-# 线程封装、线程池封装总结，将workerthread.h拆分出线程封装
-# protobuf示例
+# 将workerthread.h拆分出线程封装
 # 将workerthread2.h，实现出一个工作线程处理多个连接
-# 封装reactor函数
+
