@@ -1,0 +1,96 @@
+linux系统命令之：时间、文件等
+
+
+
+ctime函数，转换time_t到形式"Wed Jun 30 21:49:08 1993\n"
+char *ctime(const time_t *timep);
+char *ctime_r(const time_t *timep, char *buf);
+
+
+
+
+查看文件的 atime、ctime 和 mtime。
+# ls -l  filename        列出文件的 mtime 
+	// creat(), mknod(), pipe(), utime() write(2)
+	// 文件内容最后一次被修改的时间
+# ls -lu filename        列出文件的 atime 
+	// creat(), mknod(), pipe(), utime() read(2)
+	// 读取文件或者执行文件时更改
+# ls -lc filename        列出文件的 ctime 
+	// 在写入文件、更改所有者、权限或链接设置时随 Inode 的内容更改而更改，即文件状态最后一次被改变的时间。
+
+
+mount option中使用 noatime
+
+
+chown和chgrp，修改文件/目录所属用户
+chown jing:jing file1.txt # 修改文件所属用户和组
+chgrp -R mengxin /usr/meng # 修改目录所属组
+
+-h或--no-dereference：只对符号连接的文件作修改，而不是该其他任何相关文件；
+-R或——recursive：递归处理，将指令目录下的所有文件及子目录一并处理；
+
+
+whereis命令只能用于程序名的搜索，
+而且只搜索二进制文件（参数-b）、man说明文件（参数-m）和源代码文件（参数-s）。
+
+
+
+find /home -iname "*.txt" # 忽略大小写
+find /usr/ -path "*local*" # 匹配文件路径或者文件
+find . -regex ".*\(\.txt\|\.pdf\)$"
+find /home ! -name "*.txt" # 找出/home下不是以.txt结尾的文件
+
+find . -type 类型参数
+	find . -maxdepth 3 -type f # 向下最大深度限制为3
+	find . -mindepth 2 -type f # 搜索出深度距离当前目录至少2个子目录的所有文件
+find . -type f 时间戳
+	/*
+	UNIX/Linux文件系统每个文件都有三种时间戳：
+	访问时间（-atime/天，-amin/分钟）：用户最近一次访问时间。
+	修改时间（-mtime/天，-mmin/分钟）：文件最后一次修改时间。
+	变化时间（-ctime/天，-cmin/分钟）：文件数据元（例如权限等）最后一次修改时间。
+	*/
+	find . -type f -atime -7
+	find . -type f -atime 7 # 搜索恰好在七天前被访问过的所有文件
+	find . -type f -atime +7 # 搜索超过七天内被访问过的所有文件
+
+	find . -type f -newer file.log # 找出比file.log修改时间更近的所有文件
+
+find . -type f -size 文件大小单元
+	find . -type f -size 10k # 搜索等于10KB的文件
+
+find . -type f -name "*.txt" -delete # 删除当前目录下所有.txt文件
+
+根据文件权限/所有权进行匹配
+	find . -type f -perm 777 # 当前目录下搜索出权限为777的文件
+	find . -type f -user tom
+	find . -type f -group sunk
+
+借助-exec、-ok选项与其他命令结合使用
+	find .-type f -user root -exec chown tom {} \; # exec命令以;结束，\转义
+	find $HOME/. -name "*.txt" -ok rm {} \;
+	find . -type f -mtime +30 -name "*.log" -exec cp {} old \;
+	
+搜索但跳出指定的目录
+	find . -path "./sk" -prune -o -name "*.txt" -print # 查找当前目录或者子目录下所有.txt文件，但是跳过子目录sk
+
+find . -empty # 列出所有长度为零的文件
+
+
+ln创建硬链接、软连接
+
+
+
+
+lsof命令：
+
+
+
+
+
+
+
+
+
+

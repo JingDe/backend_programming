@@ -1,0 +1,27 @@
+
+sem_t
+
+int sem_init(sem_t *sem, int pshared, unsigned int value);
+pshared为1，表示进程间同步
+value表示信号量的初始值
+
+
+当初始value为0时，可当做互斥锁使用。
+
+
+int sem_destroy(sem_t *sem);
+
+int sem_wait(sem_t *sem); 
+将sem值减1，如果小于0，则阻塞进程或线程
+
+int sem_post(sem_t *sem);
+将sem值加1
+
+int sem_getvalue(sem_t *sem, int *valp);
+
+
+
+
+
+
+
