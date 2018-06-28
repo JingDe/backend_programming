@@ -81,10 +81,9 @@ find . -empty # 列出所有长度为零的文件
 ln创建硬链接、软连接
 
 
-
-
-lsof命令：
-
+网络状态和防火墙状态查看命令：netstat、ifconfig、iptables
+netstat:
+查看端口、
 
 
 

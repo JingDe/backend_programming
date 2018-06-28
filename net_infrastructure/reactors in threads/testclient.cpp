@@ -88,6 +88,7 @@ void client()
 	char buf[125];
 	
 	int sockfd=socket(AF_INET, SOCK_STREAM, 0);
+	// socket(family, SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC, IPPROTO_TCP)
 	if(sockfd<0)
 	{
 		printf("socket() failed: %s\n", strerror(errno));

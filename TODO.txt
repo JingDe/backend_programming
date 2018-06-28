@@ -31,10 +31,7 @@ TODO：
 	runtime 主要功能是序列化和反序列化。每个目标语言各有一套，可以根据需要来读，一般要结合生成的代码一起读。
 	# protobuf示例
 
-# 参考sqlite
 
-# 参考leveldb
-	缓存
 
 # 参考github star：MSEC等
 
