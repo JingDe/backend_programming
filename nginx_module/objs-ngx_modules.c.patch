@@ -1,0 +1,9 @@
+
+extern ngx_module_t ngx_http_mytest_module;
+
+ngx_module_t* ngx_modules[]={
+
+	&ngx_http_mytest_module, 
+	
+};
+

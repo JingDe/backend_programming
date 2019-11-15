@@ -22,7 +22,7 @@ typedef struct{
 	
 	void *data; // 由使用slab的模块自由使用
 	void *addr; // 指向所属的ngx_shm_zone_t里的ngx_shm_t成员的addr成员 ？？
-};
+}ngx_slab_pool_t;
 
 /*
 slab页结构体：
@@ -416,14 +416,295 @@ void ngx_slab_free_locked(ngx_slab_pool_t *pool, void *p)
 		goto fail;
 	}
 	
-	n = ((u_char*)p-pool->start) >> ngx_pagesize_shift;
-	page = &pool->pages[n];
-	slab = page->slab;
-	type = page->prev  &  NGX_SLAB_PAGE_MASK; // 
+	n = ((u_char*)p-pool->start) >> ngx_pagesize_shift; // 地址p属于第几个页面
+	page = &pool->pages[n]; // 获得页描述结构
+	slab = page->slab; // 
+	type = page->prev  &  NGX_SLAB_PAGE_MASK; // 3
 	
+	switch(type)
+	{
+		case NGX_SLAB_SMALL:
+			shift=slab &  NGX_SLAB_SHIFT_MASK;
+			size=1<<shift; // 小块内存块的大小
+			
+			if((uintptr_t)p  &  (size-1)) // p不是内存块首地址
+				goto wrong_chunk;
+			
+			n=((uintptr_t)p  &  (ngx_pagesize-1)) >> shift;
+			/* ((uintptr_t)p  &  (ngx_pagesize-1))等于p除以ngx_pagesize的余数，
+				表示p相对所在页中的地址偏移，
+				>>shift，得到的n表示p是所在页中的第几个内存块 */
+			m=(uintptr_t)1<<  (n & (sizeof(uintptr_t)*8-1));
+			/* (n & (sizeof(uintptr_t)*8-1) 等于 n除以(sizeof(uintptr_t)*8)的余数，
+				相当于将n分解为(sizeof(uintptr_t)*8) * x + y，也就是p内存块存储在bitmap[x]的第y个bit.
+				m表示在bitmap[x]中对应的位置1.
+				 */
+			n /= (sizeof(uintptr_t)*8);
+			/* 将n分解为(sizeof(uintptr_t)*8) * x + y, 其中的x */
+			bitmap=(uintptr_t*)((uintptr_t)p &  ~(ngx_pagesize-1));
+			/* bitmap等于p除以ngx_pagesize的商，等于所在页的首地址，即bitmap存储地址 */
+			
+			if(bitmap[n]  &  m) // bitmap[n]的第m位是1，表示p内存块已分配
+			{
+				if(page->next==NULL) // p是全满页中的内存块，首先插入到半满页链表
+				{
+					slots=(ngx_slab_page_t*) ((u_char*)pool+sizeof(ngx_slab_pool_t));
+					/* slots数组的首地址*/
+					slot=shift-pool->min_shift;
+					/* slots数组中的元素，分别表示从min_size开始以2递增的半满页链表，
+						这里slot等于p内存块所在页面，属于slots数组的第几个下标的半满页链表 */
+					
+					page->next=slots[slot].next;
+					slots[slot].next=page;
+					
+					page->prev=(uintptr_t) &slots[slot] | NGX_SLAB_SMALL;
+					page->next->prev=(uintptr_t)page | NGX_SLAB_SMALL;
+				}
+				bitmap[n] &= ~m;
+				
+				n = (1<<(ngx_pagesize_shift - shift)) / 8 / (1<<shift);
+				/* (1<<(ngx_pagesize_shift - shift))等于页面中的内存块的个数，
+					n等于bitmap需要的内存块的个数，
+					bitmap的前n个bit必然都是1 */
+					
+				if(n==0)
+					n=1;
+				
+				if(bitmap[0] &  ~( ((uintptr_t)1<<n) -1))
+				{ /* ((uintptr_t)1<<n) -1表示前n个全为1的位，
+					说明，bitmap[0]表示的内存块中，除了bitmap本身需要的内存块，还有其他内存块被分配 */
+					goto done;
+				}
+				
+				/* 接着检查bitmap[1]到bitmap[map-1]是否有已分配内存块 */
+				map = (1<<(ngx_pagesize_shift-shift)) / (sizeof(uintptr_t)*8);
+				
+				for(n=1; n<map; n++)
+				{
+					if(bitmap[n[)
+						goto done;
+				}
+				
+				/* 没有内存块被分配，从半满页链表脱离 */
+				ngx_slab_free_pages(pool, page, 1);
+				goto done;
+			}
+			goto chunk_alreary_free;
+			
+		case NGX_SLAB_EXACT:
+			m = (uintptr_t) 1<< (((uintptr_t) p & (ngx_pagesize-1)) >> ngx_slab_exact_shift);
+			/* ((uintptr_t) p & (ngx_pagesize-1))表示 p在页面中的偏移地址，
+				>> ngx_slab_exact_shift等于在页面中的第几个内存块， 
+				m等于内存块对应的bitmap位 */
+			size = ngx_slab_exact_size;
+			
+			if((uintptr_t)p  &  (size-1)) // p不知内存块首地址
+				goto wrong_chunk;
+			
+			if(slab  &  m) // 中等内存页的slab表示bitmap
+			{
+				if(slab  ==  NGX_SLAB_BUSY) // bitmap全为1，全满页
+				{
+					slots = (ngx_slab_page_t*) ((u_char*)pool+sizeof(ngx_slab_pool_t));
+					slot = ngx_slab_exact_shift - pool->min_shift;
+					
+					page->next = slots[slot].next;
+					slots[slot].next=page;
+					
+					page->prev=(uintptr_t) &slots[slot] | NGX_SLAB_EXACT;
+					page->next->prev = (uintptr_t)page | NGX_SLAB_EXACT;
+				}
+				page->slab  &= ~m;
+				if(page->slab)
+					goto done;
+				ngx_slab_free_pages(pool, page, 1);
+				goto done;
+			}
+			goto chunk_alreary_free;
+			
+		case NGX_SLAB_BIG:
+			shift = slab & NGX_SLAB_SHIFT_MASK; // 内存块大小的位偏移，存储在slab成员的最低一个字节
+			size = 1<<shift;
+			
+			if((uintptr_t)p  &  (size-1))
+				goto wrong_chunk;			
+			
+			m = (uintptr_t) 1 << ( (((uintptr_t)p  &  (ngx_pagesize-1)) >> shift) + NGX_SLAB_MAP_SHIFT);
+			/* (((uintptr_t)p  &  (ngx_pagesize-1)) >> shift) 等于p在页面的第几个内存块，
+				+NGX_SLAB_MAP_SHIFT是因为大块内存的bitmap存储在slab成员高一半的字节位上，
+				1<<最终得到p内存块对应的bit位 */
+			if(slab  &  m)
+			{
+				if(page->next == NULL)
+				{
+					slots = (ngx_slab_page_t*) ((u_char*)pool + sizeof(ngx_slab_pool_t));
+					slot = shift - pool->min_shift;
+					
+					page->next = slots[slot].next;
+					slots[slot].next = page;
+					
+					page->prev = (uintptr_t) &slots[slot] | NGX_SLAB_BIG;
+					page->next->prev = (uintptr_t) page | NGX_SLAB_BIG;
+				}
+				page->slab &= ~m;
+				
+				if(page->slab  &  NGX_SLAB_MAP_MASK) // bitmap存在1
+					goto done;
+				
+				ngx_slab_free_pages(pool, page, 1);
+				goto done;
+			}
+			goto chunk_alreary_free;
+			
+		case NGX_SLAB_PAGE:
+			if((uintptr_t)p  &  (ngx_pagesize-1))
+			/* p地址不是ngx_pagesize的整数倍， p不是页面首地址 */
+			{
+				goto wrong_chunk;
+			}
+			if(slab==NGX_SLAB_PAGE_FREE)
+			{ // 页面已经被释放
+				goto fail;
+			}
+			if(slab==NGX_SLAB_PAGE_BUSY)
+			{ // 页面是中间页
+				goto fail;
+			}
+			//n =((u_char*) p-pool->start) >>  ngx_pagesize_shift;
+			size = slab  &  ~NGX_SLAB_PAGE_START;
+			/* 获得随后的页面个数，按页分配的第一个页面的prev成员的高位是NGX_SLAB_PAGE_START */
+			
+			ngx_slab_free_pages(pool, &pool->pages[n], size);
+			/* 释放size个页面到free链表 */
+			ngx_slab_junk(p, size<<ngx_pagesize_shift);
+			/* 清空size个内存块范围的内存， <<ngx_pagesize_shift等于乘以ngx_pagesize */
+			return;
+	}
+
+done:
+	ngx_slab_junk(p, size);
+	return; 
+
+wrong_chunk:
+	goto fail;
+
+chunk_alreary_free:
+	ngx_slab_error();
+
 fail:
 	return;
 }
+
+// 释放page指向的页，开始的pages个页面
+static void ngx_slab_free_pages(ngx_slab_pool_t *pool, ngx_slab_page_t* page, ngx_uint_t pages)
+{
+	ngx_slab_page_t *prev;
+	page->slab = pages--;
+	
+	if(pages)
+		ngx_memzero(&page[1], pages*sizeof(ngx_slab_page_t)); // 清空后面页面的描述结构体
+	
+	if(page->next) // 从半满页链表中释放的，需要从链表中脱离
+	{
+		prev=(ngx_slab_page_t*) (page->prev  &  ~NGX_SLAB_PAGE_MASK);
+		prev->next=page->next;
+		page->next->prev=page->prev;
+	}
+	page->prev=(uintptr_t)&pool->free;
+	page->next=pool->free.next;
+	
+	page->next->prev=(uintptr_t)page;
+	
+	page->free.next=page;
+}
+
+#if (NGX_DEBUG_MALLOC)
+#define ngx_slab_junk(p, size) ngx_memset(p, 0xD0, size)
+#else
+
+#if (NGX_FREEBSD)
+#define ngx_slab_junk(p, size) if(ngx_freebsd_debug_malloc) ngx_memset(p, 0xD0, size)
+#else
+#define ngx_slab_junk(p, size)
+#endif
+
+#endif
+
+
+
+void ngx_slab_init(ngx_slab_pool_t *pool)
+{
+	u_char *p;
+	size_t size;
+	ngx_int_t m;
+	ngx_uint_t i, n, pages;
+	ngx_slab_page_t *slots;
+	
+	if(ngx_slab_max_size == 0)
+	{
+		ngx_slab_max_size = ngx_pagesize/2;
+		ngx_slab_exact_size = ngx_pagesize/(8*sizeof(uintptr_t));
+		for(n=ngx_slab_exact_size; n>>=1; ngx_slab_exact_shift++)
+		{}
+	}
+	
+	pool->min_size=1<<pool->min_shift;
+	
+	p = (u_char*) pool+sizeof(ngx_slab_pool_t);
+	size = pool->end - p;
+	
+	ngx_slab_junk(p, size); // 初始化从pool结构体之后到 共享内存池end之间的内存
+	
+	slots=(ngx_slab_page_t*) p;
+	n=ngx_pagesize_shift - pool->min_shift; /* n是slots数组的个数, 最大内存块大小是ngx_pagesize_shift-1的位偏移*/
+	
+	for(i=0; i<n; i++)
+	{
+		slots[i].slab=0;
+		slots[i].next=&slots[i];
+		slots[i].prev=0;
+	}
+	
+	p += n*sizeof(ngx_slab_page_t);
+	/* page数组首地址*/
+	
+	pages = (ngx_uint_t) (size/(ngx_pagesize+sizeof(ngx_slab_page_t)));
+	/*  pages数组长度，
+		size包含slots数组+pages数组+内存页+对齐，
+		size直接除以(pages数组单元素大小+页面大小) 得到的 pages个数，大于实际的页面个数，*/
+	
+	ngx_memzero(p, pages*sizeof(ngx_slab_page_t)); // 清空pages数组，不需要清空页面内存
+	
+	pool->pages = (ngx_slab_page_t*)p;
+	
+	pool->free.prev =0;
+	pool->free.next = (ngx_slab_page_t*)p; // 初始的空闲链表，包含一个所有页面相邻的节点。
+	
+	pool->pages->slab=pages; // pages个页面相邻
+	pool->pages->next=&pool->free; // 插入到free链表中
+	pool->pages->prev=(uintptr_t)&pool->free;
+	
+	pool->start = (u_char*)ngx_align_ptr((uintptr_t)p + pages*sizeof(ngx_slab_page_t), ngx_pagesize);
+	/* p指向pages数组，(uintptr_t)p + pages*sizeof(ngx_slab_page_t)指向pages数组结束地址，
+		对其之后，start指向实际的页面起始地址 */
+	
+	m = pages-(pool->end - pool->start)/ngx_pagesize;
+	if(m>0)
+	{
+		pages-=m;
+		pool->pages->slab=pages;
+	}
+	// pool->last = pool->pages + pages;//last指向page数组最后一个元素的后面的地址。因为开始page数组的元素个数计算出来的值偏高，导致最终有m个page数组元素被弃用，而pool->last正是指向这m个被弃用元素的第一个
+	pool->log_ctx=&pool->zero;
+	pool->zero='\0';
+	
+}
+
+/* 将地址p以页面a大小对齐，返回向后的地址
+	*/
+#define ngx_align_ptr(p, a)  \
+		(u_char*)( ((uintptr_t)(p) + ((uintptr_t)a-1) )   &  ~((uintptr_t)a-1))
+/* 先将p+(a-1),保证向上取整， &~(a-1)得到想a取整 */
 
 
 

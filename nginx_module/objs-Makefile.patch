@@ -1,0 +1,5 @@
+
+objs/addon/httpmodule/ngx_http_mytest_module.o: $(ADDON_DEPS) ../sample/httpmodule/ngx_http_mytest_module.c 
+	$(CC) -c $(CFLAGS) $(ALL_INCS) -o objs/addon/httpmodule/ngx_http_mytest_module.o ../sample/httpmodule/ngx_http_mytest_module.c
+	
+	
