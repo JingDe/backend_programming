@@ -1,0 +1,26 @@
+
+# g++ -g -o testdatetimeutil.out testdatetimeutil.cpp ../datetimeutil.cpp -I../
+# g++ -g -o teststringutil.out teststringutil.cpp ../stringutil.cpp -I../
+
+# g++ -g -o testPair.out testPair.cpp
+# g++ -g -o testParseRange.out testParseRange.cpp
+# g++ -g -o testfile.out testfile.cpp
+
+INCLUDE = -I../
+CXXFLAGS = -g -std=c++0x
+
+SIMPLE_OBJECTS = testPair.out testParseRange.out testfile.out get_open_fd.out
+OBJECTS = testdatetimeutil.out teststringutil.out
+
+.PHONY : all
+all : $(SIMPLE_OBJECTS) $(OBJECTS)
+
+$(SIMPLE_OBJECTS) : %.out:%.cpp
+	$(CXX) $(CXXFLAGS) -o $@ $<
+
+$(OBJECTS) : test%.out:test%.cpp
+	$(CXX) $(CXXFLAGS) -o $@ $< ../$*.cpp $(INCLUDE)
+
+.PHONY: clean
+clean :
+	rm -f *.out

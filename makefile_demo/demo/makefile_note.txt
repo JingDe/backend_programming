@@ -1,0 +1,170 @@
+
+指定Makefile文件：
+make -f 文件名
+
+test: test.c
+	gcc test.c -o test
+
+
+main.o: main.c
+	gcc main.c -o main.o
+	
+
+当前目录下存在clean文件时：
+伪目标申明：
+.PHONY:clean
+
+
+
+-rm a.o build/
+
+@echo $(SOURCE)
+
+
+INCLUDE = ./include/
+
+FOO = $(OBJ)
+
+CPPFLAGS = -I ./
+CFLAGS = -Wall -g -c
+LDFLAGS = -lpthread -L ./lib
+
+CC = gcc
+
+
+app: main.c func1.c 
+	gcc $^ -o $@
+
+
+%.o:%.c
+	$(CC) -c %< -o $@
+
+
+
+src = $(wildcard ./src/*.c)
+
+obj = $(patsubst %.c, %.o, $(src))
+
+ob = $(patsubst ./src/%.c, ./obj/%.o, $(src))
+
+
+
+
+///////////////////////
+
+obj = main.o fun1.o fun2.o
+CC = gcc
+
+// app : main.o fun1.o fun2.o
+$(target): $(obj)
+	$(CC) $(obj) -o $(target)
+	
+%.o: %.c
+	$(CC) -c $< -o $@
+
+
+
+//////////////////
+
+src = $(wildcard ./*.c)
+obj = $(patsubst %.c, %.o, $(src))
+#obj = $(src:%.c=%.o)
+target = app
+CC = gcc
+
+$(target): $(obj)
+	$(CC) $(obj) -o $(target)
+	
+%.o: %.c
+	$(CC) -c $< -o $@
+	
+.PHONY: clean
+clean:
+	rm -rf $(obj) $(target)
+
+
+
+////////////////
+
+SOURCE = $(wildcard *.c)
+TARGETS = $(patsubst %.c, %, $(SOURCE))
+
+CC = gcc
+CFLAGS = -Wall -g
+
+all: $(TARGETS)
+
+$(TARGETS): %:%.c
+	$(CC) $< $(CFLAGS) -o $@
+	
+.PHONY: clean
+clean:
+	-rm -rf $(TARGETS)
+
+
+///////////////////
+
+NAME_APP1 = app1
+NAME_APP2 = app2
+
+TARGETS = $(NAME_APP1) $(NAME_APP2)
+
+SOURCE_COMMON = $(wildcard ./00_Common/*.c)
+SOURCE_APP1 = $(SOURCE_COMMON) $(wildcard ./01_Application1/*.c)
+SOURCE_APP2 = $(SOURCE_COMMON) $(wildcard ./02_Application2/*.c)
+
+OBJ_APP1 = $(patsubst %.c, %.o, $(SOURCE_APP1))
+OBJ_APP2 = $(patsubst %.c, %.o, $(SOURCE_APP2))
+
+INCLUDE_COMMON = -I ./00_Common/
+
+CFLAGS = -Wall -c
+CC = gcc
+
+all: $(TARGETS)
+
+$(NAME_APP1): $(OBJ_APP1)
+	@mkdir -p output/
+	$(CC) $(OBJ_APP1) -o output/$(NAME_APP1)
+	
+$(NAME_APP2): $(OBJ_APP2)
+	@mkdir -p output/
+	$(CC) $(OBJ_APP2) -o output/$(NAME_APP2)
+
+%.o: %.c
+	$(CC) $(INCLUDE_COMMON) $(CFLAGS) $< -o $@
+	
+.PHONY clean
+clean:
+	-rm -rf $(OBJ_APP1) $(OBJ_APP2) output/
+
+
+/////////////
+
+VERSION = 1.0.0
+
+SOURCE = $(wildcard ./src/*.c)
+OBJ = $(patsubst %.c, %.o, $(SOURCE))
+INCLUDES = -I ./h
+
+LIBS = -ldylib
+LIB_PATH = -L./lib
+
+DEBUG = -D_MACRO
+CFLAGS = -Wall -c
+
+TARGET = app
+CC = gcc
+
+$(TARGET): $(OBJ)
+	@mkdir -p output/
+	$(CC) $(OBJ) $(LIB_PATH) $(LIBS) -o output/$(TARGET).$(VERSION)
+
+%.o: %.c
+	$(CC) $(INCLUDES) $(DEBUG) $(CFLAGS) %< -o $@
+
+.PHONY clean
+clean:
+	rm -rf $(OBJ) output/
+
+//////////////////////

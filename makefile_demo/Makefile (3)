@@ -1,0 +1,52 @@
+# httpserverTest.out的编译命令
+# g++ -g -Wall -DLINUX -DDEBUG  
+# -I../../BaseARE -Wl,-rpath=../../BaseARE -L../../BaseARE 
+# -o httpserverTest.out 
+# httpserverTest.cpp 
+# httpserveruto.cpp workeruto.cpp stringutil.cpp sockutil.cpp urlencodeutil.cpp datetimeutil.cpp 
+# -lBaseARE -laio -lrt -lpthread 
+# -std=c++0x
+
+# downloadserverTest.out的编译命令
+# g++ -g -Wall -DLINUX -DDEBUG  
+# -I../../BaseARE -Wl,-rpath=../../BaseARE -L../../BaseARE 
+# -o downloadserverTest.out 
+# downloadserverTest.cpp downloadserver.cpp 
+# httpserveruto.cpp workeruto.cpp stringutil.cpp sockutil.cpp urlencodeutil.cpp datetimeutil.cpp 
+# -lBaseARE -laio -lrt -lpthread 
+# -std=c++0x
+
+# include文件路径，使out文件记录链接的库所在路径
+CPPPATH = -I../../BaseARE -I../../UtilARE -Wl,-rpath=../../BaseARE -Wl,-rpath=../../UtilARE
+CXXFLAGS = -g -Wall -DLINUX -DDEBUG -std=c++0x $(CPPPATH)
+
+CPPLIB = -lBaseARE -lUtilARE -laio -lrt -lpthread
+LDFLAGS = $(CPPLIB) -L../../BaseARE -L../../UtilARE
+
+
+SRCS = httpserveruto.cpp workeruto.cpp stringutil.cpp sockutil.cpp urlencodeutil.cpp datetimeutil.cpp
+
+TARGET = httpserverTest.out downloadserverTest.out
+
+.PHONY : all
+all : $(TARGET)
+
+httpserverTest.out: httpserverTest.cpp
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(SRCS) $(LDFLAGS)
+	
+downloadserverTest.out: downloadserverTest.cpp downloadserver.cpp
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(SRCS) $(LDFLAGS)
+
+
+.PHONY : clean
+clean :
+	rm -f *.o $(TARGET)
+
+
+$(TARGET) : ../../BaseARE/libBaseARE.a ../../UtilARE/libUtilARE.a
+
+../../BaseARE/libBaseARE.a :
+	@make -C ../../BaseARE
+
+../../UtilARE/libUtilARE.a :
+	@make -C ../../UtilARE
