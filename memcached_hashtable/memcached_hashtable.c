@@ -191,7 +191,7 @@ void assoc_delete(const char* key, const size_t nkey, const uint32_t hv)
 		
 		nxt=(*before)->h_next; // key之后的节点
 		(*before)->h_next=0; // 
-		*before=nxt; // ???  
+		*before=nxt; // 修改被删除节点的内容，为后一个节点的地址
 		return ;
 	}
 	assert(false);
