@@ -10,24 +10,20 @@ struct UnixFile{
 }*head=0; // 指向第一个打开的文件, 打开文件链表，使用头插法
 
 
-SqlVFS* unixGetOS()
-{
-	// unix平台默认的vfs
-	static struct SqlVFS UNIX_OS={
-		sizeof(UnixFile),
-		200, 
-		"unix",
-		0,
-		
-		unixOpen,
-		unixDelete,
-		unixAccess,
-		unixSleep,
-		unixCurrentTime
-	};
-	
-	return &UNIX_OS;
-}
+int unixOpenFile(UnixFile* file, const char* filename, int flags);
+UnixFile* unixAlreadyOpened(const char* filename);
+
+int unixOpen(SqlVFS* vfs, const char* filename, SqlFile* ret, int flags);
+int unixDelete(SqlVFS* vfs, const char* filename);
+int unixAccess(SqlVFS* vfs, const char* filename, int flag, int *ret);
+int unixSleep(SqlVFS* vfs, int micro_secs);
+int unixCurrentTime(SqlVFS* vfs, int *ret);
+int unixClose(SqlFile* file);
+int unixRead(SqlFile* file, void* buf, int buf_sz, int offset);
+int unixWrite(SqlFile* file, const void* content, int sz, int offset);
+int unixTruncate(SqlFile* file, int sz);
+int unixSync(SqlFile* file);
+int unixFileSize(SqlFile* file, int *ret);
 
 ////////// unix的vfs操作：
 int unixOpen(SqlVFS* vfs, const char* filename, SqlFile* ret, int flags)
@@ -182,11 +178,29 @@ int unixOpenFile(UnixFile* file, const char* filename, int flags)
 	return SQL_OK;
 }
 
-///////////////////
 UnixFile* unixAlreadyOpened(const char* filename)
 {
 	UnixFile* p=head;
 	for(; p&&  strcmp(p->filename, filename); p=p->next)
 	{}
 	return p;
+}
+
+SqlVFS* unixGetOS()
+{
+	// unix平台默认的vfs
+	static struct SqlVFS UNIX_OS={
+		sizeof(UnixFile),
+		200, 
+		"unix",
+		0,
+		
+		unixOpen,
+		unixDelete,
+		unixAccess,
+		unixSleep,
+		unixCurrentTime
+	};
+	
+	return &UNIX_OS;
 }

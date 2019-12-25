@@ -2,6 +2,23 @@
 #ifndef SQLITE_DEMO_SQLITE_DEMO_H
 #define SQLITE_DEMO_SQLITE_DEMO_H
 
+#include<string.h>
+#include<stdlib.h>
+#include<stdio.h>
+
+#include<unistd.h>
+#include<time.h>
+#include<sys/stat.h>
+#include<sys/types.h>
+#include<fcntl.h>
+
+
+#define SQL_OK 0
+#define SQL_ERROR 1
+#define SQL_NOMEM 2
+
+#define SQL_DEFAULT_FILE_CREATE_MODE 744
+
 typedef struct SqlIOMethods SqlIOMethods;
 typedef struct SqlFile SqlFile;
 typedef struct SqlVFS SqlVFS;

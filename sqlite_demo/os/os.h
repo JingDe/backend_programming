@@ -24,4 +24,6 @@ int osCurrentTime(SqlVFS *, int *ret);
 SqlFile *osGetFileHandle(SqlVFS *vfs);
 SqlVFS *osGetVFS(const char *vfs_name);
 
+SqlVFS* unixGetOS();
+
 #endif

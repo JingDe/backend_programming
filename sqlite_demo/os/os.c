@@ -43,7 +43,7 @@ int osClose(SqlFile* file)
 
 int osRead(SqlFile* file, void *buf, int buf_sz, int offset)
 {
-	return file->p_methods->xRead(buf, buf_sz, offset);
+	return file->p_methods->xRead(file, buf, buf_sz, offset);
 }
 
 int osWrite(SqlFile *file, const void *content, int sz, int offset) {

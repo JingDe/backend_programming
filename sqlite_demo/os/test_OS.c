@@ -1,6 +1,6 @@
 
 #include"os.h"
-#include"sqlite.h"
+#include"sqlite_demo.h"
 
 void osTest()
 {

@@ -2,14 +2,14 @@
 OS_TEST=osTest
 PAGER_TEST=pagerTest
 
-OS_DEMO_DIR=os/
-PAGER_DEMO_DIR=pager/
+OS_DEMO_DIR=os
+PAGER_DEMO_DIR=pager
 
 OS_DEMO_SRC=$(wildcard ./$(OS_DEMO_DIR)/*.c)
 PAGER_DEMO_SRC=$(wildcard ./$(PAGER_DEMO_DIR)/*.c)
 
-OS_DEMO_OBJ=$(patsubst *.c, *.o, $(OS_DEMO_SRC))
-PAGER_DEMO_OBJ=$(patsubst *.c, *.o, $(PAGER_DEMO_SRC))
+OS_DEMO_OBJ=$(patsubst %.c, %.o, $(OS_DEMO_SRC))
+PAGER_DEMO_OBJ=$(patsubst %.c, %.o, $(PAGER_DEMO_SRC))
 
 
 .PHONY: all
@@ -29,8 +29,8 @@ INCLUDE_COMMON=-I include/
 $(OS_TEST): $(OS_DEMO_OBJ)
 	$(CC) -o $(OS_TEST) $(OS_DEMO_OBJ)
 
-$(OS_DEMO_OBJ): $(OS_DEMO_SRC)
-	$(CC) $(GCC_FLAGS) $(INCLUDE_COMMON) $^ -o $@
+%.o:%.c
+	$(CC) $(GCC_FLAGS) $(INCLUDE_COMMON) -c $< -o $@
 
 	
 #$(PAGER_TEST):
@@ -38,4 +38,4 @@ $(OS_DEMO_OBJ): $(OS_DEMO_SRC)
 
 .PHONY: clean
 clean:
-	-rm -rf $(OS_TEST) $(OS_DEMO_OBJ)
+	-rm -rf $(OS_TEST) $(OS_DEMO_OBJ) *.o
