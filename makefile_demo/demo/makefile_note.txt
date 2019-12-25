@@ -55,7 +55,7 @@ ob = $(patsubst ./src/%.c, ./obj/%.o, $(src))
 obj = main.o fun1.o fun2.o
 CC = gcc
 
-// app : main.o fun1.o fun2.o
+target = app
 $(target): $(obj)
 	$(CC) $(obj) -o $(target)
 	
