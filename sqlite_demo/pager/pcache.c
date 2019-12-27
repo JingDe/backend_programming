@@ -1,4 +1,9 @@
+#include"sqlite_demo.h"
+#include"sqliteint.h"
+#include"pcache.h"
 
+#define PCACHE_FINISH_CONVERT_NEED_INIT 1
+#define PCACHE_FINISH_CONVERT_DONT_INIT 2
 
 struct PCache{
 	PgHdr *pdirty_head, *pdirty_tail; // 脏页链表头指针和尾指针
@@ -8,6 +13,20 @@ struct PCache{
 	SqlPCache *pcache; // pluginable的cache模块 TODO
 };
 
+static int _pcacheSetPageSize(PCache *pcache, int sz_page);
+static PgHdr*_pcacheFinishConvert(
+    SqlPCachePage *p, // PCache1 模块获得的 页面
+    PCache *pcache, // 页面所在的cache
+    Pgno pgno, // page number
+    int flags);
+static void _pcacheFinishConvertInit(SqlPCachePage *p, PCache *pcache, Pgno pgno);
+
+
+int pcacheSize()
+{
+	return sizeof(PCache);
+}
+
 // 打开一个cache模块
 int pcacheOpen(int sz_page, // 每个页面的大小
 		int sz_extra, // 每个页面的额外空间
@@ -15,7 +34,7 @@ int pcacheOpen(int sz_page, // 每个页面的大小
 {
 	memset(pcache, 0, sizeof(PCache));
 	//pcache->sz_page=1; // ?? sz_page ???
-	pcache->sz_page==sz_page;
+	pcache->sz_page=sz_page;
 	pcache->sz_extra=sz_extra;
 	return _pcacheSetPageSize(pcache, sz_page);
 }
@@ -34,6 +53,7 @@ static int _pcacheSetPageSize(PCache *pcache, int sz_page)
 		pcache->pcache=pnew;
 		pcache->sz_page=sz_page;
 	}
+    return SQL_OK;
 }
 
 // 根据页面编号，从缓存中查找页面，如果不存在缓存中，返回0
@@ -63,9 +83,7 @@ PgHdr *pcacheFetch(PCache* pcache, Pgno pgno)
 }
 
 // 将 SqlPCachePage 类型转换成 PgHdr 类型
-#define PCACHE_FINISH_CONVERT_NEED_INIT 1
-#define PCACHE_FINISH_CONVERT_DONT_INIT 2
-static void _pcacheFinishConvert(
+static PgHdr* _pcacheFinishConvert(
 	SqlPCachePage *p, // PCache1 模块获得的 页面
 	PCache *pcache, // 页面所在的cache
 	Pgno pgno, // page number
@@ -92,8 +110,8 @@ static void _pcacheFinishConvertInit(SqlPCachePage *p, PCache *pcache, Pgno pgno
 	/* ret->pextra=p->extra; 
 	memset(ret->pextra,, 0, pcache->sz_extra); */
 	// TODO ??
-	ret->pextra=(void*)&ret[1]; // 指向了ret表示的PgHdr的结束地址
-	memset(ret->pextra,, 0, pcache->sz_extra);
+	ret->pextra=(void*)&ret[1]; // 指向了ret表示的PgHdr的 结束 地址
+	memset(ret->pextra, 0, pcache->sz_extra);
 	
 	ret->pcache=pcache;
 	ret->pgno=pgno;
@@ -151,8 +169,10 @@ void pcacheMakeClean(PgHdr *p)
 	if(pcache->pdirty_head==p)
 		pcache->pdirty_head=p->pdirty_next;
 	if(pcache->pdirty_tail==p)
-		pcache->pdirty_tail=p->dirty_prev;
+		pcache->pdirty_tail=p->pdirty_prev;
 	
 	p->pdirty_next=p->pdirty_prev=0;
 	p->flags ^= PGHDR_DIRTY;
 }
+
+

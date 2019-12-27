@@ -1,12 +1,17 @@
+#include"sqlite_demo.h"
+#include"pcache.h"
 
 /*
 默认的plugin cache模块实现: PCache1 (sqlite默认的pcache1)
 */
 
+#define PCACHE1_LRU_ADD 1
+#define PCACHE1_LRU_REMOVE 2
 
+typedef struct PgHdr1 PgHdr1;
+typedef struct PCache1 PCache1;
 
 /* PCache1 的每一个页面 使用 PgHdr1 结构体表示*/
-typedef struct PgHdr1 PgHdr1;
 struct PgHdr1{
 	SqlPCachePage base; // 从 PCache 模块获得
 	
@@ -21,12 +26,12 @@ struct PgHdr1{
 
 // PCache1 模块
 struct PCache1{
-	PgHdr1 *plru_head; // LRU链表头
+	PgHdr1 *plru_head; // LRU链表头,存储unpinned不使用已分配的页面，不计入mx_pages和npage中
 	PgHdr1 *plru_tail; // 
 	
 	int sz_page; // 页面大小
 	int sz_extra; // 附加内容的大小
-	int max_pages; // 可以缓存在内存中的最大页面数
+	int mx_pages; // 可以缓存在内存中的最大页面数, npage的最大值
 	
 	unsigned int nhash; // 哈希表的slot数量
 	unsigned int npage; // 哈希表的页面总数
@@ -34,6 +39,10 @@ struct PCache1{
 	PgHdr1 **aphash; // 哈希表
 };
 
+static void _pcache1ResizeHash(PCache1* pcache);
+static void _pcache1AddRemoveLRU(PgHdr1 *page, int flags);
+static void _pcache1RemoveFromHash(PgHdr1 *page, int free_flag);
+static void _pcache1AddRemoveLRU(PgHdr1 *page, int flags);
 
 // 创建 PCache1模块
 static SqlPCache* _pcache1Create(int sz_page, int sz_extra, int mx_pages)
@@ -106,6 +115,73 @@ static SqlPCachePage *_pcache1Get(SqlPCache *pcache, unsigned int key)
 	return 0;
 }
 
+// 根据页面编号获取页面，不存在时创建并返回
+static SqlPCachePage *_pcache1Fetch(SqlPCache *pcache, unsigned int key)
+{
+    printf("in _pcache1Fetch\n");
+	PCache1 *pcache1=(PCache1*)pcache;
+	
+	unsigned int h=key % pcache1->nhash;	
+    printf("key %d, nhash %d, slot %d\n", key, pcache1->nhash, h);
+	PgHdr1 *p=pcache1->aphash[h];
+	while(p  &&  p->key!=key)
+		p=p->pnext;
+	
+	if(p)
+    {
+        printf("found key %d page in aphash\n", key);
+		return &(p->base); // 返回
+    }
+
+    printf("not found key %d page in aphash %d\n", key, h);
+	
+	if(pcache1->plru_head)
+	{
+        printf("lru list not empty, get the head page\n");
+		p=pcache1->plru_head;
+		_pcache1AddRemoveLRU(p, PCACHE1_LRU_REMOVE);
+	}
+	
+	// 如果既没有找到页面，而且缓存页面数达到了mx_pages，返回0
+	if(p==0  &&  pcache1->npage>=pcache1->mx_pages)
+	{
+        printf("not found, and reache the cache mx_pages, %d\n", pcache1->mx_pages);
+        return 0;	
+    }
+	
+/* 要么p!=0, 从unpinned页面链表/lru链表中获取一个不使用的页面;
+ 要么p==0，但是没有达到mx_pages*/
+	
+	// 第二种情况，lru链表中没有unpinned的页面，允许新分配一个
+	if(p==0)
+	{
+        printf("alloc new page for key %d\n", key);
+        // 页面大小 + PCache1->sz_extra对应PCache管理结构体PgHdr的大小 + PCache1的管理结构体PgHdr1的大小
+		int alloc_bytes=pcache1->sz_page+pcache1->sz_extra+sizeof(PgHdr1);
+		void *pnew=malloc(alloc_bytes);
+		memset(pnew, 0, alloc_bytes);
+		p=(PgHdr1*)(pnew+pcache1->sz_page+pcache1->sz_extra);
+        // PgHdr1 的base成员，记录页面内容和PgHdr结构体的首地址
+		p->base.content=pnew;
+		p->base.extra=pnew+pcache1->sz_page;
+
+        PgHdr* pghdr=(PgHdr*)p->base.extra;
+        pghdr->pdata=p->base.content;
+	}
+	
+	// 如果是第一种情况，p是从lru链表头取出的页面
+	
+	p->key=key;
+	p->pnext=pcache1->aphash[h]; // 新页面插入到缓存页面的哈希表中
+	p->is_pinned=1;
+	p->pcache=pcache1;
+	
+	pcache1->aphash[h]=p;
+	++pcache1->npage; // npage记录的是aphash哈希表中页面数
+	
+	return &(p->base);
+}
+
 static void _pcache1Unpin(SqlPCachePage *page)
 {
 	PgHdr1 *p=(PgHdr1*)page;
@@ -118,7 +194,7 @@ static void _pcache1Unpin(SqlPCachePage *page)
 static void _pcache1RemoveFromHash(PgHdr1 *page, int free_flag)
 {
 	unsigned int h;
-	PCach1 *pcache=page->pcache; // 页面所在的 PCache1
+	PCache1 *pcache=page->pcache; // 页面所在的 PCache1
 	PgHdr1 **pp;
 	
 	h=page->key % pcache->nhash;
@@ -131,10 +207,11 @@ static void _pcache1RemoveFromHash(PgHdr1 *page, int free_flag)
 	--pcache->npage;
 }
 
+
 // 根据flags，从lru链表中添加或者删除一个页面
 static void _pcache1AddRemoveLRU(PgHdr1 *page, int flags)
 {
-	PCach1 *pcache1=page->pcache;
+	PCache1 *pcache1=page->pcache;
 	assert(pcache1);
 	
 	if(flags  &  PCACHE1_LRU_ADD)
@@ -164,6 +241,7 @@ static void _pcache1AddRemoveLRU(PgHdr1 *page, int flags)
 void pcache1GlobalRegister(SqlPCacheMethods *methods)
 {
 	methods->xCreate=_pcache1Create; // PCache1 创建方法
-	methods->xGet=_pcache1Get; // PCache1 查找页面方法
+	methods->xGet=_pcache1Get; // PCache1 查找页面方法，不存在返回0
+	methods->xFetch=_pcache1Fetch; // 获取页面方法，不存在创建并返回 
 	methods->xUnpin=_pcache1Unpin; // unpin页面，页面从使用到不使用
 }

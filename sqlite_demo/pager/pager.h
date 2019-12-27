@@ -1,3 +1,6 @@
+#ifndef SQLITE_DEMO_PAGER_H
+#define SQLITE_DEMO_PAGER_H
+
 /*
 pager层，一次从文件中读或写一页，
 未上层提供page cache
@@ -6,7 +9,7 @@ pager层，一次从文件中读或写一页，
 
 #include"sqlite_demo.h"
 
-#define SQL_DEFAULT_PAGE_SIZE 2048
+#define SQL_DEFAULT_PAGE_SIZE 1024
 #define SQL_DATABASE_HEADER_SIZE 0 // ???
 
 // 表示页面编号，从1开始
@@ -20,11 +23,11 @@ typedef struct PgHdr DbPage;
 
 
 // 打开或者关闭 一个Pager连接
-int pagerOpen(SqlFile* pvfs, // 打开文件的vfs
+int pagerOpen(SqlVFS* pvfs, // 打开文件的vfs
 		Pager** pppager, // 输出的Pager对象
 		const char* filename, // 数据库文件名
 		int sz_extra, // 添加到in-memroy页面后的字节数
-		int flags) // 调用vfs的xOpen方法的flags
+		int flags); // 调用vfs的xOpen方法的flags
 
 // 获取 页面引用
 int pagerGet(Pager* pager, Pgno pgno, DbPage** pppage);
@@ -39,4 +42,4 @@ int pagerWrite(DbPage*);
 int pagerCommit(Pager*);
 
 
-
+#endif

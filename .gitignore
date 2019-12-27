@@ -293,4 +293,12 @@ __pycache__/
 *.out
 *.app
 
+core.*
+
 osTest
+data
+pagerTest
+
+
+!data.db
+

@@ -5,6 +5,7 @@
 #include<string.h>
 #include<stdlib.h>
 #include<stdio.h>
+#include<assert.h>
 
 #include<unistd.h>
 #include<time.h>
@@ -75,11 +76,20 @@ struct SqlPCachePage{
 包含创建hash表、添加删除查找置换page等操作 */
 typedef struct SqlPCacheMethods SqlPCacheMethods;
 struct SqlPCacheMethods{
-	// 函数指针的指针 ？？
+	// 函数指针的指针
+	// 创建 PCache1 模块
 	SqlPCache *(*xCreate)(int sz_page, int sz_extra, int mx_pages);
+	// PCache1 页面查找方法
 	SqlPCachePage *(*xGet)(SqlPCache*, unsigned int key);
+	// 页面获取方法
 	SqlPCachePage *(*xFetch)(SqlPCache*, unsigned int key);
+	// unpin 一个页面，不使用这个页面
 	void (*xUnpin)(SqlPCachePage*);
 };
+
+#ifdef DEBUG
+#define DEBUG_PRINT(format, ...) printf()
+#else
+#define 
 
 #endif
