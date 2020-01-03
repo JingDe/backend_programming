@@ -38,9 +38,11 @@ $(OS_TEST): $(OS_DEMO_OBJ)
 #%.o:%.c
 #	$(CC) $(GCC_FLAGS) $(INCLUDE_COMMON) -c $< -o $@ 
 
-$(ALL_OBJ): %.o:%.c
-	$(CC) $(GCC_FLAGS) $(INCLUDE_COMMON) -c $< -o $@ 
+#$(ALL_OBJ): %.o:%.c
+#	$(CC) $(GCC_FLAGS) $(INCLUDE_COMMON) -c $< -o $@ 
 
+$(ALL_OBJ): %.o:%.c
+	$(CC) $(GCC_FLAGS) $(INCLUDE_COMMON) -c $< -o $@ -MD -MF "$(dir $@).$(notdir $@).d"
 	
 $(PAGER_TEST): $(PAGER_DEMO_OBJ) $(OS_API_OBJ)
 	echo $(OS_DEMO_SRC)

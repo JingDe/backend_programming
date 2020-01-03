@@ -88,8 +88,9 @@ struct SqlPCacheMethods{
 };
 
 #ifdef DEBUG
-#define DEBUG_PRINT(format, ...) printf()
+#define DEBUG_PRINT(format, ...) printf("[%s:%d:%s] " format "\n", __FILE__, __LINE__, __FUNCTION__, ##__VA_ARGS__)
 #else
-#define 
+#define DEBUG_PRINT(format, ...) 
+#endif
 
 #endif

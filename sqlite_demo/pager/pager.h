@@ -9,7 +9,7 @@ pager层，一次从文件中读或写一页，
 
 #include"sqlite_demo.h"
 
-#define SQL_DEFAULT_PAGE_SIZE 1024
+#define SQL_DEFAULT_PAGE_SIZE 2048
 #define SQL_DATABASE_HEADER_SIZE 0 // ???
 
 // 表示页面编号，从1开始

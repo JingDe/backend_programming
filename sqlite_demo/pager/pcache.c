@@ -72,13 +72,11 @@ PgHdr* pcacheGet(PCache *pcache, Pgno pgno)
 */
 PgHdr *pcacheFetch(PCache* pcache, Pgno pgno)
 {
-	// TODO
 	SqlPCachePage *ppage=global_config.sql_pcache_methods.xFetch(pcache->pcache, pgno);
 	
 	if(ppage==0)
 		return 0;
 	
-	// TODO
 	return _pcacheFinishConvert(ppage, pcache, pgno, PCACHE_FINISH_CONVERT_NEED_INIT);
 }
 
