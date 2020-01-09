@@ -157,7 +157,7 @@ bool insert2(Node* node, Key k, void *p_data, int size_data, Node *&father)
 		if(!insertLeafCell(node, k, p_data, size_data))
 			return 0;
 		if(node->cell_size>=Node::THE_ORDER)
-			splitLeafNode(node, father);
+			splitLeafNode(node, father); // 分裂node叶子节点，父节点是father
 		return 1;
 	}
 	else
@@ -165,8 +165,23 @@ bool insert2(Node* node, Key k, void *p_data, int size_data, Node *&father)
 		struct IntCell cell;
 		for(int kth=0; kth<node->cell_size; ++kth)
 		{
-			
+			getKthIntCell(node, i, &cell);
+			if(k>cell.key)
+				continue;
+			// 内部节点的当前cell不小于待插入key，插入此cell对应子节点中，node是父节点
+			// 空间不足，插入失败
+			if(!insert2(cell.child_point, k, p_data, size_data, node))
+				return 0;
+			goto INSERTED;
 		}
+		// 插入最后一个儿子节点
+		if(!insert2(node->right_child, k, p_data, size_data, node))
+			return 0;
+		
+INSERTED:
+		if(node->cell_size >= Node::THE_ORDER)
+			splitIntNode(node, father);
+		return 1;
 	}
 }
 
@@ -250,16 +265,17 @@ void splitLeafNode(Node* node, Node* &father)
 	
 	struct LeafCell cell;
 	Node* new_node=getLeafNode();
-	// 从左往后删除node的cell，并插入到new_node中
+	// 叶子节点的cell最小个数是 THE_ORDER/2	
 	while(node->cell_size>Node::THE_ORDER/2)
 	{
+		// 从左往后删除node的cell，并插入到new_node中
 		int kth=Node::THE_ORDER/2;
 		getKthLeafCell(node, kth, &cell);
 		insertLeafCell(new_node, cell.key, cell.data_point， cell.size);
 		removeKthLeafCell(node, kth);
 	}
 	
-	// cell_size等于THE_ORDER
+	// cell_size等于THE_ORDER/2
 	//获得node的最大key对应的cell
 	getKthLeafCell(node, node->cell_size-1, &cell);
 	
@@ -293,6 +309,60 @@ void splitLeafNode(Node* node, Node* &father)
 	}
 }
 
+void splitIntNode(Node* node, Node*& father)
+{
+	assert(node);
+	assert(node->is_leaf==0);
+	assert(node->cell_size>=Node::THE_ORDER);
+	
+	struct IntCell cell;
+	Node* new_node=getIntNode();
+	// 内部节点的cell最小个数是 THE_ORDER/2+1
+	while(node->cell_size>Node::THE_ORDER/2+1)
+	{
+		int kth=Node::THE_ORDER/2+1;
+		// 
+		getKthIntCell(node, kth, &cell);
+		// 将node的第kth个cell插入到新节点中
+		insertIntCell(new_node, cell.key, cell.child_point);
+		// 将node的第kth个cell删除
+		removeKthIntCell(node, kth);
+	}
+	
+	// 将node的最右节点，移动为新节点的最右节点
+	new_node->right_child=node->right_child;
+	// 将node的最右cell，移动为最右节点
+	getKthIntCell(node, Node::THE_ORDER/2, &cell);
+	removeKthIntCell(node, Node::THE_ORDER/2);	
+	node->right_child=cell.child_point;
+	
+	if(father)
+	{
+		int kth=getKnumByChild(father, node);
+		if(kth==-1) // node是father的最右节点right_child
+		{
+			assert(node==father->right_child);
+			// 
+			insertIntCell(father, cell.key, node);
+			father->right_child=new_node;
+		}
+		else
+		{
+			struct IntCell intcell;
+			getKthIntCell(father, kth, &intcell);
+			removeKthIntCell(father, kth);
+			
+			insertIntCell(father, intcell.key, new_node);
+			insertIntCell(father, cell.key, node):
+		}
+	}
+	else
+	{
+		father=getIntNode();
+		father->right_child=new_node;
+		insertIntCell(father, cell.key, node);
+	}
+}
 
 /* 检查child是否是father的一个子节点，不是返回-1，是则返回是第几个子节点。 */
 int getKnumByChild(Node *node, Node *child)
