@@ -1,3 +1,5 @@
+// g++ BPlusTreeForPager.c  -I ../pager -I ../include/
+
 #include"BPlusTree.h"
 #include"pager.h"
 
@@ -43,7 +45,7 @@ sqlite的实际payload
 struct LeafCell{
 	Key key;
 	u32 size;
-	u8 *data;
+	u8 *data_point;
 };
 
 // forward declaration
@@ -56,7 +58,7 @@ bool insertLeafCell(Node *node, Key k, void *p_data, int size_data);
 void splitLeafNode(Node *node, Node* &father);
 void splitIntNode(Node *node, Node* &father);
 bool getKthLeafCell(Node* node, int kth, LeafCell *cell);
-void getKthIntCell(Node* node, int kth, IntCell *cell);
+bool getKthIntCell(Node* node, int kth, IntCell *cell);
 bool removeKthLeafCell(Node *node, int kth);
 bool insertIntCell(Node* node, Key k, Pgno child);
 bool spaceCheck(Node* node, int size);
@@ -110,7 +112,7 @@ bool search(Node* node, Key k, void *&p_data, int &size_data)
 				if(k>cell.key)
 					continue;
 				else
-					return search(cell.child_point, k, p_data, size_data);
+					return search(cell.child, k, p_data, size_data);
 			}
 		}
 		return search(node->right_child, k, p_data, size_data);
@@ -320,7 +322,7 @@ bool getKthLeafCell(Node* node, int kth, LeafCell *cell)
 	return 1;
 }
 
-void getKthIntCell(Node* node, int kth, IntCell *cell)
+bool getKthIntCell(Node* node, int kth, IntCell *cell)
 {
 	assert(node  &&  cell);
 	assert(node->is_leaf==0);
@@ -334,6 +336,7 @@ void getKthIntCell(Node* node, int kth, IntCell *cell)
 	
 	read(node, cell_offset, 4, &cell->key);
 	read(node, cell_offset+4, 4, &cell->child);
+	return true;
 }
 
 bool removeKthLeafCell(Node *node, int kth)
@@ -454,7 +457,10 @@ void write(void* from, void *to, int off_set, int size)
 	memcpy(to+off_set, from, size);
 }
 
+
+
 int main()
 {
 	return 0;
 }
+

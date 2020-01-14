@@ -293,6 +293,7 @@ __pycache__/
 *.out
 *.app
 
+*.swp
 core.*
 
 osTest
@@ -302,3 +303,4 @@ pagerTest
 
 !data.db
 
+test_redisclient

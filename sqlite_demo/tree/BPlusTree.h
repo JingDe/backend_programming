@@ -1,4 +1,5 @@
-
+#ifndef SQLITE_DEMO_BPLUS_TREE_H
+#define SQLITE_DEMO_BPLUS_TREE_H
 
 typedef unsigned char byte;
 typedef struct Node Node;
@@ -29,4 +30,4 @@ void printfNode(Node *node);
 void printfTree(Tree *root, int indent=0);
 Node* getKthChild(Node *node, int kth);
 
-
+#endif

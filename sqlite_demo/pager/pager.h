@@ -21,6 +21,7 @@ typedef struct Pager Pager;
 // 页面的handle类型， 每一个页面通过PgHdr管理
 typedef struct PgHdr DbPage;
 
+struct SqlVFS;
 
 // 打开或者关闭 一个Pager连接
 int pagerOpen(SqlVFS* pvfs, // 打开文件的vfs

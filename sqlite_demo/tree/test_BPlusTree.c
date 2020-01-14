@@ -1,8 +1,18 @@
+// g++ -g -Wall BPlusTree.c test_BPlusTree.c 
+
 
 /*
 	测试 BPlusTree.c 
 	
 */
+
+#include"BPlusTree.h"
+#include<time.h>
+#include<map>
+#include<stdlib.h>
+#include<string.h>
+#include<stdio.h>
+
 
 struct Test{
 	Test()
@@ -34,7 +44,7 @@ int test()
 	
 	Tree* root=getTree();
 	
-	static std::map<int, Test> test_map;
+	static std::map<int,Test> test_map;
 	
 	for(int i=0; i<test_case; i++)
 	{
@@ -68,7 +78,7 @@ int test()
 			if(!search(root, key, ret_p, ret_len))
 				return 2;
 			memcpy(&ret_data, ret_p, ret_len);
-			if(!(ret_data==test_map[k]))
+			if(!(ret_data==test_map[key]))
 				return 3;
 		}
 	}

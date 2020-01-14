@@ -19,6 +19,15 @@ B+树节点的结构：
 	4字节：	指向儿子节点的指针
 */
 
+#include"BPlusTree.h"
+
+#include<assert.h>
+#include<string.h>
+#include<stdlib.h>
+#include<stdio.h>
+#include<stdint.h>
+
+
 /*头部大小计算的辅助结构体。
 由于内存对齐，不能直接相加字节数来计算。*/
 struct FOR_CALCULATE_HEADER_SIZE{
@@ -66,6 +75,32 @@ struct LeafCell{
 };
 
 
+// 前向声明
+Tree* getTree();
+Node* getLeafNode();
+Node* getIntNode();
+bool search(Node* node, Key k, void* &p_data, int &size_data);
+bool insert(Tree *&root, Key k, void *p_data, int size_data);
+bool insert2(Node* node, Key k, void *p_data, int size_data, Node *&father);
+bool insertLeafCell(Node* node, Key k, void *p_data, int size_data);
+bool insertIntCell(Node *node, Key k, Node *child);
+void splitLeafNode(Node* node, Node* &father);
+void splitIntNode(Node* node, Node*& father);
+int getKnumByChild(Node *node, Node *child);
+bool removeKthLeafCell(Node* node, int kth);
+bool removeKthIntCell(Node *node, int kth);
+bool getKthLeafCell(Node* node, int kth, LeafCell* cell);
+bool getKthIntCell(Node *node, int kth, IntCell *cell);
+bool spaceCheck(Node *node, int size);
+void spaceCleanUp(Node* node);
+int bytes2Int(void* f, int offset, int size);
+void int2Bytes(void *t, int offset, int size, int number);
+void printfNode(Node* node);
+void printfTree(Node* node, int indent);
+Node* getKthChild(Node *node, int kth);
+
+
+///////////////////////////////////////////////
 Tree* getTree()
 {
 	return getLeafNode();
@@ -76,8 +111,8 @@ Node* getLeafNode()
 {
 	Node *p=new Node();
 	p->is_leaf=1; // 叶子节点
-	p->cell_size=0；// 初始cell个数为0
-	p->frag_sizse=0; // 空闲碎片空间大小为0
+	p->cell_size=0; // 初始cell个数为0
+	p->frag_size=0; // 空闲碎片空间大小为0
 	p->right_child=0;
 	p->first_cell_pos=Node::PAGE_SIZE;
 	return p;
@@ -131,7 +166,7 @@ bool search(Node* node, Key k, void* &p_data, int &size_data)
 					continue;
 				else
 					// 在此cell指向的儿子节点中继续查找
-					return search(cell.child_point, k, p_data， size_data);
+					return search(cell.child_point, k, p_data, size_data);
 			}
 		}
 		
@@ -165,7 +200,7 @@ bool insert2(Node* node, Key k, void *p_data, int size_data, Node *&father)
 		struct IntCell cell;
 		for(int kth=0; kth<node->cell_size; ++kth)
 		{
-			getKthIntCell(node, i, &cell);
+			getKthIntCell(node, kth, &cell);
 			if(k>cell.key)
 				continue;
 			// 内部节点的当前cell不小于待插入key，插入此cell对应子节点中，node是父节点
@@ -209,10 +244,10 @@ bool insertLeafCell(Node* node, Key k, void *p_data, int size_data)
 	for(int i=node->cell_size-1; i>=kth; --i)
 	{
 		byte *p=bp+HEADER_SIZE+i*2;
-		memcpy(p+2; p, 2);
+		memcpy(p+2, p, 2);
 	}
 	node->first_cell_pos-=size_data+8; // 插入的cell大小（4字节Key+4字节data长度size_data+size_data长度data）
-	int2Bytes(bp, node->frist_cell_pos, sizeof(Key), k);
+	int2Bytes(bp, node->first_cell_pos, sizeof(Key), k);
 	int2Bytes(bp, node->first_cell_pos+4, 4, size_data);
 	memcpy((byte*)node+node->first_cell_pos+8, p_data, size_data);
 	
@@ -248,7 +283,7 @@ bool insertIntCell(Node *node, Key k, Node *child)
 	// 写入cell内容
 	node->first_cell_pos-=8;
 	int2Bytes(bp, node->first_cell_pos, 4, k);
-	int2Bytes(bp, node->first_cell_pos+4, 4, (int)child);
+	int2Bytes(bp, node->first_cell_pos+4, 4, (intptr_t)(void*)child);
 	// 写入cell指针
 	int2Bytes(bp, HEADER_SIZE+kth*2, 2, node->first_cell_pos);
 	++node->cell_size;
@@ -271,7 +306,7 @@ void splitLeafNode(Node* node, Node* &father)
 		// 从左往后删除node的cell，并插入到new_node中
 		int kth=Node::THE_ORDER/2;
 		getKthLeafCell(node, kth, &cell);
-		insertLeafCell(new_node, cell.key, cell.data_point， cell.size);
+		insertLeafCell(new_node, cell.key, cell.data_point, cell.size);
 		removeKthLeafCell(node, kth);
 	}
 	
@@ -353,7 +388,7 @@ void splitIntNode(Node* node, Node*& father)
 			removeKthIntCell(father, kth);
 			
 			insertIntCell(father, intcell.key, new_node);
-			insertIntCell(father, cell.key, node):
+			insertIntCell(father, cell.key, node);
 		}
 	}
 	else
@@ -367,7 +402,7 @@ void splitIntNode(Node* node, Node*& father)
 /* 检查child是否是father的一个子节点，不是返回-1，是则返回是第几个子节点。 */
 int getKnumByChild(Node *node, Node *child)
 {
-	assert(node  &&  childe);
+	assert(node  &&  child);
 	assert(node->is_leaf==0);
 	
 	struct IntCell cell;
@@ -411,7 +446,7 @@ bool removeKthIntCell(Node *node, int kth)
 	for(int i=kth; i<node->cell_size; ++i)
 	{
 		byte *p=bp+HEADER_SIZE+i*2;
-		memcpy(p, p+2; 2);
+		memcpy(p, p+2, 2);
 	}
 	--node->cell_size;
 	node->frag_size+=sizeof(IntCell);
@@ -439,6 +474,23 @@ bool getKthLeafCell(Node* node, int kth, LeafCell* cell)
 	return 1;
 }
 
+bool getKthIntCell(Node *node, int kth, IntCell *cell)
+{
+	assert(node  &&  cell);
+	assert(node->is_leaf==0);
+	assert(kth>=0  &&  kth<node->cell_size);
+	
+	int p_offset=HEADER_SIZE;
+	p_offset+=kth*2;
+	
+	int cell_offset=bytes2Int(node, p_offset, 2);
+	
+	cell->key=bytes2Int(node, cell_offset, 4);
+	cell->child_point=(Node*)bytes2Int(node, cell_offset+4, 4);
+	
+	return 1;
+}
+
 // 检查节点是否有足够空间存储size字节
 bool spaceCheck(Node *node, int size)
 {
@@ -461,7 +513,7 @@ bool spaceCheck(Node *node, int size)
 // 清理节点的空闲碎片空间
 void spaceCleanUp(Node* node)
 {
-	static Node *leafnode=getdLeafNode();
+	static Node *leafnode=getLeafNode();
 	static Node *intnode=getIntNode();
 	static Node *temp_node=getIntNode();
 	static LeafCell leafcell;
@@ -481,7 +533,13 @@ void spaceCleanUp(Node* node)
 	}
 	else
 	{
-		
+		memcpy(temp_node, intnode, Node::PAGE_SIZE);
+		for(int i=0; i<node->cell_size; ++i)
+		{
+			getKthIntCell(node, i, &intcell);
+			insertIntCell(temp_node, intcell.key, intcell.child_point);
+		}
+		temp_node->right_child=node->right_child;
 	}
 	
 	memcpy(node, temp_node, Node::PAGE_SIZE);
@@ -493,7 +551,7 @@ int bytes2Int(void* f, int offset, int size)
 	assert(f);
 	assert(size==1  ||  size==2  ||  size==4);
 	
-	byte *by=(byte*)f;
+	byte *bf=(byte*)f;
 	if(size==1)
 	{
 		byte bx;
@@ -512,6 +570,7 @@ int bytes2Int(void* f, int offset, int size)
 		memcpy(&ix, bf+offset, 4);
 		return ix;
 	}
+	return 0;
 }
 
 /* 在相对地址t偏移位置offset处的size字节内存中写入整数number
@@ -530,7 +589,7 @@ void int2Bytes(void *t, int offset, int size, int number)
 	}
 	else if(size==2)
 	{
-		short sx(short)number;
+		short sx=(short)number;
 		memcpy(bt+offset, &sx, 2);
 	}
 	else if(size==4)
@@ -579,7 +638,7 @@ void printfTree(Node* node, int indent)
 			getKthIntCell(node, i, &intcell);
 			// 打印第i个儿子节点紫薯
 			printfTree(intcell.child_point, indent+2);
-			for(int j=0; j<dent; ++j)
+			for(int j=0; j<indent; ++j)
 				printf(" ");
 			printf("%d\n", intcell.key);
 		}
