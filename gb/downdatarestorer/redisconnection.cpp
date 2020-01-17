@@ -130,10 +130,11 @@ bool RedisConnection::recv(RedisReplyInfo & replyInfo, ReplyParserType parserTyp
 				free(m_unparseBuf);
 				m_unparseBuf = NULL;
 				m_unparseLen = 0;
-				toParseBuf = (char*)malloc(mallocLen);
-				memset(toParseBuf, 0, mallocLen);
-				memcpy(toParseBuf, newBuf, toParseLen);
-				free(newBuf);
+//				toParseBuf = (char*)malloc(mallocLen);
+//				memset(toParseBuf, 0, mallocLen);
+//				memcpy(toParseBuf, newBuf, toParseLen);
+//				free(newBuf);
+                toParseBuf=newBuf;				
 				newBuf = NULL;
 			}
 			else

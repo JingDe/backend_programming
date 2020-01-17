@@ -696,13 +696,12 @@ bool RedisClient::doRedisCommandCluster(const string & key,
 	{
 		//add for redirect end endless loop;
 		vector<string> redirects;
-REDIS_COMMAND:
 		RedisReplyInfo replyInfo;
 		m_logger.debug("key:[%s] hit slot:[%d] select cluster[%s].", key.c_str(), crcValue, clusterId.c_str());
 		list<string> bakClusterList;
-		bakClusterList.clear();
 		list<string>::iterator bakIter;
 
+REDIS_COMMAND:
 		//get cluster
 		RedisClusterInfo clusterInfo;
 		if (getRedisClusterInfo(clusterId,clusterInfo))
@@ -712,38 +711,67 @@ REDIS_COMMAND:
 				freeReplyInfo(replyInfo);
 				m_logger.warn("cluster:%s do redis command failed.", clusterId.c_str());
 				//need send to another cluster. check bak cluster.
-				if (clusterInfo.bakClusterList.size() != 0)
-				{
-					bakClusterList = clusterInfo.bakClusterList;
-					bakIter = bakClusterList.begin();
-					if (bakIter != bakClusterList.end())
-					{
-						clusterId = (*bakIter);
-						goto REDIS_COMMAND;
-					}
-					else
-					{
-						m_logger.warn("key:[%s] send to all redis cluster failed, may be slot:[%d] is something wrong", key.c_str(), crcValue);
-						return false;
-					}
-				}
-				else
-				{
-					if (bakClusterList.size() > 0)
-					{
-						bakIter++;
-						if (bakIter != bakClusterList.end())
-						{
-							clusterId = (*bakIter);
-							goto REDIS_COMMAND;
-						}
-						else
-						{
-							m_logger.warn("key:[%s] send to all redis cluster failed, may be slot:[%d] is something wrong", key.c_str(), crcValue);
-							return false;
-						}
-					}
-				}
+                if(bakClusterList.empty()==false)
+                {
+                    bakIter++;
+                    if (bakIter != bakClusterList.end())
+                    {
+                        clusterId = (*bakIter);
+                        goto REDIS_COMMAND;
+                    }
+                    else
+                    {
+                        m_logger.warn("key:[%s] send to all bak cluster failed", key.c_str());
+                        return false;
+                    }
+                }
+                else
+                {
+                    bakClusterList = clusterInfo.bakClusterList;
+                    bakIter = bakClusterList.begin();
+                    if (bakIter != bakClusterList.end())
+                    {
+                        clusterId = (*bakIter);
+                        goto REDIS_COMMAND;
+                    }
+                    else
+                    {
+                        m_logger.warn("key:[%s] send to all bak cluster failed", key.c_str());
+                        return false;
+                    }
+                }
+//				if (clusterInfo.bakClusterList.size() != 0)
+//				{
+//					bakClusterList = clusterInfo.bakClusterList;
+//					bakIter = bakClusterList.begin();
+//					if (bakIter != bakClusterList.end())
+//					{
+//						clusterId = (*bakIter);
+//						goto REDIS_COMMAND;
+//					}
+//					else
+//					{
+//						m_logger.warn("key:[%s] send to all redis cluster failed, may be slot:[%d] is something wrong", key.c_str(), crcValue);
+//						return false;
+//					}
+//				}
+//				else
+//				{
+//					if (bakClusterList.size() > 0)
+//					{
+//						bakIter++;
+//						if (bakIter != bakClusterList.end())
+//						{
+//							clusterId = (*bakIter);
+//							goto REDIS_COMMAND;
+//						}
+//						else
+//						{
+//							m_logger.warn("key:[%s] send to all redis cluster failed, may be slot:[%d] is something wrong", key.c_str(), crcValue);
+//							return false;
+//						}
+//					}
+//				}
 			}
 			bool needRedirect = false;
 			string redirectInfo;
@@ -997,7 +1025,17 @@ REDIS_COMMAND:
 				if (reIter == redirects.end())
 				{
 					redirects.push_back(redirectInfo);
-					goto REDIS_COMMAND;
+                    // reset clusterId by redirectInfo
+                    if(getRedirectClusterId(redirectInfo, clusterId))
+                    {
+                        bakClusterList.clear();
+    					goto REDIS_COMMAND;
+                    }
+                    else
+                    {
+                        m_logger.error("no cluster of redirect info %s", redirectInfo.c_str());
+                        return false;
+                    }
 				}
 				else
 				{
@@ -1017,6 +1055,24 @@ REDIS_COMMAND:
 		return false;
 	}
 	return true;
+}
+
+bool RedisClient::getRedirectClusterId(const string& redirectInfo, string& clusterId)
+{
+    string::size_type pos=redirectInfo.find(":");
+    if(pos==string::npos)
+        return false;
+    string redirectIp=redirectInfo.substr(0, pos);
+    string redirectPort=redirectInfo.substr(pos+1);
+    for(REDIS_CLUSTER_MAP::iterator it=m_clusterMap.begin(); it!=m_clusterMap.end(); it++)
+    {
+        if(it->second.connectIp==redirectIp  &&  atoi(redirectPort.c_str())==it->second.connectPort)
+        {
+            clusterId=it->second.clusterId;
+            return true;
+        }
+    }
+    return false;
 }
 
 bool RedisClient::doRedisCommandWithLock(const string & key,int32_t commandLen,list < RedisCmdParaInfo > & commandList,int commandType,RedisLockInfo & lockInfo,bool getSerial,DBSerialize * serial)
@@ -2040,6 +2096,7 @@ bool RedisClient::checkIfNeedRedirect(RedisReplyInfo & replyInfo,bool & needRedi
 			if (findPos != string::npos)
 			{
 				redirectInfo = replyInfo.resultString.substr(findPos+1, replyInfo.resultString.length()-findPos-1);
+                //m_logger.info("redirectInfo is %s", redirectInfo.c_str());
 				return true;
 			}
 			else

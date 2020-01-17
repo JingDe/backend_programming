@@ -199,6 +199,7 @@ public:
     bool isConnected() { return m_connected; }
 	
 private:
+    bool getRedirectClusterId(const string& redirectInfo, string& clusterId);
 	bool getRedisClusterNodes();
 	bool parseClusterInfo(RedisReplyInfo& replyInfo, REDIS_CLUSTER_MAP& clusterMap);
 	bool parseOneCluster(const string& infoStr, RedisClusterInfo& clusterInfo);

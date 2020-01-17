@@ -6,10 +6,10 @@ TEST_REDIS_CLIENT_TARGET=test_redisclient
 
 CC=gcc
 CFLAGS=-g -Wall -c
-INCLUDE=-I . -I log4cxx
+INCLUDE=-I . -I log4cxx -I ../
 
-LIBPATH=-L lib
-LD_FLAGS= $(LIBPATH) -Wl,-rpath=$(LIBPATH)
+LIBPATH=lib
+LD_FLAGS=-L $(LIBPATH) -Wl,-rpath=$(LIBPATH)
 LIBS=-llog4cxx
 
 .PHONY: all
@@ -24,7 +24,7 @@ $(TEST_REDIS_CLIENT_TARGET): $(TEST_REDIS_CLIENT_OBJ)
 
 
 %.o: %.c
-	$(CC) $(CFLAGS) -o $@ $< $(INCLUDE) 
+	$(CC) $(CFLAGS) $< -o $@ $(INCLUDE) 
 
 
 .PHONY: clean
