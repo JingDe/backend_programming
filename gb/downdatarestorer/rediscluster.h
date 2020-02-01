@@ -27,9 +27,11 @@ public:
 	//for if connection not can be used, free it and create a new.
 	void freeConnection(RedisConnection *conn);
 	bool checkIfCanFree();
-private:
 	RedisConnection* getAvailableConnection();
+	
+private:	
 	bool checkConnectionAlive(RedisConnection *conn);
+	
 private:
 //	OWLog	m_logger;
 	string	m_clusterIp;

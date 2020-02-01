@@ -1,4 +1,5 @@
 #include "redisclient.h"
+#include "redisconnection.h"
 //#include "sysclass/Util.h"
 //#include "sysclass/base_func.h"
 //#include "common/macros.h"
@@ -24,7 +25,8 @@ RedisClient::RedisClient():m_logger("cdn.common.redisclient")
 
 RedisClient::~RedisClient()
 {
-    freeRedisClient();
+    if(m_connected==true)
+        freeRedisClient();
 }
 
 bool RedisClient::freeRedisClient()
@@ -1026,7 +1028,7 @@ REDIS_COMMAND:
 				{
 					redirects.push_back(redirectInfo);
                     // reset clusterId by redirectInfo
-                    if(getRedirectClusterId(redirectInfo, clusterId))
+                    if(getClusterIdFromRedirectReply(redirectInfo, clusterId))
                     {
                         bakClusterList.clear();
     					goto REDIS_COMMAND;
@@ -1057,7 +1059,7 @@ REDIS_COMMAND:
 	return true;
 }
 
-bool RedisClient::getRedirectClusterId(const string& redirectInfo, string& clusterId)
+bool RedisClient::getClusterIdFromRedirectReply(const string& redirectInfo, string& clusterId)
 {
     string::size_type pos=redirectInfo.find(":");
     if(pos==string::npos)
@@ -1066,7 +1068,7 @@ bool RedisClient::getRedirectClusterId(const string& redirectInfo, string& clust
     string redirectPort=redirectInfo.substr(pos+1);
     for(REDIS_CLUSTER_MAP::iterator it=m_clusterMap.begin(); it!=m_clusterMap.end(); it++)
     {
-        if(it->second.connectIp==redirectIp  &&  atoi(redirectPort.c_str())==it->second.connectPort)
+        if(it->second.connectIp==redirectIp  &&  (uint16_t)(atoi(redirectPort.c_str()))==(uint16_t)it->second.connectPort)
         {
             clusterId=it->second.clusterId;
             return true;
@@ -2649,5 +2651,371 @@ bool RedisClient::smembers(const string& key, list<string>& members)
 //	del(dbPre+"set"); 
 //	return true;		
 //}
+
+
+
+/*
+	API for transaction
+*/
+bool RedisClient::PrepareTransaction(RedisConnection** conn)
+{
+    if(m_redisMode==CLUSTER_MODE)
+    {
+        m_logger.error("transaction not supported in cluster mode");
+        return false;
+    }
+    
+    RedisConnection* con=m_redisProxy.clusterHandler->getAvailableConnection();
+    if(con==NULL)
+    {
+        m_logger.error("cannot acquire a redis connection");
+        return false;
+    }
+    *conn=con;
+	return true;
+}
+
+bool RedisClient::WatchKeys(const vector<string>& keys, RedisConnection* con)
+{
+	for(size_t i=0; i<keys.size(); i++)
+	{
+		if(!WatchKey(keys[i], con))
+			return false;
+	}
+	return true;
+}
+
+bool RedisClient::WatchKey(const string& key, RedisConnection* con)
+{
+	list<RedisCmdParaInfo> watchParaList;
+	int32_t watchParaLen = 0;
+	fillCommandPara("watch", 5, watchParaList);
+	watchParaLen += 18;
+	fillCommandPara(key.c_str(), key.length(), watchParaList);
+	watchParaLen += key.length() + 20;
+	bool success = doTransactionCommandInConnection(watchParaLen,watchParaList,RedisCommandType::REDIS_COMMAND_WATCH, con);
+	freeCommandList(watchParaList);
+    return success;
+}
+
+bool RedisClient::Unwatch(RedisConnection* con)
+{
+    list<RedisCmdParaInfo> unwatchParaList;
+    int32_t unwatchParaLen = 0;
+    fillCommandPara("unwatch", 6, unwatchParaList);
+    unwatchParaLen += 20;
+	bool success = doTransactionCommandInConnection(unwatchParaLen,unwatchParaList,RedisCommandType::REDIS_COMMAND_UNWATCH, con);
+    freeCommandList(unwatchParaList);
+    return success;
+}
+
+
+bool RedisClient::StartTransaction(RedisConnection* con)
+{
+    if(m_redisMode==CLUSTER_MODE)
+    {
+        m_logger.error("transaction not supported in cluster mode");
+        return false;
+    }    
+
+	bool success = false;
+	list<RedisCmdParaInfo> multiParaList;
+	int32_t multiParaLen = 0;
+	fillCommandPara("multi", 5, multiParaList);
+	multiParaLen += 18;
+	
+	// TODO call con->doRedisCommand ?
+	success = doTransactionCommandInConnection(multiParaLen,multiParaList,RedisCommandType::REDIS_COMMAND_MULTI, con);
+	freeCommandList(multiParaList);
+	if (!success)
+	{
+		m_logger.warn("do multi command failed.");
+    }
+    return success;
+}
+
+
+bool RedisClient::DiscardTransaction(RedisConnection* con)
+{
+    if(m_redisMode==CLUSTER_MODE)
+    {
+        m_logger.error("transaction not supported in cluster mode");
+        return false;
+    }
+
+	bool success = false;
+	list<RedisCmdParaInfo> paraList;
+	int32_t multiParaLen = 0;
+	fillCommandPara("discard", 7, paraList);
+	multiParaLen += 18;
+	success = doTransactionCommandInConnection(multiParaLen,paraList,RedisCommandType::REDIS_COMMAND_DISCARD, con);
+	freeCommandList(paraList);
+	if (!success)
+	{
+		m_logger.warn("do discard command failed.");
+    }
+    return success;
+}
+
+
+bool RedisClient::ExecTransaction(RedisConnection* con)
+{
+    if(m_redisMode==CLUSTER_MODE)
+    {
+        m_logger.error("transaction not supported in cluster mode");
+        return false;
+    }
+
+	bool success = false;
+	list<RedisCmdParaInfo> paraList;
+	int32_t multiParaLen = 0;
+	fillCommandPara("exec", 4, paraList);
+	multiParaLen += 18;
+	success = doTransactionCommandInConnection(multiParaLen,paraList,RedisCommandType::REDIS_COMMAND_EXEC, con);
+	freeCommandList(paraList);
+	if (!success)
+	{
+		m_logger.warn("exec transaction failed.");
+    }
+    m_logger.debug("exec transaction ok");
+    return true;
+}
+
+
+bool RedisClient::FinishTransaction(RedisConnection** conn)
+{
+    if(m_redisMode==CLUSTER_MODE)
+    {
+        m_logger.error("transaction not supported in cluster mode");
+        return false;
+    }
+
+	if(conn==NULL  ||  *conn==NULL)
+		return false;
+    m_redisProxy.clusterHandler->releaseConnection(*conn);
+    *conn=NULL;
+	return true;
+}
+
+
+bool RedisClient::doTransactionCommandInConnection(int32_t commandLen, list<RedisCmdParaInfo> &commandList, int commandType, RedisConnection* con)
+{
+	RedisReplyInfo replyInfo;
+	bool needRedirect;
+	string redirectInfo;
+    if(m_redisProxy.clusterHandler==NULL)
+    {
+        m_logger.error("m_redisProxy.clusterHandler is NULL");
+        return false;
+    }
+	if(!m_redisProxy.clusterHandler->doRedisCommand(commandList, commandLen, replyInfo))
+	{
+		freeReplyInfo(replyInfo);
+		m_logger.warn("proxy:%s do redis command failed.", m_redisProxy.proxyId.c_str());
+		return false;
+	}
+
+	switch (commandType)
+	{
+		// expects "QUEUED"			
+		case RedisCommandType::REDIS_COMMAND_SET:		
+		case RedisCommandType::REDIS_COMMAND_DEL:		
+		case RedisCommandType::REDIS_COMMAND_SADD:
+		case RedisCommandType::REDIS_COMMAND_SREM:
+			if(!parseQueuedResponseReply(replyInfo))
+			{
+				m_logger.warn("parse queued command reply failed. reply string:%s.", replyInfo.resultString.c_str());
+				freeReplyInfo(replyInfo);
+				return false;
+			}
+			break;
+		// expects "OK"
+		case RedisCommandType::REDIS_COMMAND_WATCH:
+		case RedisCommandType::REDIS_COMMAND_UNWATCH:
+		case RedisCommandType::REDIS_COMMAND_MULTI:
+		case RedisCommandType::REDIS_COMMAND_DISCARD:
+			if(!parseStatusResponseReply(replyInfo,needRedirect,redirectInfo))
+			{
+				m_logger.warn("parse watch reply failed. reply string:%s.", replyInfo.resultString.c_str());
+				freeReplyInfo(replyInfo);
+				return false;
+			}
+			break;
+		// expects array
+		case RedisCommandType::REDIS_COMMAND_EXEC:
+			if(!parseExecReply(replyInfo))
+			{
+				m_logger.warn("parse exec reply failed. reply string:%s.", replyInfo.resultString.c_str());
+				freeReplyInfo(replyInfo);
+				return false;
+			}
+			break;
+		default:
+			m_logger.warn("recv unknown command type:%d", commandType);
+			return false;
+		
+	}
+	freeReplyInfo(replyInfo);
+	return true;
+}
+
+//for watch,unwatch,multi,discard command response.
+bool RedisClient::parseStatusResponseReply(RedisReplyInfo & replyInfo)
+{
+	m_logger.debug("status replyInfo has replyType %d, resultString %s, intValue %d", replyInfo.replyType, replyInfo.resultString.c_str(), replyInfo.intValue);
+			
+	if (replyInfo.replyType != RedisReplyType::REDIS_REPLY_STATUS)
+	{
+		m_logger.warn("status response failed, redis response:[%s].", replyInfo.resultString.c_str());
+		return false;
+	}
+	return true;
+}
+
+//for queued command in a transaction
+bool RedisClient::parseQueuedResponseReply(RedisReplyInfo & replyInfo)
+{
+	m_logger.debug("queued replyInfo has replyType %d, resultString %s, intValue %d", replyInfo.replyType, replyInfo.resultString.c_str(), replyInfo.intValue);
+			
+	if (replyInfo.replyType != RedisReplyType::REDIS_REPLY_STATUS)
+	{
+		m_logger.warn("status response failed, redis response:[%s].", replyInfo.resultString.c_str());
+		return false;
+	}
+	return true;
+}
+
+bool RedisClient::parseExecReply(RedisReplyInfo & replyInfo)
+{
+	m_logger.debug("exec replyInfo has replyType %d, resultString %s, intValue %d", replyInfo.replyType, replyInfo.resultString.c_str(), replyInfo.intValue);
+
+	if(replyInfo.replyType  == RedisReplyType::REDIS_REPLY_NIL)
+	{
+		m_logger.warn("transaction interrupted: nil");
+		return false;
+	}
+	if (replyInfo.replyType != RedisReplyType::REDIS_REPLY_ARRAY)
+	{
+		m_logger.warn("recv redis wrong reply type:[%d].", replyInfo.replyType);
+		return false;
+	}
+	// empty array
+	if (replyInfo.replyType == RedisReplyType::REDIS_REPLY_ARRAY && replyInfo.intValue == -1)
+	{
+		m_logger.warn("exec reply -1, set serial exec failed.");
+		return false;
+	}
+
+	list<ReplyArrayInfo>::iterator arrayIter;
+	for (arrayIter = replyInfo.arrayList.begin(); arrayIter != replyInfo.arrayList.end(); arrayIter++)
+	{
+		m_logger.debug("arrayList has replyType %d, arrayValue %s, arrayLen %d", (*arrayIter).replyType, arrayIter->arrayValue, arrayIter->arrayLen);
+
+		if ((*arrayIter).replyType == RedisReplyType::REDIS_REPLY_STRING)
+		{
+			// error type
+			if (strncmp((*arrayIter).arrayValue, "-", 1) == 0)
+			{
+				m_logger.warn("recv failed exec reply:%s.", (*arrayIter).arrayValue);
+				return false;
+			}
+			// integer type: 0
+			else if(strncmp((*arrayIter).arrayValue, ":0", 2) == 0)
+			{
+				m_logger.warn("recv failed exec reply:%s.", (*arrayIter).arrayValue);
+				return false;
+			}
+			// bulk string: nil
+			else if(strncmp((*arrayIter).arrayValue, "$-1", 3) == 0)
+			{
+				m_logger.warn("recv failed exec reply:%s.", (*arrayIter).arrayValue);
+				return false;
+			}
+			// array type: empty array
+			else if(strncmp((*arrayIter).arrayValue, "*-1", 3) == 0)
+			{
+				m_logger.warn("recv failed exec reply:%s.", (*arrayIter).arrayValue);
+				return false;
+			}
+		}
+	}
+	return true;
+}
+
+
+bool RedisClient::Set(RedisConnection* con, const string & key, const string& value)
+{
+	list<RedisCmdParaInfo> paraList;
+	int32_t paraLen = 0;
+	fillCommandPara("set", 3, paraList);
+	paraLen += 15;
+	fillCommandPara(key.c_str(), key.length(), paraList);
+	paraLen += key.length() + 20;
+	fillCommandPara(value.c_str(), value.size(), paraList);
+	paraLen += value.size() + 20;
+	bool success = doTransactionCommandInConnection(paraLen,paraList,RedisCommandType::REDIS_COMMAND_SET, con);
+	freeCommandList(paraList);
+	if(!success)
+	{
+		m_logger.error("set of transaction failed");
+	}
+	return success;
+}
+
+bool RedisClient::Del(RedisConnection* con, const string & key)
+{
+	list<RedisCmdParaInfo> paraList;
+	int32_t paraLen = 0;
+	fillCommandPara("del", 3, paraList);
+	paraLen += 15;
+	fillCommandPara(key.c_str(), key.length(), paraList);
+	paraLen += key.length() + 20;
+	bool success = doTransactionCommandInConnection(paraLen,paraList,RedisCommandType::REDIS_COMMAND_DEL, con);
+	freeCommandList(paraList);
+	if(!success)
+	{
+		m_logger.error("del of transaction failed");
+	}
+	return success;
+}
+
+bool RedisClient::Sadd(RedisConnection* con, const string & setKey, const string& member)
+{
+	list<RedisCmdParaInfo> paraList;
+	int32_t paraLen = 0;
+	fillCommandPara("sadd", 4, paraList);
+	paraLen += 15;
+	fillCommandPara(setKey.c_str(), setKey.length(), paraList);
+	paraLen += setKey.length() + 20;
+	fillCommandPara(member.c_str(), member.size(), paraList);
+	paraLen += member.size() + 20;
+	bool success = doTransactionCommandInConnection(paraLen,paraList,RedisCommandType::REDIS_COMMAND_SADD, con);
+	freeCommandList(paraList);
+	if(!success)
+	{
+		m_logger.error("sadd of transaction failed");
+	}
+	return success;
+}
+
+bool RedisClient::Srem(RedisConnection* con, const string & setKey, const string& member)
+{
+	list<RedisCmdParaInfo> paraList;
+	int32_t paraLen = 0;
+	fillCommandPara("srem", 4, paraList);
+	paraLen += 15;
+	fillCommandPara(setKey.c_str(), setKey.length(), paraList);
+	paraLen += setKey.length() + 20;
+	fillCommandPara(member.c_str(), member.size(), paraList);
+	paraLen += member.size() + 20;
+	bool success = doTransactionCommandInConnection(paraLen,paraList,RedisCommandType::REDIS_COMMAND_SREM, con);
+	freeCommandList(paraList);
+	if(!success)
+	{
+		m_logger.error("srem of transaction failed");
+	}
+	return success;
+}
+
 
 

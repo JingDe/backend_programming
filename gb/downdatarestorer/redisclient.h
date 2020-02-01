@@ -17,6 +17,8 @@
 
 using namespace std;
 
+class RedisConnection;
+
 typedef struct RedisServerInfoTag
 {
 	RedisServerInfoTag()
@@ -116,6 +118,7 @@ struct RedisCommandType
 		REDIS_COMMAND_UNWATCH,
 		REDIS_COMMAND_MULTI,
 		REDIS_COMMAND_EXEC,
+		REDIS_COMMAND_DISCARD,
 		REDIS_COMMAND_ZADD,
 		REDIS_COMMAND_ZREM,
 		REDIS_COMMAND_ZINCRBY,
@@ -197,9 +200,24 @@ public:
 	bool getRedisClustersByCommand(REDIS_CLUSTER_MAP& clusterMap);
 	void getRedisClusters(REDIS_CLUSTER_MAP& clusterMap);
     bool isConnected() { return m_connected; }
+
+	// Transaction API
+	bool PrepareTransaction(RedisConnection** conn);
+	bool WatchKeys(const vector<string>& keys, RedisConnection* con);
+	bool WatchKey(const string& key, RedisConnection* con);
+	bool Unwatch(RedisConnection* con);
+	bool StartTransaction(RedisConnection* con);
+	bool DiscardTransaction(RedisConnection* con);
+    bool ExecTransaction(RedisConnection* con);
+	bool FinishTransaction(RedisConnection** conn);
+	// commands supported in a transaction
+	bool Set(RedisConnection*, const string&, const string&);
+	bool Del(RedisConnection*, const string&);
+	bool Sadd(RedisConnection*, const string& key, const string& member);
+	bool Srem(RedisConnection*, const string& key, const string& member);
 	
 private:
-    bool getRedirectClusterId(const string& redirectInfo, string& clusterId);
+    bool getClusterIdFromRedirectReply(const string& redirectInfo, string& clusterId);
 	bool getRedisClusterNodes();
 	bool parseClusterInfo(RedisReplyInfo& replyInfo, REDIS_CLUSTER_MAP& clusterMap);
 	bool parseOneCluster(const string& infoStr, RedisClusterInfo& clusterInfo);
@@ -236,11 +254,16 @@ private:
 	bool doRedisCommandCluster(const string& key, int32_t commandLen, list<RedisCmdParaInfo> &commandList, int commandType, DBSerialize* serial = NULL);
 	
 	bool doRedisCommandWithLock(const string& key, int32_t commandLen, list<RedisCmdParaInfo> &commandList, int commandType, RedisLockInfo& lockInfo, bool getSerial = false, DBSerialize* serial = NULL);
+	bool doMultiCommand(int32_t commandLen, list<RedisCmdParaInfo> &commandList, RedisConnection** conn);
 	bool doCommandArray(const string & key,int32_t commandLen,list < RedisCmdParaInfo > & commandList, int commandType, list<string>& members);
 	bool doCommandArrayCluster(const string & key,int32_t commandLen,list < RedisCmdParaInfo > & commandList, int commandType, list<string>& members);
 	bool doCommandArrayProxy(const string & key,int32_t commandLen,list < RedisCmdParaInfo > & commandist, int commandType, list<string>& members);
 
-
+	// for Transaction API
+	bool doTransactionCommandInConnection(int32_t commandLen, list<RedisCmdParaInfo> &commandList, int commandType, RedisConnection* con);
+	bool parseStatusResponseReply(RedisReplyInfo & replyInfo);
+	bool parseQueuedResponseReply(RedisReplyInfo & replyInfo);
+	bool parseExecReply(RedisReplyInfo & replyInfo);
 	
 
 private:
