@@ -212,6 +212,7 @@ public:
 	bool FinishTransaction(RedisConnection** conn);
 	// commands supported in a transaction
 	bool Set(RedisConnection*, const string&, const string&);
+	bool Set(RedisConnection* con, const string & key, const DBSerialize& serial);
 	bool Del(RedisConnection*, const string&);
 	bool Sadd(RedisConnection*, const string& key, const string& member);
 	bool Srem(RedisConnection*, const string& key, const string& member);

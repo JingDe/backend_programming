@@ -2776,9 +2776,13 @@ bool RedisClient::ExecTransaction(RedisConnection* con)
 	if (!success)
 	{
 		m_logger.warn("exec transaction failed.");
+		return false;
     }
-    m_logger.debug("exec transaction ok");
-    return true;
+    else
+    {
+	    m_logger.debug("exec transaction ok");
+	    return true;
+	}
 }
 
 
@@ -2942,6 +2946,26 @@ bool RedisClient::parseExecReply(RedisReplyInfo & replyInfo)
 	return true;
 }
 
+bool RedisClient::Set(RedisConnection* con, const string & key, const DBSerialize& serial)
+{
+	list<RedisCmdParaInfo> paraList;
+	int32_t paraLen = 0;
+	fillCommandPara("set", 3, paraList);
+	paraLen += 15;
+	fillCommandPara(key.c_str(), key.length(), paraList);
+	paraLen += key.length() + 20;	
+	DBOutStream out; 
+	serial.save(out);
+	fillCommandPara(out.getData(), out.getSize(), paraList);
+	paraLen += out.getSize() + 20;
+	bool success = doTransactionCommandInConnection(paraLen,paraList,RedisCommandType::REDIS_COMMAND_SET, con);
+	freeCommandList(paraList);
+	if(!success)
+	{
+		m_logger.error("set of transaction failed");
+	}
+	return success;
+}
 
 bool RedisClient::Set(RedisConnection* con, const string & key, const string& value)
 {

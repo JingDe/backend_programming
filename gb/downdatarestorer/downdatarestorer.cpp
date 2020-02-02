@@ -1,8 +1,8 @@
 #include"downdatastorer.h"
 #include"countdownlatch.h"
-#include"device.h"
-#include"channel.h"
-#include"executinginvitecmd.h"
+#include"devicemgr.h"
+#include"channelmgr.h"
+#include"executinginvitecmdmgr.h"
 #include"glog/logging.h"
 
 DownDataRestorer::DownDataRestorer()
@@ -11,7 +11,10 @@ DownDataRestorer::DownDataRestorer()
 	started_(false),
 	data_restorer_threads_num_(0),
 	data_restorer_threads_(),
-	data_restorer_threads_exit_latch(NULL)
+	data_restorer_threads_exit_latch(NULL),
+	operations_queue_mutex_(),
+	operations_queue_not_empty_condvar(&operations_queue_mutex_),
+	operations_queue_()
 {
 	google::InitGoogleLogging("downdatarestorer");
 	FLAGS_logtostderr=false;
@@ -30,6 +33,12 @@ DownDataRestorer::~DownDataRestorer()
 		Stop();
 	if(inited_)
 		Uninit();
+	if(device_mgr_)
+		delete device_mgr_;
+	if(channel_mgr_)
+		delete channel_mgr_;
+	if(executing_invite_cmd_mgr_)
+		delete executing_invite_cmd_mgr_;
 	google::ShutdownGoogleLogging();	
 }
 
@@ -114,6 +123,15 @@ int DownDataRestorer::Start()
 		LOG(ERROR)<<"init CountDownLatch failed";
 		return DDR_FAIL;
 	}
+
+	device_mgr_=new DeviceMgr(redis_client_);
+	channel_mgr_=new channel_mgr_(redis_client_);
+	executing_invite_cmd_mgr_=new ExecutingInviteCmdMgr(redis_client_);
+	if(!device_mgr_  ||  !channel_mgr_  ||  !executing_invite_cmd_mgr_)
+	{
+		return DDR_FAIL;
+	}
+	
 	started_=true;
 	return DDR_OK;
 }
@@ -127,7 +145,7 @@ int DownDataRestorer::Stop()
 	}
 
 	force_thread_exit=true;
-	data_restorer_threads_exit_latch.wait();
+	data_restorer_threads_exit_latch.Wait();
 
 	started_=false;
 	return DDR_OK;
@@ -142,15 +160,198 @@ void* DownDataRestorer::DataRestorerThreadFuncWrapper(void* arg)
 
 void DownDataRestorer::DataRestorerThreadFunc()
 {
-	
+	while(!force_thread_exit)
+	{
+		DataRestorerOperation operation;
+		{
+		MutexLockGuard gurad(&operations_queue_mutex_);
+		while(operations_queue_.empty())
+			operations_queue_not_empty_condvar.Wait();
+		operation=operations_queue_.begin();
+		operations_queue_.pop_front();
+		}
+
+		if(operation.operation_type_==DataRestorerOperation::INSERT)
+		{
+			if(operation.entity_type_==DataRestorerOperation::DEVICE)
+			{
+				device_mgr_.InsertDevice(*(Device*)(operation.entities.begin());
+			}
+			else if(operation.entity_type_==DataRestorerOperation::CHANNEL)
+			{
+				channel_mgr_.InsertChannel(*(Channel*)(operation.entities.begin());
+			}
+			else if(operation.entity_type_==DataRestorerOperation::EXECUTING_INVITE_CMD)
+			{
+				
+			}
+		}
+		else if(operation.operation_type_==DataRestorerOperation::DELETE)
+		{
+			if(operation.entity_type_==DataRestorerOperation::DEVICE)
+			{
+				device_mgr_.DeleteDevice(*(Device*)(operation.entities.begin());
+			}
+			else if(operation.entity_type_==DataRestorerOperation::CHANNEL)
+			{
+				channel_mgr_.DeleteChannel(*(Channel*)(operation.entities.begin());
+			}
+			else if(operation.entity_type_==DataRestorerOperation::EXECUTING_INVITE_CMD)
+			{
+				
+			}
+		}
+		else if(operation.operation_type_==DataRestorerOperation::CLEAR)
+		{
+			if(operation.entity_type_==DataRestorerOperation::DEVICE)
+			{
+				device_mgr_.ClearDevices();
+			}
+			else if(operation.entity_type_==DataRestorerOperation::CHANNEL)
+			{
+				channel_mgr_.ClearChannels();
+			}
+			else if(operation.entity_type_==DataRestorerOperation::EXECUTING_INVITE_CMD)
+			{
+				
+			}
+		}
+		else if(operation.operation_type_==DataRestorerOperation::UPDATE)
+		{
+			if(operation.entity_type_==DataRestorerOperation::DEVICE)
+			{
+				device_mgr_.UpdateDevices(*(Device*)(operation.entities.begin());
+			}
+			else if(operation.entity_type_==DataRestorerOperation::CHANNEL)
+			{
+				channel_mgr_.UpdateChannels(*(Channel*)(operation.entities.begin());
+			}
+			else if(operation.entity_type_==DataRestorerOperation::EXECUTING_INVITE_CMD)
+			{
+				
+			}
+		}
+
+		
+		for(list<void*>::iterator it=operation.entities.begin(); it!=operation.entities.end(); it++)
+		{
+			if(operation.entity_type_==DataRestorerOperation::DEVICE)
+			{
+				delete (Device*)(*it);
+			}
+			else if(operation.entity_type_==DataRestorerOperation::CHANNEL)
+			{
+				delete (Channel*)(*it);
+			}
+			else if(operation.entity_type_==DataRestorerOperation::EXECUTING_INVITE_CMD)
+			{
+				delete (ExecutingInviteCmd*)(*it);
+			}
+		}
+	}
+
+	LOG(INFO)<<"data restorer thread exits now";
+	data_restorer_threads_exit_latch.CountDown();
 }
 
 int DownDataRestorer::GetStat()
 {
+	// TODO
 	return DDR_OK;
 }
 
 int DownDataRestorer::LoadDeviceList(list<Device>& devices)
 {
+	assert(started_);
+	device_mgr_->LoadDevices(devices);
+	return DDR_OK;
+}
+
+int DownDataRestorer::SelectDeviceList(Device& device)
+{
+	// TODO
+	return DDR_OK;
+}
+
+int DownDataRestorer::InsertDeviceList(const Device& device)
+{
+	MutexLockGuard guard(&operations_queue_mutex_);
+	DataRestorerOperation operation(DataRestorerOperation::INSERT, DataRestorerOperation::DEVICE, &device);
+	operations_queue_.insert(operation);
+	if(operations_queue_.size()==1)
+		operations_queue_not_empty_condvar.SignalAll();
+	return DDR_OK;
+}
+
+int DownDataRestorer::DeleteDeviceList(const Device& device)
+{
+	MutexLockGuard guard(&operations_queue_mutex_);
+	DataRestorerOperation operation(DataRestorerOperation::DELETE, DataRestorerOperation::DEVICE, &device);
+	operations_queue_.insert(operation);
+	if(operations_queue_.size()==1)
+		operations_queue_not_empty_condvar.SignalAll();
+	return DDR_OK;
+}
+
+int DownDataRestorer::ClearDeviceList()
+{
+	MutexLockGuard guard(&operations_queue_mutex_);
+	DataRestorerOperation operation(DataRestorerOperation::CLEAR, DataRestorerOperation::DEVICE, NULL);
+	operations_queue_.insert(operation);
+	if(operations_queue_.size()==1)
+		operations_queue_not_empty_condvar.SignalAll();
+	return DDR_OK;
+}
+
+int DownDataRestorer::UpdateDeviceList(const list<Device>& devices)
+{
+	MutexLockGuard guard(&operations_queue_mutex_);
+	list<void*> device_list;
+	for(list<Device>::iterator it=devices.begin(); it!=devices.end(); ++it)
+	{
+		device_list.push_back(&(*it));
+	}
+	DataRestorerOperation operation(DataRestorerOperation::UPDATE, DataRestorerOperation::DEVICE, device_list);
+	operations_queue_.insert(operation);
+	if(operations_queue_.size()==1)
+		operations_queue_not_empty_condvar.SignalAll();
+	return DDR_OK;
+}
+
+/*
+int LoadChannelList(list<Channel>& channels);
+int SelectChannelList(Channel& channel);
+int InsertChannelList(const Channel& channel);
+int DeleteChannelList(const Channel& channel);
+int ClearChannelList();
+int UpdateChannelList(const list<Channel>& channels);
+*/
+
+int DownDataRestorer::LoadExecutingInviteCmdList(vector<ExecutingInviteCmdList>& executinginvitecmdlists)
+{
 	
 }
+
+int DownDataRestorer::SelectExecutingInviteCmdList()
+{}
+
+int DownDataRestorer::InsertExecutingInviteCmdList(const ExecutingInviteCmd& executinginvitecmd)
+{}
+
+int DownDataRestorer::DeleteExecutingInviteCmdList(const ExecutingInviteCmd& executinginvitecmd)
+{}
+
+int DownDataRestorer::ClearExecutingInviteCmdList()
+{
+
+}
+
+int DownDataRestorer::UpdateExecutingInviteCmdList(const ExecutingInviteCmdList& executinginvitecmdlist)
+{}
+
+int DownDataRestorer::UpdateExecutingInviteCmdList(const vector<ExecutingInviteCmdList>& executinginvitecmdlists)
+{}
+
+
+
+

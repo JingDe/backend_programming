@@ -1,9 +1,20 @@
 #ifndef DOWN_DATA_RESTORER_DEVICE_H
 #define DOWN_DATA_RESTORER_DEVICE_H
 
-class Device{
+
+#include"dbstream.h"
+#include<string>
+
+using std::string;
+
+class Device : public DBSerialize {
 public:
 
+	string getDeviceId() { return device_id_; }
+	
+	void save(DBOutStream &out);
+    void load(DBInStream &in);
+    
 private:
 	string device_id_;
 	string device_sip_ip_;
