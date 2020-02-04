@@ -1,17 +1,26 @@
-#include"downdatastorer.h"
+#include"downdatarestorer.h"
 #include"countdownlatch.h"
 #include"devicemgr.h"
 #include"channelmgr.h"
 #include"executinginvitecmdmgr.h"
+#include"mutexlockguard.h"
+#include"redisclient.h"
+
+#include<cassert>
+
 #include"glog/logging.h"
 
 DownDataRestorer::DownDataRestorer()
 	:redis_client_(NULL),
 	inited_(false),
 	started_(false),
+    force_thread_exit_(false),
 	data_restorer_threads_num_(0),
 	data_restorer_threads_(),
 	data_restorer_threads_exit_latch(NULL),
+	device_mgr_(NULL),
+	channel_mgr_(NULL),
+	executing_invite_cmd_mgr_(NULL),
 	operations_queue_mutex_(),
 	operations_queue_not_empty_condvar(&operations_queue_mutex_),
 	operations_queue_()
@@ -63,7 +72,7 @@ int DownDataRestorer::Init(string redis_server_ip, uint16_t redis_server_port, i
 		return DDR_FAIL;
 	}
 	
-	if(redis_client_.init(redis_server_list, connection_num, keepalive_time_secs)==false)
+	if(redis_client_->init(redis_server_list, connection_num, keepalive_time_secs)==false)
 	{
 		LOG(ERROR)<<"init RedisClient failed";
 		return -1;
@@ -76,7 +85,7 @@ int DownDataRestorer::Uninit()
 {
 	if(inited_  &&  redis_client_)
 	{
-		redis_client_.freeRedisClient();
+		redis_client_->freeRedisClient();
 		redis_client_=NULL;
 	}
 	return DDR_OK;
@@ -116,17 +125,20 @@ int DownDataRestorer::Start()
 		LOG(ERROR)<<"start redis threads failed";
 		return DDR_FAIL;
 	}
-	data_restorer_threads_.shrink_to_fit();
+	//data_restorer_threads_.shrink_to_fit();
+    data_restorer_threads_.resize(data_restorer_threads_.size());
 	data_restorer_threads_exit_latch=new CountDownLatch(data_restorer_threads_.size());
-	if(data_restorer_threads_exit_latch.IsValid()==false)
+	if(data_restorer_threads_exit_latch->IsValid()==false)
 	{
 		LOG(ERROR)<<"init CountDownLatch failed";
 		return DDR_FAIL;
 	}
 
 	device_mgr_=new DeviceMgr(redis_client_);
-	channel_mgr_=new channel_mgr_(redis_client_);
-	executing_invite_cmd_mgr_=new ExecutingInviteCmdMgr(redis_client_);
+	channel_mgr_=new ChannelMgr(redis_client_);
+	// TODO
+	int worker_thread_num=GetWorkerThreadNum();
+	executing_invite_cmd_mgr_=new ExecutingInviteCmdMgr(redis_client_, worker_thread_num);
 	if(!device_mgr_  ||  !channel_mgr_  ||  !executing_invite_cmd_mgr_)
 	{
 		return DDR_FAIL;
@@ -136,16 +148,21 @@ int DownDataRestorer::Start()
 	return DDR_OK;
 }
 
+int DownDataRestorer::GetWorkerThreadNum()
+{
+	return 8;
+}
+
 int DownDataRestorer::Stop()
 {
 	if(!started_)
 	{
 		LOG(WARNING)<<"not started yet";
-		retun DDR_FAIL;
+		return DDR_FAIL;
 	}
 
-	force_thread_exit=true;
-	data_restorer_threads_exit_latch.Wait();
+	force_thread_exit_=true;
+	data_restorer_threads_exit_latch->Wait();
 
 	started_=false;
 	return DDR_OK;
@@ -160,80 +177,79 @@ void* DownDataRestorer::DataRestorerThreadFuncWrapper(void* arg)
 
 void DownDataRestorer::DataRestorerThreadFunc()
 {
-	while(!force_thread_exit)
+	while(!force_thread_exit_)
 	{
 		DataRestorerOperation operation;
 		{
 		MutexLockGuard gurad(&operations_queue_mutex_);
 		while(operations_queue_.empty())
 			operations_queue_not_empty_condvar.Wait();
-		operation=operations_queue_.begin();
-		operations_queue_.pop_front();
+		operation=operations_queue_.front();
+		operations_queue_.pop();
 		}
 
 		if(operation.operation_type_==DataRestorerOperation::INSERT)
 		{
 			if(operation.entity_type_==DataRestorerOperation::DEVICE)
 			{
-				device_mgr_.InsertDevice(*(Device*)(operation.entities.begin());
+				device_mgr_->InsertDevice(*(Device*)(*operation.entities_.begin()));
 			}
 			else if(operation.entity_type_==DataRestorerOperation::CHANNEL)
 			{
-				channel_mgr_.InsertChannel(*(Channel*)(operation.entities.begin());
+				channel_mgr_->InsertChannel(*(Channel*)(*(operation.entities_.begin())));
 			}
 			else if(operation.entity_type_==DataRestorerOperation::EXECUTING_INVITE_CMD)
 			{
-				
+				executing_invite_cmd_mgr_->Insert(*(ExecutingInviteCmd*)(*operation.entities_.begin()), operation.executing_invite_cmd_list_num_);
 			}
 		}
 		else if(operation.operation_type_==DataRestorerOperation::DELETE)
 		{
 			if(operation.entity_type_==DataRestorerOperation::DEVICE)
 			{
-				device_mgr_.DeleteDevice(*(Device*)(operation.entities.begin());
+				device_mgr_->DeleteDevice(*(Device*)(*operation.entities_.begin()));
 			}
 			else if(operation.entity_type_==DataRestorerOperation::CHANNEL)
 			{
-				channel_mgr_.DeleteChannel(*(Channel*)(operation.entities.begin());
+				channel_mgr_->DeleteChannel(*(Channel*)(*operation.entities_.begin()));
 			}
 			else if(operation.entity_type_==DataRestorerOperation::EXECUTING_INVITE_CMD)
 			{
-				
+				executing_invite_cmd_mgr_->Delete(*(ExecutingInviteCmd*)(*operation.entities_.begin()), operation.executing_invite_cmd_list_num_);
 			}
 		}
 		else if(operation.operation_type_==DataRestorerOperation::CLEAR)
 		{
 			if(operation.entity_type_==DataRestorerOperation::DEVICE)
 			{
-				device_mgr_.ClearDevices();
+				device_mgr_->ClearDevices();
 			}
 			else if(operation.entity_type_==DataRestorerOperation::CHANNEL)
 			{
-				channel_mgr_.ClearChannels();
+				channel_mgr_->ClearChannels();
 			}
 			else if(operation.entity_type_==DataRestorerOperation::EXECUTING_INVITE_CMD)
 			{
-				
+				executing_invite_cmd_mgr_->Clear();
 			}
 		}
 		else if(operation.operation_type_==DataRestorerOperation::UPDATE)
 		{
 			if(operation.entity_type_==DataRestorerOperation::DEVICE)
 			{
-				device_mgr_.UpdateDevices(*(Device*)(operation.entities.begin());
+				device_mgr_->UpdateDevices(operation.entities_);
 			}
 			else if(operation.entity_type_==DataRestorerOperation::CHANNEL)
 			{
-				channel_mgr_.UpdateChannels(*(Channel*)(operation.entities.begin());
+				channel_mgr_->UpdateChannels(operation.entities_);
 			}
 			else if(operation.entity_type_==DataRestorerOperation::EXECUTING_INVITE_CMD)
 			{
-				
+				executing_invite_cmd_mgr_->Update(operation.entities_, operation.executing_invite_cmd_list_num_);
 			}
 		}
-
 		
-		for(list<void*>::iterator it=operation.entities.begin(); it!=operation.entities.end(); it++)
+		for(list<void*>::iterator it=operation.entities_.begin(); it!=operation.entities_.end(); it++)
 		{
 			if(operation.entity_type_==DataRestorerOperation::DEVICE)
 			{
@@ -251,7 +267,7 @@ void DownDataRestorer::DataRestorerThreadFunc()
 	}
 
 	LOG(INFO)<<"data restorer thread exits now";
-	data_restorer_threads_exit_latch.CountDown();
+	data_restorer_threads_exit_latch->CountDown();
 }
 
 int DownDataRestorer::GetStat()
@@ -276,8 +292,8 @@ int DownDataRestorer::SelectDeviceList(Device& device)
 int DownDataRestorer::InsertDeviceList(const Device& device)
 {
 	MutexLockGuard guard(&operations_queue_mutex_);
-	DataRestorerOperation operation(DataRestorerOperation::INSERT, DataRestorerOperation::DEVICE, &device);
-	operations_queue_.insert(operation);
+	DataRestorerOperation operation(DataRestorerOperation::INSERT, DataRestorerOperation::DEVICE, const_cast<Device*>(&device));
+	operations_queue_.push(operation);
 	if(operations_queue_.size()==1)
 		operations_queue_not_empty_condvar.SignalAll();
 	return DDR_OK;
@@ -286,8 +302,8 @@ int DownDataRestorer::InsertDeviceList(const Device& device)
 int DownDataRestorer::DeleteDeviceList(const Device& device)
 {
 	MutexLockGuard guard(&operations_queue_mutex_);
-	DataRestorerOperation operation(DataRestorerOperation::DELETE, DataRestorerOperation::DEVICE, &device);
-	operations_queue_.insert(operation);
+	DataRestorerOperation operation(DataRestorerOperation::DELETE, DataRestorerOperation::DEVICE, const_cast<Device*>(&device));
+	operations_queue_.push(operation);
 	if(operations_queue_.size()==1)
 		operations_queue_not_empty_condvar.SignalAll();
 	return DDR_OK;
@@ -297,7 +313,7 @@ int DownDataRestorer::ClearDeviceList()
 {
 	MutexLockGuard guard(&operations_queue_mutex_);
 	DataRestorerOperation operation(DataRestorerOperation::CLEAR, DataRestorerOperation::DEVICE, NULL);
-	operations_queue_.insert(operation);
+	operations_queue_.push(operation);
 	if(operations_queue_.size()==1)
 		operations_queue_not_empty_condvar.SignalAll();
 	return DDR_OK;
@@ -307,12 +323,12 @@ int DownDataRestorer::UpdateDeviceList(const list<Device>& devices)
 {
 	MutexLockGuard guard(&operations_queue_mutex_);
 	list<void*> device_list;
-	for(list<Device>::iterator it=devices.begin(); it!=devices.end(); ++it)
+	for(list<Device>::const_iterator it=devices.begin(); it!=devices.end(); ++it)
 	{
-		device_list.push_back(&(*it));
+		device_list.push_back(const_cast<Device*>(&(*it)));
 	}
 	DataRestorerOperation operation(DataRestorerOperation::UPDATE, DataRestorerOperation::DEVICE, device_list);
-	operations_queue_.insert(operation);
+	operations_queue_.push(operation);
 	if(operations_queue_.size()==1)
 		operations_queue_not_empty_condvar.SignalAll();
 	return DDR_OK;
@@ -327,30 +343,68 @@ int ClearChannelList();
 int UpdateChannelList(const list<Channel>& channels);
 */
 
-int DownDataRestorer::LoadExecutingInviteCmdList(vector<ExecutingInviteCmdList>& executinginvitecmdlists)
+int DownDataRestorer::LoadExecutingInviteCmdList(vector<ExecutingInviteCmdList>& executing_invite_cmd_lists)
 {
-	
+	assert(started_);
+	executing_invite_cmd_mgr_->Load(executing_invite_cmd_lists);
+	return DDR_OK;
 }
 
 int DownDataRestorer::SelectExecutingInviteCmdList()
-{}
+{
+	// TODO
+	return DDR_OK;
+}
 
-int DownDataRestorer::InsertExecutingInviteCmdList(const ExecutingInviteCmd& executinginvitecmd)
-{}
+int DownDataRestorer::InsertExecutingInviteCmdList(const ExecutingInviteCmd& cmd, int worker_thread_num)
+{
+	MutexLockGuard guard(&operations_queue_mutex_);
+	DataRestorerOperation operation(DataRestorerOperation::INSERT, DataRestorerOperation::EXECUTING_INVITE_CMD, const_cast<ExecutingInviteCmd*>(&cmd), worker_thread_num);
+	operations_queue_.push(operation);
+	operations_queue_not_empty_condvar.Signal();
+	return DDR_OK;
+}
 
-int DownDataRestorer::DeleteExecutingInviteCmdList(const ExecutingInviteCmd& executinginvitecmd)
-{}
+int DownDataRestorer::DeleteExecutingInviteCmdList(const ExecutingInviteCmd& executinginvitecmd, int worker_thread_num)
+{
+	MutexLockGuard guard(&operations_queue_mutex_);
+	DataRestorerOperation operation(DataRestorerOperation::DELETE, DataRestorerOperation::EXECUTING_INVITE_CMD, const_cast<ExecutingInviteCmd*>(&executinginvitecmd), worker_thread_num);
+	operations_queue_.push(operation);
+	if(operations_queue_.size()==1)
+		operations_queue_not_empty_condvar.SignalAll();
+	return DDR_OK;
+}
 
 int DownDataRestorer::ClearExecutingInviteCmdList()
 {
-
+	MutexLockGuard guard(&operations_queue_mutex_);
+	DataRestorerOperation operation(DataRestorerOperation::CLEAR, DataRestorerOperation::EXECUTING_INVITE_CMD, NULL);
+	operations_queue_.push(operation);
+	if(operations_queue_.size()==1)
+		operations_queue_not_empty_condvar.SignalAll();
+	return DDR_OK;
 }
 
-int DownDataRestorer::UpdateExecutingInviteCmdList(const ExecutingInviteCmdList& executinginvitecmdlist)
-{}
+int DownDataRestorer::UpdateExecutingInviteCmdList(const ExecutingInviteCmdList& executing_invite_cmd_list)
+{
+	MutexLockGuard guard(&operations_queue_mutex_);
+	list<void*> cmd_list;
+	for(ExecutingInviteCmdList::const_iterator it=executing_invite_cmd_list.begin(); it!=executing_invite_cmd_list.end(); ++it)
+	{
+		cmd_list.push_back(const_cast<ExecutingInviteCmd*>(&(*it)));
+	}
+	DataRestorerOperation operation(DataRestorerOperation::UPDATE, DataRestorerOperation::EXECUTING_INVITE_CMD, cmd_list);
+	operations_queue_.push(operation);
+	if(operations_queue_.size()==1)
+		operations_queue_not_empty_condvar.SignalAll();
+	return DDR_OK;
+}
 
 int DownDataRestorer::UpdateExecutingInviteCmdList(const vector<ExecutingInviteCmdList>& executinginvitecmdlists)
-{}
+{
+	// TODO
+	return DDR_OK;
+}
 
 
 

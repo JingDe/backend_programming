@@ -1,4 +1,11 @@
-#include"device.cpp"
+#include"device.h"
+
+Device::Device()
+	:device_id_(),
+	device_sip_ip_(),
+	device_sip_port_(),
+	device_state_()
+{}
 
 void Device::save(DBOutStream &out)
 {
@@ -16,3 +23,8 @@ void Device::load(DBInStream &in)
 	in>>device_state_;
 }
 
+void Device::UpdateRegisterLastTime(time_t t)
+{}
+
+void Device::UpdateKeepaliveLastTime(time_t t)
+{}

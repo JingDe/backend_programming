@@ -1,4 +1,5 @@
 #include"countdownlatch.h"
+#include<cassert>
 
 CountDownLatch::CountDownLatch(int count)
 	:count_(count),
@@ -40,16 +41,16 @@ void CountDownLatch::Wait()
 	pthread_mutex_lock(&mutex_);
 	while(count_)
 		pthread_cond_wait(&condition_, &mutex_);
-	ptread_mutex_unlock(&mutex_);
+	pthread_mutex_unlock(&mutex_);
 }
 
 void CountDownLatch::CountDown()
 {
 	assert(valid_);
-	pthead_mutex_lock(&mutex_);
+	pthread_mutex_lock(&mutex_);
 	count_--;
 	if(count_==0)
 		pthread_cond_broadcast(&condition_);
-	ptread_mutex_unlock(&mutex_);
+	pthread_mutex_unlock(&mutex_);
 }
 

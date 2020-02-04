@@ -3,6 +3,8 @@
 
 #include<pthread.h>
 
+class CondVar;
+
 class MutexLock{
 	friend class CondVar;
 public:
@@ -15,7 +17,7 @@ private:
 	pthread_mutex_t mutex_;
 
 	MutexLock(const MutexLock&);
-	MutexLock& opreator=(const MutexLock&);
+	MutexLock& operator=(const MutexLock&);
 };
 
 #endif

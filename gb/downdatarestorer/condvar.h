@@ -17,6 +17,9 @@ public:
 private:
     MutexLock * mu_;
     pthread_cond_t cv_;
+
+    CondVar(const CondVar&);
+    CondVar& operator=(const CondVar&);
 };
 
 #endif

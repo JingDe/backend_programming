@@ -2,7 +2,7 @@
 
 MutexLock::MutexLock()
 {
-	pthread_mutex_init(&mutex_);
+	pthread_mutex_init(&mutex_, NULL);
 }
 
 MutexLock::~MutexLock()

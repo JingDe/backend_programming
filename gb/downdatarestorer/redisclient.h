@@ -160,9 +160,9 @@ public:
 	bool getSerialWithLock(const string& key, DBSerialize &serial, RedisLockInfo& lockInfo);
 	bool find(const string& key);
 	bool delKeys(const string & delKeys);
-	bool setSerial(const string& key, DBSerialize &serial);
-	bool setSerialWithLock(const string& key, DBSerialize &serial, RedisLockInfo& lockInfo);
-	bool setSerialWithExpire(const string& key, DBSerialize &serial, uint32_t expireTime);
+	bool setSerial(const string& key, const DBSerialize &serial);
+	bool setSerialWithLock(const string& key, const DBSerialize &serial, RedisLockInfo& lockInfo);
+	bool setSerialWithExpire(const string& key, const DBSerialize &serial, uint32_t expireTime);
 	//need unwatch key.
 	bool releaseLock(const string& key, RedisLockInfo& lockInfo);
 	bool del(const string& key);

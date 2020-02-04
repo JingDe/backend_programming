@@ -9,8 +9,10 @@ using std::string;
 
 class Device : public DBSerialize {
 public:
-
-	string getDeviceId() { return device_id_; }
+	Device();
+	string GetDeviceId() const { return device_id_; }
+    void UpdateRegisterLastTime(time_t t);
+    void UpdateKeepaliveLastTime(time_t t);
 	
 	void save(DBOutStream &out);
     void load(DBInStream &in);

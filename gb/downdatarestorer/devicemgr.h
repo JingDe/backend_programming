@@ -15,11 +15,12 @@ public:
 	DeviceMgr(RedisClient*);
 
 	int LoadDevices(list<Device>& devices);
-	int SearchDevice(string& deviceId);
+	int SearchDevice(const string& device_id, Device& device);
 	int InsertDevice(const Device& device);
 	int DeleteDevice(const Device& device);
 	int ClearDevices();
 	int UpdateDevices(const list<Device>& devices);
+	int UpdateDevices(const list<void*>& devices);
 
 private:
 	RedisClient* redis_client_;

@@ -1,4 +1,5 @@
 #include"redisclient.h"
+#include"downdatarestorer.h"
 #include<string>
 
 using std::string;
@@ -99,7 +100,7 @@ int main(int argc, char** argv)
     if(argc<2)
     {
         printf("usage: %s configFileName\n", argv[0]);
-        prnitf("default: %s", log_config_filename.c_str());
+        printf("default: %s", log_config_filename.c_str());
 //        return -1;
     }
     log_config_filename=argv[1];
@@ -107,7 +108,9 @@ int main(int argc, char** argv)
 
     OWLog::config(log_config_filename);
 
-	TestTransactionSetDel();
-	
+//	TestTransactionSetDel();
+    
+    DownDataRestorer ddr;
+
     return 0;
 }

@@ -250,7 +250,7 @@ bool RedisClient::getSerialWithLock(const string & key,DBSerialize & serial,Redi
 	return success;
 }
 
-bool RedisClient::setSerialWithLock(const string & key,DBSerialize & serial,RedisLockInfo & lockInfo)
+bool RedisClient::setSerialWithLock(const string & key, const DBSerialize& serial,RedisLockInfo & lockInfo)
 {
 	//add for  redis Optimistic Lock command, includes multi, set key, exec.
 	bool success = false;
@@ -358,7 +358,7 @@ bool RedisClient::delKeys(const string & keyPrefix)
 	keys.clear();
 	return true;
 }
-bool RedisClient::setSerial(const string & key,DBSerialize & serial)
+bool RedisClient::setSerial(const string& key, const DBSerialize& serial)
 {
 	list<RedisCmdParaInfo> paraList;
 	int32_t paraLen = 0;
@@ -376,7 +376,7 @@ bool RedisClient::setSerial(const string & key,DBSerialize & serial)
 	return success;
 }
 
-bool RedisClient::setSerialWithExpire(const string & key,DBSerialize & serial,uint32_t expireTime)
+bool RedisClient::setSerialWithExpire(const string & key, const DBSerialize & serial,uint32_t expireTime)
 {
 	list<RedisCmdParaInfo> paraList;
 	int32_t paraLen = 0;

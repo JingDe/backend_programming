@@ -7,15 +7,18 @@ class MutexLockGuard{
 public:
 	explicit MutexLockGuard(MutexLock* lock){
 		mutex_lock_=lock;
-		mutex_lock_.Lock();
+		mutex_lock_->Lock();
 	}
 
 	~MutexLockGuard(){
-		mutex_lock_.Unlock();
+		mutex_lock_->Unlock();
 	}
 
 private:
 	MutexLock* mutex_lock_;
+
+    MutexLockGuard(const MutexLockGuard&);
+    MutexLockGuard& operator=(const MutexLockGuard&);
 };
 
 #endif

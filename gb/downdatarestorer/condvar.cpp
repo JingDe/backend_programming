@@ -1,5 +1,6 @@
 #include"condvar.h"
 #include<time.h>
+#include<cstdint>
 
 CondVar::CondVar(MutexLock* mu) :mu_(mu)
 {
@@ -18,7 +19,7 @@ void CondVar::Wait()
 
 void CondVar::WaitForSeconds(int secs)
 {
-	const struct timespec abstime;
+	struct timespec abstime;
 	/*struct timespec{
 		time_t tv_sec;
 		long tv_nsec;
@@ -31,7 +32,7 @@ void CondVar::WaitForSeconds(int secs)
 	abstime.tv_sec += static_cast<time_t>((abstime.tv_nsec + nanoseconds) / kNanoSecondsPerSecond);
 	abstime.tv_nsec = static_cast<long>((abstime.tv_nsec + nanoseconds) % kNanoSecondsPerSecond);
 
-	pthread_cond_timewait(&cv_, &mu_->mutex_, &abstime); // 等待到一个绝对时间
+	pthread_cond_timedwait(&cv_, &mu_->mutex_, &abstime); // 等待到一个绝对时间
 }
 
 void CondVar::Signal()
