@@ -17,6 +17,8 @@ $(TEST_REDIS_CLIENT_TARGET):
 
 .PHONY: clean
 clean:
-	rm $(TEST_REDIS_CLIENT_TARGET)
-	rm $(TEST_REDIS_CLIENT_OBJ)
+	-rm downdatarestorerlogdir/*
+	-rm test_redisclient.log
+	-rm $(TEST_REDIS_CLIENT_TARGET)
+	-rm $(TEST_REDIS_CLIENT_OBJ)
 

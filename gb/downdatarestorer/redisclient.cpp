@@ -19,8 +19,8 @@ RedisClient::RedisClient():m_logger("cdn.common.redisclient")
 	m_unusedHandlers.clear();
     m_connected=false;
 
-    printf("in construct\n");
-    m_logger.debug("construct ok");
+    printf("RedisClient construction\n");
+    m_logger.debug("construct RedisClient ok");
 }
 
 RedisClient::~RedisClient()
@@ -2812,7 +2812,7 @@ bool RedisClient::doTransactionCommandInConnection(int32_t commandLen, list<Redi
         m_logger.error("m_redisProxy.clusterHandler is NULL");
         return false;
     }
-	if(!m_redisProxy.clusterHandler->doRedisCommand(commandList, commandLen, replyInfo))
+	if(!m_redisProxy.clusterHandler->doRedisCommandOneConnection(commandList, commandLen, replyInfo, false, &con))
 	{
 		freeReplyInfo(replyInfo);
 		m_logger.warn("proxy:%s do redis command failed.", m_redisProxy.proxyId.c_str());
@@ -2927,7 +2927,8 @@ bool RedisClient::parseExecReply(RedisReplyInfo & replyInfo)
 			else if(strncmp((*arrayIter).arrayValue, ":0", 2) == 0)
 			{
 				m_logger.warn("recv failed exec reply:%s.", (*arrayIter).arrayValue);
-				return false;
+//				return false;
+				return true;
 			}
 			// bulk string: nil
 			else if(strncmp((*arrayIter).arrayValue, "$-1", 3) == 0)

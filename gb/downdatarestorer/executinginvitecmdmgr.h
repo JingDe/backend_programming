@@ -14,6 +14,7 @@ public:
 	
 	int Load(vector<ExecutingInviteCmdList>& cmd_lists);
 	int Search(const string& executing_invite_cmd_id, ExecutingInviteCmd& cmd);
+	int Search(const string& executing_invite_cmd_id, ExecutingInviteCmd& cmd, int worker_thread_no);
 	int Insert(const ExecutingInviteCmd& cmd, int worker_thread_no);
 	int Delete(const ExecutingInviteCmd& cmd, int worker_thread_no);
 	int Clear();

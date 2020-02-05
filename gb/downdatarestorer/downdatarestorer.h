@@ -7,7 +7,9 @@
 #include"executinginvitecmd.h"
 #include"mutexlock.h"
 #include"condvar.h"
+//#include"owlog.h"
 
+#include<cassert>
 #include<vector>
 #include<list>
 #include<queue>
@@ -70,7 +72,7 @@ struct DataRestorerOperation{
 				}
                 break;
             default:
-				exit(-1);
+				assert(false);
 			}
 		}
 		else if(operation_type==CLEAR)
@@ -94,7 +96,7 @@ struct DataRestorerOperation{
 				}
                 break;
 			default:
-				exit(-1);
+				assert(false);
 			}
 		}	
 	}
@@ -163,29 +165,28 @@ public:
     int GetStat();
 
 	int LoadDeviceList(list<Device>& devices);
-	int SelectDeviceList(Device& device);
+	int SelectDeviceList(const string& device_id, Device& device);
 	int InsertDeviceList(const Device& device);
 	int DeleteDeviceList(const Device& device);
 	int ClearDeviceList();
 	int UpdateDeviceList(const list<Device>& devices);
 
 	int LoadChannelList(list<Channel>& channels);
-	int SelectChannelList(Channel& channel);
+	int SelectChannelList(const string& channel_id, Channel& channel);
 	int InsertChannelList(const Channel& channel);
 	int DeleteChannelList(const Channel& channel);
 	int ClearChannelList();
 	int UpdateChannelList(const list<Channel>& channels);
 
 	int LoadExecutingInviteCmdList(vector<ExecutingInviteCmdList>& executinginvitecmdlists);
-	int SelectExecutingInviteCmdList(); // TODO
+	int SelectExecutingInviteCmdList(const string& cmd_id, ExecutingInviteCmd& cmd);
+	int SelectExecutingInviteCmdList(const string& cmd_id, ExecutingInviteCmd& cmd, int worker_thread_num);
 	int InsertExecutingInviteCmdList(const ExecutingInviteCmd& executinginvitecmd, int);
 	int DeleteExecutingInviteCmdList(const ExecutingInviteCmd& executinginvitecmd, int);
 	int ClearExecutingInviteCmdList();
-	// TODO
 	int UpdateExecutingInviteCmdList(const ExecutingInviteCmdList& executinginvitecmdlist);
 	int UpdateExecutingInviteCmdList(const vector<ExecutingInviteCmdList>& executinginvitecmdlists);
 
-	// for test
 	int GetDeviceCount();
 	int GetChannelCount();
 
@@ -209,6 +210,8 @@ private:
 	MutexLock operations_queue_mutex_;
 	CondVar operations_queue_not_empty_condvar;
 	queue<DataRestorerOperation> operations_queue_;
+
+    //OWLog logger_;
 };
 
 #endif

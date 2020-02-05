@@ -131,11 +131,9 @@ bool RedisCluster::doRedisCommandOneConnection(list < RedisCmdParaInfo > & paraL
 	}
 	else
 	{
-//		m_logger.warn("doRedisCommandOneConnection, cluster:[%s:%d] not find available connection, use once connection.",m_clusterIp.c_str(), m_clusterPort);
 		*conn = new RedisConnection(m_clusterIp, m_clusterPort, 30);
 		if(!(*conn)->connect())
 		{
-//			m_logger.warn("doRedisCommandOneConnection, connect to clusterIp:%s clusterPort:%d failed.", m_clusterIp.c_str(), m_clusterPort);
 			return false;
 		}
 		(*conn)->m_connectTime = getCurrTimeSec();

@@ -73,7 +73,7 @@ int ChannelMgr::InsertChannel(const Channel& channel)
     }
             
     redis_client_->FinishTransaction(&con);
-    LOG(ERROR)<<"InsertChannel success: "<<channel.GetId();
+    LOG(INFO)<<"InsertChannel success: "<<channel.GetId();
 	return 0;
 
 FAIL:
@@ -117,7 +117,7 @@ int ChannelMgr::DeleteChannel(const Channel& channel)
     }
             
     redis_client_->FinishTransaction(&con);
-    LOG(ERROR)<<"DeleteChannel success: "<<channel.GetId();
+    LOG(INFO)<<"DeleteChannel success: "<<channel.GetId();
 	return 0;
 
 FAIL:

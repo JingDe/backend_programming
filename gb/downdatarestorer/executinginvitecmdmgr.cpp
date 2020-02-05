@@ -59,6 +59,22 @@ int ExecutingInviteCmdMgr::Search(const string& executing_invite_cmd_id, Executi
 	return -1;
 }
 
+int ExecutingInviteCmdMgr::Search(const string& executing_invite_cmd_id, ExecutingInviteCmd& cmd, int worker_thread_no)
+{
+
+	bool exist=redis_client_->sismember(s_set_key_prefix+ToString(worker_thread_no), executing_invite_cmd_id);
+	if(exist)
+	{
+		if(redis_client_->getSerial(s_key_prefix+ToString(worker_thread_no)+executing_invite_cmd_id, cmd))
+		{
+			return 0;
+		}
+	}	
+
+	return -1;
+}
+
+
 int ExecutingInviteCmdMgr::Insert(const ExecutingInviteCmd& cmd, int worker_thread_no)
 {
 	MutexLockGuard guard(&modify_mutex_list_[worker_thread_no]);
@@ -91,7 +107,7 @@ int ExecutingInviteCmdMgr::Insert(const ExecutingInviteCmd& cmd, int worker_thre
     }
             
     redis_client_->FinishTransaction(&con);
-    LOG(ERROR)<<"Insert cmd success: "<<cmd.GetId();
+    LOG(INFO)<<"Insert cmd success: "<<cmd.GetId();
 	return 0;
 
 FAIL:
@@ -135,7 +151,7 @@ int ExecutingInviteCmdMgr::Delete(const ExecutingInviteCmd& cmd, int worker_thre
     }
             
     redis_client_->FinishTransaction(&con);
-    LOG(ERROR)<<"Delete cmd success: "<<cmd.GetId();
+    LOG(INFO)<<"Delete cmd success: "<<cmd.GetId();
 	return 0;
 
 FAIL:

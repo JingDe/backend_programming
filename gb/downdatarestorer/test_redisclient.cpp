@@ -2,6 +2,7 @@
 #include"downdatarestorer.h"
 #include"device.h"
 #include"glog/logging.h"
+#include"owlog.h"
 #include<string>
 #include<list>
 #include<iostream>
@@ -30,19 +31,29 @@ bool TestTransactionSetAdd()
 	}
 	
 	RedisConnection *con=NULL;
+	printf("use connection %p\n", con);
+	
 	do{
 	    if(!client.PrepareTransaction(&con))
 	    	break;
 	    	
+	    printf("use connection %p\n", con);
 	    if(!client.StartTransaction(con))
 	    	break;
+	    	
+	    printf("use connection %p\n", con);
 	    if(!client.Set(con, "GbDeviceSet_deviceid1", "deviceid1desc"))
 	    	break;
+	    	
+	    printf("use connection %p\n", con);
 	    if(!client.Sadd(con, "GbDeviceSet", "GbDeviceSet_deviceid1"))
 	    	break;
+
+	    printf("use connection %p\n", con);
 	    if(!client.ExecTransaction(con))
 	    	break;
-	    	
+
+	    printf("use connection %p\n", con);
 	    client.FinishTransaction(&con);
 	    printf("success\n");
 	    		    
@@ -51,6 +62,7 @@ bool TestTransactionSetAdd()
     if(con)
     {
     	printf("failed\n");
+    	printf("use connection %p\n", con);
     	client.FinishTransaction(&con);
     }
 
@@ -112,23 +124,31 @@ void print(const list<Device>& devices)
 
 void TestDownDataRestorer()
 {
+    OWLog logger("common.test");
 	DownDataRestorer ddr;
 	ddr.Init(redis_ip, redis_port, 8);
 	ddr.Start();
 
-	
-	std::cout<<"devices size: "<<ddr.GetDeviceCount()<<std::endl;
+	int device_count=ddr.GetDeviceCount();
+	logger.debug("devices size: %d", device_count);
+	std::cout<<"devices size: "<<device_count<<std::endl;
 
 	Device device1("device_id_1");
 	ddr.InsertDeviceList(device1);
-
-	std::cout<<"devices size: "<<ddr.GetDeviceCount()<<std::endl;
-	list<Device> devices;
-	ddr.LoadDeviceList(devices);
-	print(devices);
+	
+	device_count=ddr.GetDeviceCount();
+	logger.debug("devices size: %d", device_count);
+	std::cout<<"devices size: "<<device_count<<std::endl;
+	
+//	list<Device> devices;
+//	ddr.LoadDeviceList(devices);
+//	print(devices);
 
 	ddr.DeleteDeviceList(device1);
-	std::cout<<"devices size: "<<ddr.GetDeviceCount()<<std::endl;
+
+	device_count=ddr.GetDeviceCount();
+	logger.debug("devices size: %d", device_count);
+	std::cout<<"devices size: "<<device_count<<std::endl;
 
 	ddr.Stop();
 	ddr.Uninit();
@@ -141,7 +161,7 @@ int main(int argc, char** argv)
     if(argc<2)
     {
         printf("usage: %s configFileName\n", argv[0]);
-        printf("default: %s", log_config_filename.c_str());
+        printf("default: %s\n", log_config_filename.c_str());
     }
     else
     {
@@ -151,6 +171,8 @@ int main(int argc, char** argv)
 
     OWLog::config(log_config_filename);
 
+	TestTransactionSetAdd();
+	printf("********************\n");
     TestDownDataRestorer();
     return 0;
 }

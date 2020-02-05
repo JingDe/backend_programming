@@ -8,7 +8,8 @@ const string DeviceMgr::s_key_prefix="deviceset";
 
 DeviceMgr::DeviceMgr(RedisClient* redis_client)
 	:redis_client_(redis_client),
-	modify_mutex_()
+	modify_mutex_(),
+    logger_("common.test")
 {
 	LOG(INFO)<<"DeviceMgr constructed";
 }
@@ -52,14 +53,17 @@ int DeviceMgr::InsertDevice(const Device& device)
 
     if(!redis_client_->PrepareTransaction(&con))
     {
+        logger_.error("PrepareTransaction failed");
     	LOG(ERROR)<<"PrepareTransaction failed";
     	goto FAIL;
     }
     if(!redis_client_->StartTransaction(con))
     {
+        logger_.error("StartTransaction failed");
 	    LOG(ERROR)<<"StartTransaction failed";
     	goto FAIL;
     }
+    logger_.debug("to start transaction");
     if(!redis_client_->Set(con, s_key_prefix+device.GetDeviceId(), device))
     {
 	    LOG(ERROR)<<"Set failed";
@@ -75,15 +79,16 @@ int DeviceMgr::InsertDevice(const Device& device)
 	    LOG(ERROR)<<"ExecTransaction failed";
     	goto FAIL;
     }
-            
     redis_client_->FinishTransaction(&con);
-    LOG(ERROR)<<"InsertDevice success: "<<device.GetDeviceId();
+    LOG(INFO)<<"InsertDevice success: "<<device.GetDeviceId();
 	return 0;
 
 FAIL:
     if(con)
-    {                                                                            
+    {
+    	logger_.debug("use connection %p", con);
         redis_client_->FinishTransaction(&con);
+        logger_.debug("use connection %p", con);
     }
     LOG(ERROR)<<"InsertDevice failed: "<<device.GetDeviceId();
     return -1;
@@ -122,7 +127,7 @@ int DeviceMgr::DeleteDevice(const Device& device)
     }
             
     redis_client_->FinishTransaction(&con);
-    LOG(ERROR)<<"DeleteDevice success: "<<device.GetDeviceId();
+    LOG(INFO)<<"DeleteDevice success: "<<device.GetDeviceId();
 	return 0;
 
 FAIL:
