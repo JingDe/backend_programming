@@ -2,6 +2,7 @@
 #define DOWN_DATA_RESTORER_DEVICE_MGR_H
 
 #include"device.h"
+#include"mutexlock.h"
 #include<list>
 #include<string>
 
@@ -21,9 +22,11 @@ public:
 	int ClearDevices();
 	int UpdateDevices(const list<Device>& devices);
 	int UpdateDevices(const list<void*>& devices);
+	int GetDeviceCount();
 
 private:
 	RedisClient* redis_client_;
+	MutexLock modify_mutex_;
 
 	const static string s_set_key;
 	const static string s_key_prefix;

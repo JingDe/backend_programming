@@ -306,3 +306,4 @@ pagerTest
 test_redisclient
 
 *.txt
+downdatarestorerlogdir/

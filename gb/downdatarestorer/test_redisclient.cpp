@@ -1,8 +1,15 @@
 #include"redisclient.h"
 #include"downdatarestorer.h"
+#include"device.h"
+#include"glog/logging.h"
 #include<string>
+#include<list>
+#include<iostream>
+#include<cstdio>
 
 using std::string;
+using std::list;
+
 
 const string redis_ip="192.168.12.59";
 const uint16_t redis_port=6379;
@@ -93,6 +100,40 @@ bool TestTransactionSetDel()
     return true;
 }
 
+void print(const list<Device>& devices)
+{
+	for(list<Device>::const_iterator it=devices.begin(); it!=devices.end(); ++it)
+	{
+		printf("deviceId=%s, ", it->GetDeviceId().c_str());
+	}
+	printf("\n");
+}
+
+
+void TestDownDataRestorer()
+{
+	DownDataRestorer ddr;
+	ddr.Init(redis_ip, redis_port, 8);
+	ddr.Start();
+
+	
+	std::cout<<"devices size: "<<ddr.GetDeviceCount()<<std::endl;
+
+	Device device1("device_id_1");
+	ddr.InsertDeviceList(device1);
+
+	std::cout<<"devices size: "<<ddr.GetDeviceCount()<<std::endl;
+	list<Device> devices;
+	ddr.LoadDeviceList(devices);
+	print(devices);
+
+	ddr.DeleteDeviceList(device1);
+	std::cout<<"devices size: "<<ddr.GetDeviceCount()<<std::endl;
+
+	ddr.Stop();
+	ddr.Uninit();
+	
+}
 
 int main(int argc, char** argv)
 {
@@ -101,16 +142,15 @@ int main(int argc, char** argv)
     {
         printf("usage: %s configFileName\n", argv[0]);
         printf("default: %s", log_config_filename.c_str());
-//        return -1;
     }
-    log_config_filename=argv[1];
-    printf("log config filename %s\n", log_config_filename.c_str());
+    else
+    {
+        log_config_filename=argv[1];
+        printf("log config filename %s\n", log_config_filename.c_str());
+    }
 
     OWLog::config(log_config_filename);
 
-//	TestTransactionSetDel();
-    
-    DownDataRestorer ddr;
-
+    TestDownDataRestorer();
     return 0;
 }

@@ -1,12 +1,14 @@
 #include"devicemgr.h"
 #include"redisclient.h"
+#include"mutexlockguard.h"
 #include"glog/logging.h"
 
 const string DeviceMgr::s_set_key="deviceset";
 const string DeviceMgr::s_key_prefix="deviceset";
 
 DeviceMgr::DeviceMgr(RedisClient* redis_client)
-	:redis_client_(redis_client)
+	:redis_client_(redis_client),
+	modify_mutex_()
 {
 	LOG(INFO)<<"DeviceMgr constructed";
 }
@@ -21,7 +23,6 @@ int DeviceMgr::LoadDevices(list<Device>& devices)
 		Device device;
 		if(redis_client_->getSerial(s_key_prefix+*it, device))
 		{
-			// update RegisterLastTime, KeepaliveLastTime
 			device.UpdateRegisterLastTime(now);
 			device.UpdateKeepaliveLastTime(now);
 			devices.push_back(device);
@@ -45,6 +46,8 @@ int DeviceMgr::SearchDevice(const string& device_id, Device& device)
 
 int DeviceMgr::InsertDevice(const Device& device)
 {
+	MutexLockGuard guard(&modify_mutex_);
+	
     RedisConnection *con=NULL;
 
     if(!redis_client_->PrepareTransaction(&con))
@@ -88,6 +91,8 @@ FAIL:
 
 int DeviceMgr::DeleteDevice(const Device& device)
 {
+	MutexLockGuard guard(&modify_mutex_);
+
 	RedisConnection *con=NULL;
 
     if(!redis_client_->PrepareTransaction(&con))
@@ -131,7 +136,8 @@ FAIL:
 
 int DeviceMgr::ClearDevices()
 {
-	// TODO lock
+	MutexLockGuard guard(&modify_mutex_);
+	
 	list<string> device_id_list;
 	redis_client_->smembers(s_set_key, device_id_list);
 	redis_client_->del(s_set_key);
@@ -144,7 +150,8 @@ int DeviceMgr::ClearDevices()
 
 int DeviceMgr::UpdateDevices(const list<Device>& devices)
 {
-	// TODO lock
+	MutexLockGuard guard(&modify_mutex_);
+	
 	for(list<Device>::const_iterator it=devices.begin(); it!=devices.end(); ++it)
 	{
 		redis_client_->sadd(s_set_key, it->GetDeviceId());
@@ -155,7 +162,8 @@ int DeviceMgr::UpdateDevices(const list<Device>& devices)
 
 int DeviceMgr::UpdateDevices(const list<void*>& devices)
 {
-	// TODO lock
+	MutexLockGuard guard(&modify_mutex_);
+	
 	for(list<void*>::const_iterator it=devices.begin(); it!=devices.end(); ++it)
 	{
 		Device* device=(Device*)(*it);
@@ -165,3 +173,7 @@ int DeviceMgr::UpdateDevices(const list<void*>& devices)
     return 0;
 }
 
+int DeviceMgr::GetDeviceCount()
+{
+	return redis_client_->scard(s_set_key);
+}

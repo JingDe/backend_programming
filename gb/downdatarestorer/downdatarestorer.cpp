@@ -406,6 +406,16 @@ int DownDataRestorer::UpdateExecutingInviteCmdList(const vector<ExecutingInviteC
 	return DDR_OK;
 }
 
+/*
+	for test
+*/
+int DownDataRestorer::GetDeviceCount()
+{
+	return device_mgr_->GetDeviceCount();
+}
 
-
+int DownDataRestorer::GetChannelCount()
+{
+	return channel_mgr_->GetChannelCount();
+}
 

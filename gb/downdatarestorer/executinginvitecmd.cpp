@@ -6,7 +6,7 @@ string ExecutingInviteCmd::GetId() const
 	return ToString(cmd_seq_);
 }
 
-void ExecutingInviteCmd::save(DBOutStream &out)
+void ExecutingInviteCmd::save(DBOutStream &out) const
 {
 	out<<cmd_sender_id_
 		<<device_id_

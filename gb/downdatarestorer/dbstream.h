@@ -114,7 +114,7 @@ public:
 		in >> this->m_data_version;
 		//printf("load version is %ld\n", (uint64_t_t)this->m_data_version);
 	};
-	virtual void save(DBOutStream &out) = 0;
+	virtual void save(DBOutStream &out) const = 0;
 	virtual void load(DBInStream &in) = 0;
 
 	uint64_t get_data_version(){

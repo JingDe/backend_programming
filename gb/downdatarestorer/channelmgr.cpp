@@ -1,12 +1,14 @@
 #include"channelmgr.h"
 #include"redisclient.h"
+#include"mutexlockguard.h"
 #include"glog/logging.h"
 
 const string ChannelMgr::s_set_key="channelset";
 const string ChannelMgr::s_key_prefix="channelset";
 
 ChannelMgr::ChannelMgr(RedisClient* redis_client)
-	:redis_client_(redis_client)
+	:redis_client_(redis_client),
+	modify_mutex_()
 {
 	LOG(INFO)<<"ChannelMgr constructed";
 }
@@ -41,8 +43,9 @@ int ChannelMgr::SearchChannel(const string& channel_id, Channel& channel)
 
 int ChannelMgr::InsertChannel(const Channel& channel)
 {
+	MutexLockGuard guard(&modify_mutex_);
+	
     RedisConnection *con=NULL;
-
     if(!redis_client_->PrepareTransaction(&con))
     {
     	LOG(ERROR)<<"PrepareTransaction failed";
@@ -84,8 +87,9 @@ FAIL:
 
 int ChannelMgr::DeleteChannel(const Channel& channel)
 {
-	RedisConnection *con=NULL;
+	MutexLockGuard guard(&modify_mutex_);
 
+	RedisConnection *con=NULL;
     if(!redis_client_->PrepareTransaction(&con))
     {
     	LOG(ERROR)<<"PrepareTransaction failed";
@@ -127,7 +131,8 @@ FAIL:
 
 int ChannelMgr::ClearChannels()
 {
-	// TODO lock
+	MutexLockGuard guard(&modify_mutex_);
+	
 	list<string> channel_id_list;
 	redis_client_->smembers(s_set_key, channel_id_list);
 	redis_client_->del(s_set_key);
@@ -140,7 +145,8 @@ int ChannelMgr::ClearChannels()
 
 int ChannelMgr::UpdateChannels(const list<Channel>& channels)
 {
-	// TODO lock
+	MutexLockGuard guard(&modify_mutex_);
+	
 	for(list<Channel>::const_iterator it=channels.begin(); it!=channels.end(); ++it)
 	{
 		redis_client_->sadd(s_set_key, it->GetId());
@@ -151,7 +157,8 @@ int ChannelMgr::UpdateChannels(const list<Channel>& channels)
 
 int ChannelMgr::UpdateChannels(const list<void*>& channels)
 {
-	// TODO lock
+	MutexLockGuard guard(&modify_mutex_);
+	
 	for(list<void*>::const_iterator it=channels.begin(); it!=channels.end(); ++it)
 	{
 		Channel* channel=(Channel*)(*it);
@@ -159,5 +166,10 @@ int ChannelMgr::UpdateChannels(const list<void*>& channels)
 		redis_client_->setSerial(s_key_prefix+channel->GetId(), *channel);
 	}
     return 0;
+}
+
+int ChannelMgr::GetChannelCount()
+{
+	return redis_client_->scard(s_set_key);
 }
 

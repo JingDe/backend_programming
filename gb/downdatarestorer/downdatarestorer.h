@@ -68,7 +68,9 @@ struct DataRestorerOperation{
 				entity_=(void*)(new Channel(*channel));
 				entities_.push_back(entity_);
 				}
-                break;				
+                break;
+            default:
+				exit(-1);
 			}
 		}
 		else if(operation_type==CLEAR)
@@ -91,6 +93,8 @@ struct DataRestorerOperation{
 				entities_.push_back(entity_);
 				}
                 break;
+			default:
+				exit(-1);
 			}
 		}	
 	}
@@ -180,6 +184,10 @@ public:
 	// TODO
 	int UpdateExecutingInviteCmdList(const ExecutingInviteCmdList& executinginvitecmdlist);
 	int UpdateExecutingInviteCmdList(const vector<ExecutingInviteCmdList>& executinginvitecmdlists);
+
+	// for test
+	int GetDeviceCount();
+	int GetChannelCount();
 
 private:
     static void* DataRestorerThreadFuncWrapper(void* arg);

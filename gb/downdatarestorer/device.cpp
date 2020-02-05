@@ -7,7 +7,15 @@ Device::Device()
 	device_state_()
 {}
 
-void Device::save(DBOutStream &out)
+Device::Device(const string& device_id)
+	:device_id_(device_id),
+	device_sip_ip_(),
+	device_sip_port_(),
+	device_state_()
+{}
+
+
+void Device::save(DBOutStream &out) const
 {
 	out<<device_id_;
 	out<<device_sip_ip_;

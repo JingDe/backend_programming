@@ -11,7 +11,7 @@ all: $(TEST_REDIS_CLIENT_TARGET)
 
 $(TEST_REDIS_CLIENT_TARGET):
 	@echo `pwd`
-	g++ -g -Wall -o $(TEST_REDIS_CLIENT_TARGET) $(TEST_REDIS_CLIENT_SRC) -I . -I log4cxx -Wl,-rpath=lib -L lib -llog4cxx -std=c++0x
+	g++ -g -Wall -o $(TEST_REDIS_CLIENT_TARGET) $(TEST_REDIS_CLIENT_SRC) -I . -I log4cxx -Wl,-rpath=lib:/usr/local/lib -L lib -L /usr/local/lib -llog4cxx -lglog -std=c++0x
 
 
 

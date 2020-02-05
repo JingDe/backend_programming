@@ -10,11 +10,12 @@ using std::string;
 class Device : public DBSerialize {
 public:
 	Device();
+	Device(const string& deviceId);
 	string GetDeviceId() const { return device_id_; }
     void UpdateRegisterLastTime(time_t t);
     void UpdateKeepaliveLastTime(time_t t);
 	
-	void save(DBOutStream &out);
+	void save(DBOutStream &out) const;
     void load(DBInStream &in);
     
 private:

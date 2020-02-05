@@ -10,10 +10,10 @@ class ExecutingInviteCmd : public DBSerialize {
 public:
 
 	string GetId() const;
-    void SetSipRestared(){
-        sip_restarted_=true;
+    void SetSipRestarted(bool sip_restarted){
+        sip_restarted_=sip_restarted;
     }	
-	void save(DBOutStream &out);
+	void save(DBOutStream &out) const;
     void load(DBInStream &in);
 
 private:

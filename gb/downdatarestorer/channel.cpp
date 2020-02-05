@@ -1,6 +1,6 @@
 #include"channel.h"
 
-void Channel::save(DBOutStream &out)
+void Channel::save(DBOutStream &out) const
 {
 	out<<device_id_;
 	out<<device_sip_ip_;

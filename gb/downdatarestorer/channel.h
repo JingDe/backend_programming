@@ -13,7 +13,7 @@ public:
 		return device_id_+channel_device_id_;
 	}
 
-	void save(DBOutStream &out);
+	void save(DBOutStream &out) const;
     void load(DBInStream &in);
     
 private:

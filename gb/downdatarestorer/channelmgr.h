@@ -2,6 +2,7 @@
 #define DOWN_DATA_RESTORER_CHANNEL_MGR_H
 
 #include"channel.h"
+#include"mutexlock.h"
 #include<list>
 #include<string>
 
@@ -21,9 +22,11 @@ public:
 	int ClearChannels();
 	int UpdateChannels(const list<Channel>& channels);
 	int UpdateChannels(const list<void*>& channels);
+	int GetChannelCount();
 
 private:
 	RedisClient* redis_client_;
+	MutexLock modify_mutex_;
 
 	const static string s_set_key;
 	const static string s_key_prefix;
