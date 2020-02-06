@@ -1,5 +1,4 @@
 #include "rediscluster.h"
-//#include "basefunc.h"
 #include"util.h"
 
 #define CONNECTION_RELEASE_TIME 10
@@ -26,7 +25,7 @@ RedisCluster::~RedisCluster()
 bool RedisCluster::initConnectPool(const string & clusterIp,uint32_t clusterPort,uint32_t connectionNum,uint32_t keepaliveTime)
 {
 	//create redis connection.
-//	WriteGuard guard(m_lockAvailableConnection);
+	WriteGuard guard(m_lockAvailableConnection);
 	for (unsigned int i = 0; i < connectionNum; i++)
 	{
 		RedisConnection *connection = new RedisConnection(clusterIp, clusterPort, keepaliveTime);
@@ -48,7 +47,7 @@ bool RedisCluster::initConnectPool(const string & clusterIp,uint32_t clusterPort
 
 bool RedisCluster::freeConnectPool()
 {
-//	WriteGuard guard(m_lockAvailableConnection);
+	WriteGuard guard(m_lockAvailableConnection);
 	REDIS_CONNECTIONS::iterator iter;
 	for (iter = m_connections.begin(); iter != m_connections.end(); iter++)
 	{
@@ -77,7 +76,7 @@ bool RedisCluster::freeConnectPool()
 
 bool RedisCluster::checkIfCanFree()
 {
-//	WriteGuard guard(m_lockAvailableConnection);
+	WriteGuard guard(m_lockAvailableConnection);
 	bool findFree = true;
 	REDIS_CONNECTIONS::iterator iter;
 	for (iter = m_connections.begin(); iter != m_connections.end(); iter++)
@@ -138,7 +137,7 @@ bool RedisCluster::doRedisCommandOneConnection(list < RedisCmdParaInfo > & paraL
 		}
 		(*conn)->m_connectTime = getCurrTimeSec();
 		success = (*conn)->doRedisCommand(paraList, paraLen, replyInfo);
-//		WriteGuard guard(m_lockAvailableConnection);
+		WriteGuard guard(m_lockAvailableConnection);
 		m_tmpConnections.push_back(*conn);
 	}
 	if (release)
@@ -148,7 +147,7 @@ bool RedisCluster::doRedisCommandOneConnection(list < RedisCmdParaInfo > & paraL
 
 RedisConnection* RedisCluster::getAvailableConnection()
 {
-//	WriteGuard guard(m_lockAvailableConnection);
+	WriteGuard guard(m_lockAvailableConnection);
 	uint32_t currentTime = getCurrTimeSec();
 	REDIS_CONNECTIONS::iterator iter;
 	for (iter = m_tmpConnections.begin(); iter != m_tmpConnections.end(); )
@@ -202,7 +201,7 @@ RedisConnection* RedisCluster::getAvailableConnection()
 
 void RedisCluster::releaseConnection(RedisConnection * conn)
 {
-//	WriteGuard guard(m_lockAvailableConnection);
+	WriteGuard guard(m_lockAvailableConnection);
 	bool find = false;
 	REDIS_CONNECTIONS::iterator iter;
 	for (iter = m_connections.begin(); iter != m_connections.end(); iter++)
@@ -238,7 +237,7 @@ void RedisCluster::releaseConnection(RedisConnection * conn)
 
 void RedisCluster::freeConnection(RedisConnection * conn)
 {
-//	WriteGuard guard(m_lockAvailableConnection);
+	WriteGuard guard(m_lockAvailableConnection);
 	uint32_t currentTime = getCurrTimeSec();
 	REDIS_CONNECTIONS::iterator iter;
 	for (iter = m_connections.begin(); iter != m_connections.end(); iter++)
@@ -266,7 +265,7 @@ void RedisCluster::freeConnection(RedisConnection * conn)
 
 bool RedisCluster::checkConnectionAlive(RedisConnection * conn)
 {
-//	WriteGuard guard(m_lockAvailableConnection);
+	WriteGuard guard(m_lockAvailableConnection);
 	bool find = false;
 	REDIS_CONNECTIONS::iterator iter;
 	for (iter = m_connections.begin(); iter != m_connections.end(); iter++)

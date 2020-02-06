@@ -3,6 +3,7 @@
 
 #include"downdatarestorerdef.h"
 #include"executinginvitecmd.h"
+#include"rwmutex.h"
 
 class RedisClient;
 class MutexLock;
@@ -26,7 +27,8 @@ public:
 private:
 	RedisClient* redis_client_;
 	int worker_thread_num_;
-	MutexLock* modify_mutex_list_;
+//	MutexLock* modify_mutex_list_;
+	RWMutex* rwmutexes_;
 	
 	const static string s_set_key_prefix;
 	const static string s_key_prefix;

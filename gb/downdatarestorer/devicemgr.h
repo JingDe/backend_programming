@@ -2,7 +2,8 @@
 #define DOWN_DATA_RESTORER_DEVICE_MGR_H
 
 #include"device.h"
-#include"mutexlock.h"
+//#include"mutexlock.h"
+#include"rwmutex.h"
 #include"owlog.h"
 #include<list>
 #include<string>
@@ -27,7 +28,8 @@ public:
 
 private:
 	RedisClient* redis_client_;
-	MutexLock modify_mutex_;
+//	MutexLock modify_mutex_;
+	RWMutex rwmutex_;
     OWLog logger_;
 	const static string s_set_key;
 	const static string s_key_prefix;

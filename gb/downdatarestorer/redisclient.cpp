@@ -1,12 +1,9 @@
 #include "redisclient.h"
 #include "redisconnection.h"
-//#include "sysclass/Util.h"
-//#include "sysclass/base_func.h"
-//#include "common/macros.h"
+#include"util.h"
 #include <algorithm>
 #include<cassert>
 
-#include"util.h"
 
 RedisClient::RedisClient():m_logger("cdn.common.redisclient")
 {
@@ -19,7 +16,6 @@ RedisClient::RedisClient():m_logger("cdn.common.redisclient")
 	m_unusedHandlers.clear();
     m_connected=false;
 
-    printf("RedisClient construction\n");
     m_logger.debug("construct RedisClient ok");
 }
 
@@ -92,7 +88,7 @@ bool RedisClient::init(REDIS_SERVER_LIST& serverList,uint32_t connectionNum,uint
 
 bool RedisClient::initRedisCluster()
 {
-//	WriteGuard guard(m_rwClusterMutex);
+	WriteGuard guard(m_rwClusterMutex);
 	REDIS_CLUSTER_MAP::iterator clusterIter;
 	for (clusterIter = m_clusterMap.begin(); clusterIter != m_clusterMap.end(); clusterIter++)
 	{
@@ -105,7 +101,7 @@ bool RedisClient::initRedisCluster()
 		//fill slot map
 		if (((*clusterIter).second).isMaster)
 		{
-//			WriteGuard guard(m_rwSlotMutex);
+			WriteGuard guard(m_rwSlotMutex);
 			map<uint16_t,uint16_t>::iterator iter;
 			for(iter = ((*clusterIter).second).slotMap.begin(); iter != ((*clusterIter).second).slotMap.end(); iter++)
 			{
@@ -163,7 +159,7 @@ bool RedisClient::initRedisProxy()
 
 bool RedisClient::freeRedisCluster()
 {
-//	WriteGuard guard(m_rwClusterMutex);
+	WriteGuard guard(m_rwClusterMutex);
 	REDIS_CLUSTER_MAP::iterator clusterIter;
 	for (clusterIter = m_clusterMap.begin(); clusterIter != m_clusterMap.end(); clusterIter++)
 	{
@@ -1632,7 +1628,7 @@ bool RedisClient::getKeys(const string & queryKey,list < string > & keys)
 
 void RedisClient::getRedisClusters(REDIS_CLUSTER_MAP & clusterMap)
 {
-//	ReadGuard guard(m_rwClusterMutex);
+	ReadGuard guard(m_rwClusterMutex);
 	clusterMap = m_clusterMap;
 	return;
 }
@@ -1705,10 +1701,10 @@ bool RedisClient::getRedisClustersByCommand(REDIS_CLUSTER_MAP & clusterMap)
 
 bool RedisClient::checkAndSaveRedisClusters(REDIS_CLUSTER_MAP & clusterMap)
 {
-//	WriteGuard guard(m_rwClusterMutex);
+	WriteGuard guard(m_rwClusterMutex);
 	REDIS_CLUSTER_MAP::iterator clusterIter;
 	{
-//		WriteGuard guard(m_rwSlotMutex);
+		WriteGuard guard(m_rwSlotMutex);
 		m_slotMap.clear();
 		for (clusterIter = clusterMap.begin(); clusterIter != clusterMap.end(); clusterIter++)
 		{
@@ -1802,7 +1798,7 @@ bool RedisClient::setKeyExpireTime(const string & key,uint32_t expireTime)
 
 void RedisClient::releaseUnusedClusterHandler()
 {
-//	WriteGuard guard(m_rwClusterMutex);
+	WriteGuard guard(m_rwClusterMutex);
 	list<string> needFreeClusters;
 	needFreeClusters.clear();
 	map<string, RedisCluster*>::iterator clusterIter;
@@ -1889,7 +1885,7 @@ bool RedisClient::getRedisClusterNodes()
 			return false;
 		}
 		{
-//			WriteGuard guard(m_rwClusterMutex);
+			WriteGuard guard(m_rwClusterMutex);
 			m_clusterMap = clusterMap;
 		}
 		freeReplyInfo(replyInfo);
@@ -2327,7 +2323,7 @@ void RedisClient::freeCommandList(list < RedisCmdParaInfo > & paraList)
 
 bool RedisClient::getRedisClusterInfo(string & clusterId,RedisClusterInfo & clusterInfo)
 {
-//	ReadGuard guard(m_rwClusterMutex);
+	ReadGuard guard(m_rwClusterMutex);
 	if (m_clusterMap.find(clusterId) != m_clusterMap.end())
 	{
 		clusterInfo = m_clusterMap[clusterId];
@@ -2341,7 +2337,7 @@ void RedisClient::updateClusterCursor(const string& clusterId, int newcursor)
 {
 	if(newcursor<0)
 		return;
-//	ReadGuard guard(m_rwClusterMutex);
+	ReadGuard guard(m_rwClusterMutex);
 	if (m_clusterMap.find(clusterId) != m_clusterMap.end())
 	{
 		m_clusterMap[clusterId].scanCursor=newcursor;
@@ -2354,7 +2350,7 @@ void RedisClient::updateClusterCursor(const string& clusterId, int newcursor)
 bool RedisClient::getClusterIdBySlot(uint16_t slotNum,string & clusterId)
 {
 	assert(m_redisMode==CLUSTER_MODE);
-//	ReadGuard guard(m_rwSlotMutex);
+	ReadGuard guard(m_rwSlotMutex);
 	if (m_slotMap.find(slotNum) != m_slotMap.end())
 	{
 		clusterId = m_slotMap[slotNum];

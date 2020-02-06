@@ -8,7 +8,8 @@ const string DeviceMgr::s_key_prefix="deviceset";
 
 DeviceMgr::DeviceMgr(RedisClient* redis_client)
 	:redis_client_(redis_client),
-	modify_mutex_(),
+//	modify_mutex_(),
+	rwmutex_(),
     logger_("common.test")
 {
 	LOG(INFO)<<"DeviceMgr constructed";
@@ -16,6 +17,8 @@ DeviceMgr::DeviceMgr(RedisClient* redis_client)
 
 int DeviceMgr::LoadDevices(list<Device>& devices)
 {
+	ReadGuard guard(rwmutex_);
+	
 	time_t now=time(NULL);
 	list<string> device_id_list;
 	redis_client_->smembers(s_set_key, device_id_list);
@@ -34,6 +37,8 @@ int DeviceMgr::LoadDevices(list<Device>& devices)
 
 int DeviceMgr::SearchDevice(const string& device_id, Device& device)
 {
+	ReadGuard guard(rwmutex_);
+	
 	bool exist=redis_client_->sismember(s_set_key, device_id);
 	if(exist)
 	{
@@ -47,8 +52,9 @@ int DeviceMgr::SearchDevice(const string& device_id, Device& device)
 
 int DeviceMgr::InsertDevice(const Device& device)
 {
-	MutexLockGuard guard(&modify_mutex_);
-	
+//	MutexLockGuard guard(&modify_mutex_);
+	WriteGuard guard(rwmutex_);
+
     RedisConnection *con=NULL;
 
     if(!redis_client_->PrepareTransaction(&con))
@@ -96,7 +102,8 @@ FAIL:
 
 int DeviceMgr::DeleteDevice(const Device& device)
 {
-	MutexLockGuard guard(&modify_mutex_);
+//	MutexLockGuard guard(&modify_mutex_);
+	WriteGuard guard(rwmutex_);
 
 	RedisConnection *con=NULL;
 
@@ -141,7 +148,8 @@ FAIL:
 
 int DeviceMgr::ClearDevices()
 {
-	MutexLockGuard guard(&modify_mutex_);
+//	MutexLockGuard guard(&modify_mutex_);
+	WriteGuard guard(rwmutex_);
 	
 	list<string> device_id_list;
 	redis_client_->smembers(s_set_key, device_id_list);
@@ -155,7 +163,8 @@ int DeviceMgr::ClearDevices()
 
 int DeviceMgr::UpdateDevices(const list<Device>& devices)
 {
-	MutexLockGuard guard(&modify_mutex_);
+//	MutexLockGuard guard(&modify_mutex_);
+	WriteGuard guard(rwmutex_);
 	
 	for(list<Device>::const_iterator it=devices.begin(); it!=devices.end(); ++it)
 	{
@@ -167,7 +176,8 @@ int DeviceMgr::UpdateDevices(const list<Device>& devices)
 
 int DeviceMgr::UpdateDevices(const list<void*>& devices)
 {
-	MutexLockGuard guard(&modify_mutex_);
+//	MutexLockGuard guard(&modify_mutex_);
+	WriteGuard guard(rwmutex_);
 	
 	for(list<void*>::const_iterator it=devices.begin(); it!=devices.end(); ++it)
 	{
@@ -180,5 +190,6 @@ int DeviceMgr::UpdateDevices(const list<void*>& devices)
 
 int DeviceMgr::GetDeviceCount()
 {
+	ReadGuard guard(rwmutex_);
 	return redis_client_->scard(s_set_key);
 }

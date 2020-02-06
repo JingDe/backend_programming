@@ -8,13 +8,15 @@ const string ChannelMgr::s_key_prefix="channelset";
 
 ChannelMgr::ChannelMgr(RedisClient* redis_client)
 	:redis_client_(redis_client),
-	modify_mutex_()
+	rwmutex_()
+//	modify_mutex_()
 {
 	LOG(INFO)<<"ChannelMgr constructed";
 }
 
 int ChannelMgr::LoadChannels(list<Channel>& channels)
 {
+	ReadGuard guard(rwmutex_);
 	list<string> channel_id_list;
 	redis_client_->smembers(s_set_key, channel_id_list);
 	for(list<string>::iterator it=channel_id_list.begin(); it!=channel_id_list.end(); it++)
@@ -30,6 +32,7 @@ int ChannelMgr::LoadChannels(list<Channel>& channels)
 
 int ChannelMgr::SearchChannel(const string& channel_id, Channel& channel)
 {
+	ReadGuard guard(rwmutex_);
 	bool exist=redis_client_->sismember(s_set_key, channel_id);
 	if(exist)
 	{
@@ -43,7 +46,8 @@ int ChannelMgr::SearchChannel(const string& channel_id, Channel& channel)
 
 int ChannelMgr::InsertChannel(const Channel& channel)
 {
-	MutexLockGuard guard(&modify_mutex_);
+//	MutexLockGuard guard(&modify_mutex_);
+	WriteGuard guard(rwmutex_);
 	
     RedisConnection *con=NULL;
     if(!redis_client_->PrepareTransaction(&con))
@@ -87,7 +91,8 @@ FAIL:
 
 int ChannelMgr::DeleteChannel(const Channel& channel)
 {
-	MutexLockGuard guard(&modify_mutex_);
+//	MutexLockGuard guard(&modify_mutex_);
+	WriteGuard guard(rwmutex_);
 
 	RedisConnection *con=NULL;
     if(!redis_client_->PrepareTransaction(&con))
@@ -131,7 +136,8 @@ FAIL:
 
 int ChannelMgr::ClearChannels()
 {
-	MutexLockGuard guard(&modify_mutex_);
+//	MutexLockGuard guard(&modify_mutex_);
+	WriteGuard guard(rwmutex_);
 	
 	list<string> channel_id_list;
 	redis_client_->smembers(s_set_key, channel_id_list);
@@ -145,7 +151,8 @@ int ChannelMgr::ClearChannels()
 
 int ChannelMgr::UpdateChannels(const list<Channel>& channels)
 {
-	MutexLockGuard guard(&modify_mutex_);
+//	MutexLockGuard guard(&modify_mutex_);
+	WriteGuard guard(rwmutex_);
 	
 	for(list<Channel>::const_iterator it=channels.begin(); it!=channels.end(); ++it)
 	{
@@ -157,7 +164,8 @@ int ChannelMgr::UpdateChannels(const list<Channel>& channels)
 
 int ChannelMgr::UpdateChannels(const list<void*>& channels)
 {
-	MutexLockGuard guard(&modify_mutex_);
+//	MutexLockGuard guard(&modify_mutex_);
+	WriteGuard guard(rwmutex_);
 	
 	for(list<void*>::const_iterator it=channels.begin(); it!=channels.end(); ++it)
 	{
@@ -170,6 +178,7 @@ int ChannelMgr::UpdateChannels(const list<void*>& channels)
 
 int ChannelMgr::GetChannelCount()
 {
+	ReadGuard guard(rwmutex_);
 	return redis_client_->scard(s_set_key);
 }
 

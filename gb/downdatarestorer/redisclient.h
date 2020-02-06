@@ -9,7 +9,7 @@
 #include "redisconnection.h"
 #include "rediscluster.h"
 #include "owlog.h"
-//#include "thread/rwmutex.h"
+#include "rwmutex.h"
 
 
 #define REDIS_DEFALUT_SERVER_PORT 6379
@@ -278,9 +278,9 @@ private:
 	REDIS_SLOT_MAP m_slotMap;
 	map<string, RedisCluster*> m_unusedHandlers;
 	OWLog	m_logger;
-//	RWMutex	m_rwClusterMutex;
-//	RWMutex m_rwProxyMutex; // TODO
-//	RWMutex	m_rwSlotMutex;
+	RWMutex	m_rwClusterMutex;
+//	RWMutex m_rwProxyMutex;
+	RWMutex	m_rwSlotMutex;
     bool m_connected;
 };
 

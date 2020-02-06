@@ -6,8 +6,8 @@
 #include <list>
 #include <vector>
 #include "redisconnection.h"
+#include "rwmutex.h"
 //#include "owlog.h"
-//#include "thread/rwmutex.h"
 
 using namespace std;
 
@@ -40,7 +40,7 @@ private:
 	uint32_t 	m_keepaliveTime;
 	REDIS_CONNECTIONS m_connections;
 	REDIS_CONNECTIONS m_tmpConnections;
-//	RWMutex m_lockAvailableConnection;
+	RWMutex m_lockAvailableConnection;
 };
 
 #endif

@@ -11,23 +11,31 @@ const string ExecutingInviteCmdMgr::s_key_prefix="deviceset";
 ExecutingInviteCmdMgr::ExecutingInviteCmdMgr(RedisClient* redis_client, int worker_thread_num)
 	:redis_client_(redis_client),
 	worker_thread_num_(worker_thread_num),
-	modify_mutex_list_(NULL)
+	rwmutexes_(NULL)
+//	modify_mutex_list_(NULL)
 {
-	modify_mutex_list_=new MutexLock[worker_thread_num];
+//	modify_mutex_list_=new MutexLock[worker_thread_num];
+	rwmutexes_=new RWMutex[worker_thread_num];
 	LOG(INFO)<<"ExecutingInviteCmdMgr constructed";
 }
 
 ExecutingInviteCmdMgr::~ExecutingInviteCmdMgr()
 {
-	if(modify_mutex_list_)
-		delete[] modify_mutex_list_;
+//	if(modify_mutex_list_)
+//		delete[] modify_mutex_list_;
+	if(rwmutexes_)
+		delete[] rwmutexes_;
 }
 
 int ExecutingInviteCmdMgr::Load(vector<ExecutingInviteCmdList>& cmd_lists)
 {
+	
+
 	cmd_lists.resize(worker_thread_num_);
 	for(int i=0; i<worker_thread_num_; i++)
 	{
+		ReadGuard guard(rwmutexes_[i]);
+		
 		list<string> cmd_id_list;
 		redis_client_->smembers(s_set_key_prefix+ToString(i), cmd_id_list);
 		for(list<string>::iterator it=cmd_id_list.begin(); it!=cmd_id_list.end(); it++)
@@ -47,6 +55,7 @@ int ExecutingInviteCmdMgr::Search(const string& executing_invite_cmd_id, Executi
 {
 	for(int i=0; i<worker_thread_num_; ++i)
 	{
+		ReadGuard guard(rwmutexes_[i]);
 		bool exist=redis_client_->sismember(s_set_key_prefix+ToString(i), executing_invite_cmd_id);
 		if(exist)
 		{
@@ -61,7 +70,7 @@ int ExecutingInviteCmdMgr::Search(const string& executing_invite_cmd_id, Executi
 
 int ExecutingInviteCmdMgr::Search(const string& executing_invite_cmd_id, ExecutingInviteCmd& cmd, int worker_thread_no)
 {
-
+	ReadGuard guard(rwmutexes_[worker_thread_no]);
 	bool exist=redis_client_->sismember(s_set_key_prefix+ToString(worker_thread_no), executing_invite_cmd_id);
 	if(exist)
 	{
@@ -77,7 +86,8 @@ int ExecutingInviteCmdMgr::Search(const string& executing_invite_cmd_id, Executi
 
 int ExecutingInviteCmdMgr::Insert(const ExecutingInviteCmd& cmd, int worker_thread_no)
 {
-	MutexLockGuard guard(&modify_mutex_list_[worker_thread_no]);
+//	MutexLockGuard guard(&modify_mutex_list_[worker_thread_no]);
+	WriteGuard guard(rwmutexes_[worker_thread_no]);
 	
 	RedisConnection *con=NULL;
     if(!redis_client_->PrepareTransaction(&con))
@@ -121,7 +131,8 @@ FAIL:
 
 int ExecutingInviteCmdMgr::Delete(const ExecutingInviteCmd& cmd, int worker_thread_no)
 {
-	MutexLockGuard guard(&modify_mutex_list_[worker_thread_no]);
+//	MutexLockGuard guard(&modify_mutex_list_[worker_thread_no]);
+	WriteGuard guard(rwmutexes_[worker_thread_no]);
 	
 	RedisConnection *con=NULL;
     if(!redis_client_->PrepareTransaction(&con))
@@ -174,7 +185,8 @@ int ExecutingInviteCmdMgr::Clear()
 
 int ExecutingInviteCmdMgr::Clear(int worker_thread_no)
 {
-	MutexLockGuard guard(&modify_mutex_list_[worker_thread_no]);
+//	MutexLockGuard guard(&modify_mutex_list_[worker_thread_no]);
+	WriteGuard guard(rwmutexes_[worker_thread_no]);
 	
 	list<string> device_id_list;
 	redis_client_->smembers(s_set_key_prefix+ToString(worker_thread_no), device_id_list);
@@ -205,7 +217,9 @@ int ExecutingInviteCmdMgr::Update(const vector<ExecutingInviteCmdList>& cmd_list
 
 int ExecutingInviteCmdMgr::Update(const ExecutingInviteCmdList& cmd_list, int worker_thread_no)
 {	
-	MutexLockGuard guard(&modify_mutex_list_[worker_thread_no]);
+//	MutexLockGuard guard(&modify_mutex_list_[worker_thread_no]);
+	WriteGuard guard(rwmutexes_[worker_thread_no]);
+	
 	// TODO 
 	// ClearWithLockHeld(worker_thread_no);
 	
@@ -219,7 +233,9 @@ int ExecutingInviteCmdMgr::Update(const ExecutingInviteCmdList& cmd_list, int wo
 
 int ExecutingInviteCmdMgr::Update(const list<void*>& cmd_list, int worker_thread_no)
 {
-	MutexLockGuard guard(&modify_mutex_list_[worker_thread_no]);
+//	MutexLockGuard guard(&modify_mutex_list_[worker_thread_no]);
+	WriteGuard guard(rwmutexes_[worker_thread_no]);
+	
 	// TODO 
 	// ClearWithLockHeld(worker_thread_no);
 

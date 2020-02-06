@@ -2,7 +2,8 @@
 #define DOWN_DATA_RESTORER_CHANNEL_MGR_H
 
 #include"channel.h"
-#include"mutexlock.h"
+//#include"mutexlock.h"
+#include"rwmutex.h"
 #include<list>
 #include<string>
 
@@ -26,7 +27,8 @@ public:
 
 private:
 	RedisClient* redis_client_;
-	MutexLock modify_mutex_;
+//	MutexLock modify_mutex_;
+	RWMutex rwmutex_;
 
 	const static string s_set_key;
 	const static string s_key_prefix;
