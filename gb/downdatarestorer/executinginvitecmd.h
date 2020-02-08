@@ -8,7 +8,9 @@ using std::string;
 
 class ExecutingInviteCmd : public DBSerialize {
 public:
-
+	ExecutingInviteCmd(){}
+	ExecutingInviteCmd(int cmd_seq);
+	
 	string GetId() const;
     void SetSipRestarted(bool sip_restarted){
         sip_restarted_=sip_restarted;

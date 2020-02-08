@@ -1,6 +1,12 @@
 #include"executinginvitecmd.h"
 #include"downdatarestorercommon.h"
 
+ExecutingInviteCmd::ExecutingInviteCmd(int cmd_seq)
+	:cmd_seq_(cmd_seq)
+{
+	
+}
+
 string ExecutingInviteCmd::GetId() const
 {
 	return ToString(cmd_seq_);

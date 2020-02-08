@@ -5,8 +5,8 @@
 #include"mutexlockguard.h"
 #include"glog/logging.h"
 
-const string ExecutingInviteCmdMgr::s_set_key_prefix="deviceset";
-const string ExecutingInviteCmdMgr::s_key_prefix="deviceset";
+const string ExecutingInviteCmdMgr::s_set_key_prefix="executinginvitecmdset";
+const string ExecutingInviteCmdMgr::s_key_prefix="executinginvitecmdset";
 
 ExecutingInviteCmdMgr::ExecutingInviteCmdMgr(RedisClient* redis_client, int worker_thread_num)
 	:redis_client_(redis_client),
@@ -29,47 +29,56 @@ ExecutingInviteCmdMgr::~ExecutingInviteCmdMgr()
 
 int ExecutingInviteCmdMgr::Load(vector<ExecutingInviteCmdList>& cmd_lists)
 {
-	
-
 	cmd_lists.resize(worker_thread_num_);
 	for(int i=0; i<worker_thread_num_; i++)
 	{
-		ReadGuard guard(rwmutexes_[i]);
-		
-		list<string> cmd_id_list;
-		redis_client_->smembers(s_set_key_prefix+ToString(i), cmd_id_list);
-		for(list<string>::iterator it=cmd_id_list.begin(); it!=cmd_id_list.end(); it++)
-		{
-			ExecutingInviteCmd cmd;
-			if(redis_client_->getSerial(s_key_prefix+ToString(i)+*it, cmd))
-			{
-				cmd.SetSipRestarted(true);
-				cmd_lists[i].push_back(cmd);
-			}
-		}
+		Load(i, cmd_lists[i]);
 	}
 	return 0;
 }
 
-int ExecutingInviteCmdMgr::Search(const string& executing_invite_cmd_id, ExecutingInviteCmd& cmd)
+int ExecutingInviteCmdMgr::Load(int worker_thread_no, ExecutingInviteCmdList& cmd_list)
 {
-	for(int i=0; i<worker_thread_num_; ++i)
+	if(worker_thread_no<0  ||  worker_thread_no>=worker_thread_num_)
+		return -1;
+	ReadGuard guard(rwmutexes_[worker_thread_no]);
+	
+	list<string> cmd_id_list;
+	redis_client_->smembers(s_set_key_prefix+ToString(worker_thread_no), cmd_id_list);
+	for(list<string>::iterator it=cmd_id_list.begin(); it!=cmd_id_list.end(); it++)
 	{
-		ReadGuard guard(rwmutexes_[i]);
-		bool exist=redis_client_->sismember(s_set_key_prefix+ToString(i), executing_invite_cmd_id);
-		if(exist)
+		ExecutingInviteCmd cmd;
+		if(redis_client_->getSerial(s_key_prefix+ToString(worker_thread_no)+*it, cmd))
 		{
-			if(redis_client_->getSerial(s_key_prefix+ToString(i)+executing_invite_cmd_id, cmd))
-			{
-				return 0;
-			}
-		}	
+			cmd.SetSipRestarted(true);
+			cmd_list.push_back(cmd);
+		}
 	}
-	return -1;
+
+	return 0;
 }
+
+//int ExecutingInviteCmdMgr::Search(const string& executing_invite_cmd_id, ExecutingInviteCmd& cmd)
+//{
+//	for(int i=0; i<worker_thread_num_; ++i)
+//	{
+//		ReadGuard guard(rwmutexes_[i]);
+//		bool exist=redis_client_->sismember(s_set_key_prefix+ToString(i), executing_invite_cmd_id);
+//		if(exist)
+//		{
+//			if(redis_client_->getSerial(s_key_prefix+ToString(i)+executing_invite_cmd_id, cmd))
+//			{
+//				return 0;
+//			}
+//		}	
+//	}
+//	return -1;
+//}
 
 int ExecutingInviteCmdMgr::Search(const string& executing_invite_cmd_id, ExecutingInviteCmd& cmd, int worker_thread_no)
 {
+	if(worker_thread_no<0  ||  worker_thread_no>=worker_thread_num_)
+		return -1;
 	ReadGuard guard(rwmutexes_[worker_thread_no]);
 	bool exist=redis_client_->sismember(s_set_key_prefix+ToString(worker_thread_no), executing_invite_cmd_id);
 	if(exist)
@@ -86,6 +95,8 @@ int ExecutingInviteCmdMgr::Search(const string& executing_invite_cmd_id, Executi
 
 int ExecutingInviteCmdMgr::Insert(const ExecutingInviteCmd& cmd, int worker_thread_no)
 {
+	if(worker_thread_no<0  ||  worker_thread_no>=worker_thread_num_)
+		return -1;
 //	MutexLockGuard guard(&modify_mutex_list_[worker_thread_no]);
 	WriteGuard guard(rwmutexes_[worker_thread_no]);
 	
@@ -131,6 +142,8 @@ FAIL:
 
 int ExecutingInviteCmdMgr::Delete(const ExecutingInviteCmd& cmd, int worker_thread_no)
 {
+	if(worker_thread_no<0  ||  worker_thread_no>=worker_thread_num_)
+		return -1;
 //	MutexLockGuard guard(&modify_mutex_list_[worker_thread_no]);
 	WriteGuard guard(rwmutexes_[worker_thread_no]);
 	
@@ -185,6 +198,8 @@ int ExecutingInviteCmdMgr::Clear()
 
 int ExecutingInviteCmdMgr::Clear(int worker_thread_no)
 {
+	if(worker_thread_no<0  ||  worker_thread_no>=worker_thread_num_)
+		return -1;
 //	MutexLockGuard guard(&modify_mutex_list_[worker_thread_no]);
 	WriteGuard guard(rwmutexes_[worker_thread_no]);
 	
@@ -199,6 +214,20 @@ int ExecutingInviteCmdMgr::Clear(int worker_thread_no)
     return 0;
 }
 
+int ExecutingInviteCmdMgr::ClearWithLockHeld(int worker_thread_no)
+{	
+	if(worker_thread_no<0  ||  worker_thread_no>=worker_thread_num_)
+		return -1;
+	list<string> device_id_list;
+	redis_client_->smembers(s_set_key_prefix+ToString(worker_thread_no), device_id_list);
+	redis_client_->del(s_set_key_prefix+ToString(worker_thread_no));
+	for(list<string>::iterator it=device_id_list.begin(); it!=device_id_list.end(); it++)
+	{
+		redis_client_->del(s_key_prefix+ToString(worker_thread_no)+*it);
+	}
+
+    return 0;
+}
 
 int ExecutingInviteCmdMgr::Update(const vector<ExecutingInviteCmdList>& cmd_lists)
 {
@@ -216,12 +245,13 @@ int ExecutingInviteCmdMgr::Update(const vector<ExecutingInviteCmdList>& cmd_list
 }
 
 int ExecutingInviteCmdMgr::Update(const ExecutingInviteCmdList& cmd_list, int worker_thread_no)
-{	
+{
+	if(worker_thread_no<0  ||  worker_thread_no>=worker_thread_num_)
+		return -1;
 //	MutexLockGuard guard(&modify_mutex_list_[worker_thread_no]);
 	WriteGuard guard(rwmutexes_[worker_thread_no]);
-	
-	// TODO 
-	// ClearWithLockHeld(worker_thread_no);
+
+	ClearWithLockHeld(worker_thread_no);
 	
 	for(ExecutingInviteCmdList::const_iterator it=cmd_list.begin(); it!=cmd_list.end(); ++it)
 	{		
@@ -233,11 +263,12 @@ int ExecutingInviteCmdMgr::Update(const ExecutingInviteCmdList& cmd_list, int wo
 
 int ExecutingInviteCmdMgr::Update(const list<void*>& cmd_list, int worker_thread_no)
 {
+	if(worker_thread_no<0  ||  worker_thread_no>=worker_thread_num_)
+		return -1;
 //	MutexLockGuard guard(&modify_mutex_list_[worker_thread_no]);
 	WriteGuard guard(rwmutexes_[worker_thread_no]);
 	
-	// TODO 
-	// ClearWithLockHeld(worker_thread_no);
+	ClearWithLockHeld(worker_thread_no);
 
 	for(list<void*>::const_iterator it=cmd_list.begin(); it!=cmd_list.end(); ++it)
 	{
@@ -248,4 +279,11 @@ int ExecutingInviteCmdMgr::Update(const list<void*>& cmd_list, int worker_thread
     return 0;
 }
 
+int ExecutingInviteCmdMgr::GetExecutingInviteCmdListSize(int worker_thread_no)
+{
+	if(worker_thread_no<0  ||  worker_thread_no>=worker_thread_num_)
+		return -1;
+	ReadGuard guard(rwmutexes_[worker_thread_no]);
+	return redis_client_->scard(s_set_key_prefix+ToString(worker_thread_no));
+}
 

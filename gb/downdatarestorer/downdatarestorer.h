@@ -19,8 +19,8 @@ using std::vector;
 using std::list;
 using std::queue;
 
-#define DDR_OK 		0
-#define DDR_FAIL 	-1
+#define DDR_OK 		1
+#define DDR_FAIL 	0
 
 class RedisClient;
 class DeviceMgr;
@@ -30,27 +30,30 @@ class CountDownLatch;
 
 struct DataRestorerOperation{
 	enum OperationType{
-		INSERT,
+		INSERT=0,
 		DELETE,
 		CLEAR,
 		UPDATE,
 	} operation_type_;
 	enum EntityType{
-		DEVICE,
+		DEVICE=0,
 		CHANNEL,
 		EXECUTING_INVITE_CMD,
 	} entity_type_;
 	list<void*> entities_; // for operation type INSERT, DELELTE, for UPDATE
-	int executing_invite_cmd_list_num_; // for entity type EXECUTING_INVITE_CMD
+	int executing_invite_cmd_list_no_; // for entity type EXECUTING_INVITE_CMD
 	// TODO 
 	// vector<ExecutingInviteCmdList> entity_lists;
     
     DataRestorerOperation()
     {}
-	DataRestorerOperation(OperationType operation_type, EntityType entity_type, void* entity)
+    
+	DataRestorerOperation(OperationType operation_type, EntityType entity_type, void* entity, int worker_thread_no)
 	{
 		operation_type_=operation_type;
 		entity_type_=entity_type;
+		executing_invite_cmd_list_no_=worker_thread_no;
+		
         void* entity_=0;
 
 		if(operation_type==INSERT  ||  operation_type==DELETE)
@@ -71,40 +74,33 @@ struct DataRestorerOperation{
 				entities_.push_back(entity_);
 				}
                 break;
-            default:
-				assert(false);
-			}
-		}
-		else if(operation_type==CLEAR)
-		{}		
-	}
-	DataRestorerOperation(OperationType operation_type, EntityType entity_type, void* entity, int worker_thread_num)
-	{
-		operation_type_=operation_type;
-		entity_type_=entity_type;
-		executing_invite_cmd_list_num_=worker_thread_num;
-
-		if(operation_type==INSERT  ||  operation_type==DELETE)
-		{
-			switch(entity_type)
-			{
-			case EXECUTING_INVITE_CMD:
+            case EXECUTING_INVITE_CMD:
 				{
                 ExecutingInviteCmd* cmd=(ExecutingInviteCmd*)entity;
 				void* entity_=(void*)(new ExecutingInviteCmd(*cmd));
 				entities_.push_back(entity_);
 				}
                 break;
-			default:
+            default:
 				assert(false);
 			}
-		}	
+		}
+		else if(operation_type==CLEAR)
+		{
+			
+		}
+		else
+		{
+			assert(false);
+		}
 	}
 	
-	DataRestorerOperation(OperationType operation_type, EntityType entity_type, const list<void*>& entities)
+	DataRestorerOperation(OperationType operation_type, EntityType entity_type, const list<void*>& entities, int worker_thread_no)
 	{
 		operation_type_=operation_type;
 		entity_type_=entity_type;
+		executing_invite_cmd_list_no_=worker_thread_no;
+		
 		if(operation_type==UPDATE)
 		{
 			switch(entity_type)
@@ -133,7 +129,13 @@ struct DataRestorerOperation{
 					entities_.push_back(entity_);
 				}
 				break;
+			default:
+				assert(false);
 			}
+		}
+		else
+		{
+			assert(false);
 		}
 	}
 
@@ -141,7 +143,7 @@ struct DataRestorerOperation{
 	{
 		operation_type_=op.operation_type_;
 		entity_type_=op.entity_type_;
-		executing_invite_cmd_list_num_=op.executing_invite_cmd_list_num_;
+		executing_invite_cmd_list_no_=op.executing_invite_cmd_list_no_;
 //		entities_.swap(op.entities_);
         for(list<void*>::const_iterator it=op.entities_.begin(); it!=op.entities_.end(); ++it)
         {
@@ -179,16 +181,19 @@ public:
 	int UpdateChannelList(const list<Channel>& channels);
 
 	int LoadExecutingInviteCmdList(vector<ExecutingInviteCmdList>& executinginvitecmdlists);
-	int SelectExecutingInviteCmdList(const string& cmd_id, ExecutingInviteCmd& cmd);
-	int SelectExecutingInviteCmdList(const string& cmd_id, ExecutingInviteCmd& cmd, int worker_thread_num);
-	int InsertExecutingInviteCmdList(const ExecutingInviteCmd& executinginvitecmd, int);
-	int DeleteExecutingInviteCmdList(const ExecutingInviteCmd& executinginvitecmd, int);
+	int LoadExecutingInviteCmdList(int worker_thread_no, ExecutingInviteCmdList& executing_invite_cmd_lists);
+	int SelectExecutingInviteCmdList(int worker_thread_no, const string& cmd_id, ExecutingInviteCmd& cmd);
+	int InsertExecutingInviteCmdList(int worker_thread_no, const ExecutingInviteCmd& executinginvitecmd);
+	int DeleteExecutingInviteCmdList(int worker_thread_no, const ExecutingInviteCmd& executinginvitecmd);
 	int ClearExecutingInviteCmdList();
-	int UpdateExecutingInviteCmdList(const ExecutingInviteCmdList& executinginvitecmdlist);
+	int ClearExecutingInviteCmdList(int worker_thread_no);
+	int UpdateExecutingInviteCmdList(int worker_thread_no, const ExecutingInviteCmdList& executinginvitecmdlist);
 	int UpdateExecutingInviteCmdList(const vector<ExecutingInviteCmdList>& executinginvitecmdlists);
 
 	int GetDeviceCount();
 	int GetChannelCount();
+	int GetExecutingInviteCmdCount(int worker_thread_no);
+	
 
 private:
     static void* DataRestorerThreadFuncWrapper(void* arg);

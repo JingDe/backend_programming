@@ -412,15 +412,15 @@ bool RedisClient::doRedisCommand(const string & key,
 							int32_t commandLen,
 							list < RedisCmdParaInfo > & commandList,
 							int commandType,
-							DBSerialize * serial)
+							DBSerialize * serial, int* count)
 {
 	if(m_redisMode==CLUSTER_MODE)
 	{
-		return doRedisCommandCluster(key, commandLen, commandList, commandType, serial);
+		return doRedisCommandCluster(key, commandLen, commandList, commandType, serial, count);
 	}
 	else
 	{
-		return doRedisCommandProxy(key, commandLen, commandList, commandType, serial);
+		return doRedisCommandProxy(key, commandLen, commandList, commandType, serial, count);
 	}
 }
 
@@ -428,7 +428,7 @@ bool RedisClient::doRedisCommandProxy(const string & key,
 							int32_t commandLen,
 							list < RedisCmdParaInfo > & commandList,
 							int commandType,
-							DBSerialize * serial)
+							DBSerialize * serial, int* count)
 {
 	RedisReplyInfo replyInfo;
 	bool needRedirect;
@@ -625,48 +625,51 @@ bool RedisClient::doRedisCommandProxy(const string & key,
 			{
 				m_logger.warn("parse key:[%s] zset add reply failed. reply string:%s.", key.c_str(), replyInfo.resultString.c_str());
 				freeReplyInfo(replyInfo);
-				return -1;
+				return false;
 			}
 			
 			if(replyInfo.replyType == RedisReplyType::REDIS_REPLY_INTEGER)
 			{
-				int count = replyInfo.intValue;
-				m_logger.info("key %s commandType %d success, return integer %d", key.c_str(), commandType, count);
+				if(count)
+					*count = replyInfo.intValue;
+				m_logger.info("key %s commandType %d success, return integer %d", key.c_str(), commandType, replyInfo.intValue);
 				freeReplyInfo(replyInfo);
-				return count;
-			}
-			break;
-		case RedisCommandType::REDIS_COMMAND_ZSCORE:
-			if (checkIfNeedRedirect(replyInfo, needRedirect, redirectInfo))
-			{
-				m_logger.info("need direct to cluster:[%s].", redirectInfo.c_str());
+				return true;
 			}
 			else
+			{
+				m_logger.warn("key %s commandType %d, return error", key.c_str(), commandType);
+				return false;
+			}
+			break;
+		case RedisCommandType::REDIS_COMMAND_ZSCORE:			
 			{	
 				if (replyInfo.replyType != RedisReplyType::REDIS_REPLY_STRING)
 				{
 					m_logger.warn("recv redis wrong reply type:[%d].", replyInfo.replyType);
 					freeReplyInfo(replyInfo);
-					return -1;
+					return false;
 				}
 				list<ReplyArrayInfo>::iterator iter = replyInfo.arrayList.begin();
 				if (iter == replyInfo.arrayList.end())
 				{
 					m_logger.warn("reply not have array info.");
 					freeReplyInfo(replyInfo);
-					return -1;
+					return false;
 				}
 				if ((*iter).replyType == RedisReplyType::REDIS_REPLY_NIL)
 				{
 					m_logger.warn("get failed,the key not exist.");
 					freeReplyInfo(replyInfo);
-					return -1;
+					return false;
 				}
 				char score_c[64] = {0};
 				memcpy(score_c,(*iter).arrayValue,(*iter).arrayLen);
-				int score = atoi(score_c);
-				m_logger.info("key:%s,score:%d",key.c_str(),score);
-				return score;	
+				if(count==NULL)
+					return false;
+				*count = atoi(score_c);
+				m_logger.info("key:%s,score:%d",key.c_str(), *count);
+				return true;	
 			}
 			break;
 		default:
@@ -683,7 +686,7 @@ bool RedisClient::doRedisCommandCluster(const string & key,
 							int32_t commandLen,
 							list < RedisCmdParaInfo > & commandList,
 							int commandType,
-							DBSerialize * serial)
+							DBSerialize * serial, int* count)
 {
 	assert(m_redisMode==CLUSTER_MODE);
 	//first calc crc16 value.
@@ -778,8 +781,7 @@ REDIS_COMMAND:
 			//switch command type
 			switch (commandType)
 			{
-				case RedisCommandType::REDIS_COMMAND_GET:
-					
+				case RedisCommandType::REDIS_COMMAND_GET:					
 					if(!parseGetSerialReply(replyInfo,*serial,needRedirect,redirectInfo))
 					{
 						m_logger.warn("parse key:[%s] get string reply failed. reply string:%s.", key.c_str(), replyInfo.resultString.c_str());
@@ -963,15 +965,16 @@ REDIS_COMMAND:
 					{
 						m_logger.warn("parse key:[%s] zset add reply failed. reply string:%s.", key.c_str(), replyInfo.resultString.c_str());
 						freeReplyInfo(replyInfo);
-						return -1;
+						return false;
 					}
 					
 					if(replyInfo.replyType == RedisReplyType::REDIS_REPLY_INTEGER)
 					{
-						int count = replyInfo.intValue;
-						m_logger.info("key %s commandType %d success, return integer %d", key.c_str(), commandType, count);
+						if(count)
+							*count = replyInfo.intValue;
+						m_logger.info("key %s commandType %d success, return integer %d", key.c_str(), commandType, replyInfo.intValue);
 						freeReplyInfo(replyInfo);
-						return count;
+						return true;
 					}
 					break;
 				case RedisCommandType::REDIS_COMMAND_ZSCORE:
@@ -985,26 +988,27 @@ REDIS_COMMAND:
 						{
 							m_logger.warn("recv redis wrong reply type:[%d].", replyInfo.replyType);
 							freeReplyInfo(replyInfo);
-							return -1;
+							return false;
 						}
 						list<ReplyArrayInfo>::iterator iter = replyInfo.arrayList.begin();
 						if (iter == replyInfo.arrayList.end())
 						{
 							m_logger.warn("reply not have array info.");
 							freeReplyInfo(replyInfo);
-							return -1;
+							return false;
 						}
 						if ((*iter).replyType == RedisReplyType::REDIS_REPLY_NIL)
 						{
 							m_logger.warn("get failed,the key not exist.");
 							freeReplyInfo(replyInfo);
-							return -1;
+							return false;
 						}
 						char score_c[64] = {0};
 						memcpy(score_c,(*iter).arrayValue,(*iter).arrayLen);
-						int score = atoi(score_c);
-						m_logger.info("key:%s,score:%d",key.c_str(),score);
-						return score;	
+						if(count)
+							*count = atoi(score_c);
+						m_logger.info("key:%s,score:%d",key.c_str(), atoi(score_c));
+						return true;	
 					}
 					break;
 				default:
@@ -1038,6 +1042,7 @@ REDIS_COMMAND:
 				else
 				{
 					m_logger.warn("redirect:%s is already do redis command,the slot:[%d] may be removed by redis.please check it.", redirectInfo.c_str(), crcValue);
+					return false;
 				}
 			}
 		}
@@ -2442,8 +2447,9 @@ int RedisClient::zcount(const string& key,int start, int end)
     fillCommandPara(end_c, strlen(end_c), paraList);
     paraLen += strlen(end_c) + 20;
 
-    int count = -1;
-    count = doRedisCommand( key,paraLen,paraList,RedisCommandType::REDIS_COMMAND_ZCOUNT);
+    int count = 0;
+    bool success = doRedisCommand( key,paraLen,paraList,RedisCommandType::REDIS_COMMAND_ZCOUNT, NULL, &count);
+    (void)success;
     freeCommandList(paraList);
     return count;
 }
@@ -2458,8 +2464,9 @@ int RedisClient::zcard(const string& key)
     fillCommandPara(key.c_str(), key.length(), paraList);
     paraLen += key.length() + 20;
 
-    int count = -1;
-    count = doRedisCommand( key,paraLen,paraList,RedisCommandType::REDIS_COMMAND_ZCARD);
+    int count = 0;
+    bool success = doRedisCommand( key,paraLen,paraList,RedisCommandType::REDIS_COMMAND_ZCARD, NULL, &count);
+    (void) success;
     freeCommandList(paraList);
     return count;
 }
@@ -2472,8 +2479,9 @@ int RedisClient::dbsize()
     fillCommandPara(str.c_str(), str.size(), paraList);
     paraLen += str.size()+11;
 
-    int count = -1;
-    count = doRedisCommand( "",paraLen,paraList,RedisCommandType::REDIS_COMMAND_DBSIZE);
+    int count = 0;
+    bool success = doRedisCommand( "",paraLen,paraList,RedisCommandType::REDIS_COMMAND_DBSIZE, NULL, &count);
+    (void)success;
     freeCommandList(paraList);
     return count;
 }
@@ -2490,7 +2498,8 @@ int RedisClient::zscore(const string& key,const string& member)
     paraLen += member.length() + 20;
 
     int count = -1;
-    count = doRedisCommand( key,paraLen,paraList,RedisCommandType::REDIS_COMMAND_ZSCORE);
+    bool success = doRedisCommand( key,paraLen,paraList,RedisCommandType::REDIS_COMMAND_ZSCORE, NULL, &count);
+    (void)success;
     freeCommandList(paraList);
     return count;
 }
@@ -2558,10 +2567,9 @@ bool RedisClient::sadd(const string& key, const string& member)
     fillCommandPara(member.c_str(), member.length(), paraList);
     paraLen += member.length() + 20;
 
-    int count = -1;
-    count = doRedisCommand( key,paraLen,paraList,RedisCommandType::REDIS_COMMAND_SCARD);
+    bool success = doRedisCommand( key,paraLen,paraList,RedisCommandType::REDIS_COMMAND_SADD);
     freeCommandList(paraList);
-    return (count>0) ? true : false;
+    return success;
 }
 
 bool RedisClient::srem(const string& key, const string& member)
@@ -2577,10 +2585,9 @@ bool RedisClient::srem(const string& key, const string& member)
     fillCommandPara(member.c_str(), member.length(), paraList);
     paraLen += member.length() + 20;
 
-    int count = -1;
-    count = doRedisCommand( key,paraLen,paraList,RedisCommandType::REDIS_COMMAND_SCARD);
+    bool success = doRedisCommand( key,paraLen,paraList,RedisCommandType::REDIS_COMMAND_SREM);
     freeCommandList(paraList);
-    return (count>0) ? true : false;
+    return success;
 }
 
 int RedisClient::scard(const string& key)
@@ -2593,8 +2600,9 @@ int RedisClient::scard(const string& key)
     fillCommandPara(key.c_str(), key.length(), paraList);
     paraLen += key.length() + 20;
 
-    int count = -1;
-    count = doRedisCommand( key,paraLen,paraList,RedisCommandType::REDIS_COMMAND_SCARD);
+    int count = 0;
+    bool success = doRedisCommand( key,paraLen,paraList,RedisCommandType::REDIS_COMMAND_SCARD, NULL, &count);
+    (void)success;
     freeCommandList(paraList);
     return count;
 }
@@ -2613,7 +2621,8 @@ bool RedisClient::sismember(const string& key, const string& member)
     paraLen += member.length() + 20;
 
     int count = -1;
-    count = doRedisCommand( key,paraLen,paraList,RedisCommandType::REDIS_COMMAND_SCARD);
+    bool success = doRedisCommand( key,paraLen,paraList,RedisCommandType::REDIS_COMMAND_SISMEMBER, NULL, &count);
+    (void) success;
     freeCommandList(paraList);
     return (count==1) ? true : false;
 }

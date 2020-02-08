@@ -14,15 +14,19 @@ public:
 	~ExecutingInviteCmdMgr();
 	
 	int Load(vector<ExecutingInviteCmdList>& cmd_lists);
-	int Search(const string& executing_invite_cmd_id, ExecutingInviteCmd& cmd);
+	int Load(int worker_thread_num, ExecutingInviteCmdList& cmd_list);
+//	int Search(const string& executing_invite_cmd_id, ExecutingInviteCmd& cmd);
 	int Search(const string& executing_invite_cmd_id, ExecutingInviteCmd& cmd, int worker_thread_no);
 	int Insert(const ExecutingInviteCmd& cmd, int worker_thread_no);
 	int Delete(const ExecutingInviteCmd& cmd, int worker_thread_no);
 	int Clear();
 	int Clear(int worker_thread_no);
+	int ClearWithLockHeld(int worker_thread_no);
 	int Update(const vector<ExecutingInviteCmdList>& cmd_lists);
 	int Update(const ExecutingInviteCmdList& cmd_list, int worker_thread_no);
 	int Update(const list<void*>& cmd_list, int worker_thread_no);
+
+	int GetExecutingInviteCmdListSize(int worker_thread_no);
 	
 private:
 	RedisClient* redis_client_;
