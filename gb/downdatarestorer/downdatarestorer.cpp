@@ -23,13 +23,14 @@ DownDataRestorer::DownDataRestorer()
 	executing_invite_cmd_mgr_(NULL),
 	operations_queue_mutex_(),
 	operations_queue_not_empty_condvar(&operations_queue_mutex_),
-	operations_queue_()
+	operations_queue_(),
+	worker_thread_num_(8)
 {
-	google::InitGoogleLogging("downdatarestorer");
-	FLAGS_logtostderr=false;
-	FLAGS_log_dir="./downdatarestorerlogdir";
-	FLAGS_alsologtostderr=true;
-	FLAGS_colorlogtostderr=true;
+//	google::InitGoogleLogging("downdatarestorer");
+//	FLAGS_logtostderr=false;
+//	FLAGS_log_dir="./downdatarestorerlogdir";
+//	FLAGS_alsologtostderr=true;
+//	FLAGS_colorlogtostderr=true;
 	
 	LOG(INFO)<<"DownDataRestorer constructed ok";
 }
@@ -48,7 +49,8 @@ DownDataRestorer::~DownDataRestorer()
 		delete channel_mgr_;
 	if(executing_invite_cmd_mgr_)
 		delete executing_invite_cmd_mgr_;
-	google::ShutdownGoogleLogging();	
+		
+//	google::ShutdownGoogleLogging();	
 }
 
 int DownDataRestorer::Init(string redis_server_ip, uint16_t redis_server_port, int connection_num)
@@ -153,9 +155,14 @@ int DownDataRestorer::Start()
 }
 
 // TODO
+void DownDataRestorer::SetWorkerThreadNum(int num)
+{
+	worker_thread_num_=num;
+}
+
 int DownDataRestorer::GetWorkerThreadNum()
 {
-	return 8;
+	return worker_thread_num_;
 }
 
 int DownDataRestorer::Stop()

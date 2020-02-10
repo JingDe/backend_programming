@@ -193,7 +193,8 @@ public:
 	int GetDeviceCount();
 	int GetChannelCount();
 	int GetExecutingInviteCmdCount(int worker_thread_no);
-	
+
+	void SetWorkerThreadNum(int num);
 
 private:
     static void* DataRestorerThreadFuncWrapper(void* arg);
@@ -216,6 +217,7 @@ private:
 	CondVar operations_queue_not_empty_condvar;
 	queue<DataRestorerOperation> operations_queue_;
 
+	int worker_thread_num_;
     //OWLog logger_;
 };
 

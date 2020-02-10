@@ -9,7 +9,8 @@ ExecutingInviteCmd::ExecutingInviteCmd(int cmd_seq)
 
 string ExecutingInviteCmd::GetId() const
 {
-	return ToString(cmd_seq_);
+	// CmdSenderId、DeviceId、CmdSeq
+	return cmd_sender_id_+device_id_+ToString(cmd_seq_);
 }
 
 void ExecutingInviteCmd::save(DBOutStream &out) const

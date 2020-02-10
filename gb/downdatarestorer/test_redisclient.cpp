@@ -2,16 +2,17 @@
 #include"downdatarestorer.h"
 #include"device.h"
 #include"glog/logging.h"
+#include"glog/raw_logging.h"
 #include"owlog.h"
 #include<string>
 #include<list>
 #include<iostream>
 #include<cstdio>
 #include<unistd.h>
+#include<fstream>
 
 using std::string;
 using std::list;
-
 
 const string redis_ip="192.168.12.59";
 const uint16_t redis_port=6379;
@@ -147,14 +148,14 @@ void TestDownDataRestorerDevice()
 	Device device1("device_id_1");
 	ddr.InsertDeviceList(device1);
 
-	sleep(5);
+	sleep(3);
 	
 	device_count=ddr.GetDeviceCount();
 	logger.debug("after insert, devices size: %d", device_count);
 	std::cout<<"after insert, devices size: "<<device_count<<std::endl;
 
 	printf("after insert, before search, to check redis-cli\n");
-	getchar();
+//	getchar();
 	//getc(stdin);
 
 	Device device;
@@ -166,7 +167,7 @@ void TestDownDataRestorerDevice()
 	{
 		printf("search device_id_1 failed\n");
 	}
-	getchar();
+//	getchar();
 
 	Device device2("device_id_2");
 	ddr.InsertDeviceList(device2);
@@ -181,11 +182,11 @@ void TestDownDataRestorerDevice()
 
 	ddr.DeleteDeviceList(device1);
 
-	sleep(5);
+	sleep(3);
 	ShowDevices(ddr);
 
 	ddr.ClearDeviceList();
-	sleep(5);
+	sleep(3);
 	
 	device_count=ddr.GetDeviceCount();
 	logger.debug("after clear, devices size: %d", device_count);
@@ -195,7 +196,7 @@ void TestDownDataRestorerDevice()
 	list<Device> devices({device1, device3});
 	ddr.UpdateDeviceList(devices);
 
-	sleep(5);
+	sleep(3);
 	printf("after update\n");
 	ShowDevices(ddr);
 
@@ -205,22 +206,25 @@ void TestDownDataRestorerDevice()
 
 void PrintCmdList(const ExecutingInviteCmdList& cmdlist, int set_no)
 {
-	printf("start show the %d cmd set, [%d]\n", set_no, (int)cmdlist.size());
+//	printf("start show the %d cmd set, [%d]\n", set_no, (int)cmdlist.size());
+	LOG(INFO)<<"start show the "<<set_no<<" cmd set, ["<<cmdlist.size()<<"]\n";
 	for(ExecutingInviteCmdList::const_iterator it=cmdlist.begin(); it!=cmdlist.end(); ++it)
 	{
-		printf("%s,\t", it->GetId().c_str());
+//		printf("%s,\t", it->GetId().c_str());
+		LOG(INFO)<<it->GetId().c_str()<<"\t";
 	}
-	printf("\n");
+//	printf("\n");
 }
 
 void PrintCmdLists(const vector<ExecutingInviteCmdList>& cmdlists)
 {
-	printf("*** start show cmd lists: [%d]\n", (int)cmdlists.size());
+//	printf("*** start show cmd lists: [%d]\n", (int)cmdlists.size());
+	LOG(INFO)<<"*** start show cmd lists: ["<<cmdlists.size()<<"]\n";
 	for(size_t i=0; i<cmdlists.size(); ++i)
 	{
 		PrintCmdList(cmdlists[i], i+1);
 	}
-	printf("*** end\n");
+//	printf("*** end\n");
 }
 
 typedef void* WorkerThreadFuncType(void*);
@@ -260,7 +264,7 @@ void* WorkerThread0Func(void* arg)
 	printf("after insert\n");
 	ShowCmdList(thread_no);
 	
-	getchar();
+//	getchar();
 
 	ExecutingInviteCmd cmd;
 	if(g_ddr->SelectExecutingInviteCmdList(thread_no, "1", cmd)==DDR_OK)
@@ -272,7 +276,7 @@ void* WorkerThread0Func(void* arg)
 		printf("select failed\n");
 	}
 
-	getchar();
+//	getchar();
 	
 	g_ddr->DeleteExecutingInviteCmdList(thread_no, cmd1);
 
@@ -280,7 +284,7 @@ void* WorkerThread0Func(void* arg)
 	printf("after delete\n");
 	ShowCmdList(thread_no);
 
-	getchar();
+//	getchar();
 
 	ExecutingInviteCmdList cmd_list({cmd1});
 	g_ddr->UpdateExecutingInviteCmdList(thread_no, cmd_list);
@@ -290,11 +294,11 @@ void* WorkerThread0Func(void* arg)
 	ShowCmdList(thread_no);
 
 	printf("before clear\n");
-	getchar();
+//	getchar();
 
 	g_ddr->ClearExecutingInviteCmdList(thread_no);
 
-	sleep(5);
+	sleep(3);
 	printf("after clear\n");
 	ShowCmdList(thread_no);
 
@@ -314,7 +318,8 @@ void* WorkerThread1Func(void* arg)
 void TestDownDataRestorerExecutingInviteCmd()
 {
 	DownDataRestorer ddr;
-	ddr.Init(redis_ip, redis_port, 8);
+	ddr.SetWorkerThreadNum(2);
+	ddr.Init(redis_ip, redis_port, 2);
 	ddr.Start();
 
 	g_ddr=&ddr;
@@ -326,14 +331,35 @@ void TestDownDataRestorerExecutingInviteCmd()
 //	pthread_t t1=StartWorkerThread(worker_thread_no_1, WorkerThread1Func);
 
 
-	sleep(5);
+	sleep(3);
+	{
+		vector<ExecutingInviteCmdList> cmdlists;
+		ddr.LoadExecutingInviteCmdList(cmdlists);
+		PrintCmdLists(cmdlists);
+	}
+
+	sleep(10);
+	LOG(INFO)<<"main thread CLEAR all\n";
+	ddr.ClearExecutingInviteCmdList();
+
+	{
+		ExecutingInviteCmd cmd11(11);
+		ExecutingInviteCmd cmd12(12);
+		ExecutingInviteCmdList cmd_list1({cmd11, cmd12});
+		ExecutingInviteCmd cmd21(21);
+		ExecutingInviteCmd cmd22(22);
+		ExecutingInviteCmdList cmd_list2({cmd21, cmd22});
+		vector<ExecutingInviteCmdList> cmdlists({cmd_list1, cmd_list2});
+		ddr.UpdateExecutingInviteCmdList(cmdlists);
+	}
+
+	sleep(3);
+
+	{
 	vector<ExecutingInviteCmdList> cmdlists;
 	ddr.LoadExecutingInviteCmdList(cmdlists);
 	PrintCmdLists(cmdlists);
-
-//	sleep(11);
-//	LOG(INFO)<<"main thread clear all\n";
-//	ddr.ClearExecutingInviteCmdList();
+	}
 
 	pthread_join(t0, NULL);
 //	pthread_join(t1, NULL);
@@ -343,8 +369,44 @@ void TestDownDataRestorerExecutingInviteCmd()
 }
 
 
+//将信息输出到单独的文件和 LOG(ERROR)
+void SignalHandle(const char* data, int size)
+{
+    std::ofstream fs("glog_dump.log", std::ios::app);
+    std::string str = std::string(data,size);
+    fs<<str;
+    fs.close();
+    LOG(ERROR)<<str;
+}
+
+class Glogger{
+public:
+	Glogger()
+	{
+	//	google::InitGoogleLogging("main");
+	//	FLAGS_logtostderr=false;
+	//	FLAGS_log_dir="./downdatarestorerlogdir";
+	//	FLAGS_alsologtostderr=true;
+	//	FLAGS_colorlogtostderr=true;
+
+		google::InitGoogleLogging("test_ddr");
+		FLAGS_log_dir="./downdatarestorerlogdir";
+	    FLAGS_stderrthreshold=google::INFO;
+	    FLAGS_colorlogtostderr=true;
+	    google::InstallFailureWriter(&SignalHandle);
+	}
+
+	~Glogger()
+	{
+		google::ShutdownGoogleLogging();
+	}
+};
+
+
 int main(int argc, char** argv)
 {
+	Glogger glog;
+
     string log_config_filename="log.conf";
     if(argc<2)
     {
@@ -360,8 +422,11 @@ int main(int argc, char** argv)
     OWLog::config(log_config_filename);
 
 //	TestTransactionSetAdd();
+//	TestTransactionSetDel();
+
 	printf("********************\n");
-//    TestDownDataRestorerDevice();
+    TestDownDataRestorerDevice();
+    
 	printf("********************\n");
     TestDownDataRestorerExecutingInviteCmd();
     
