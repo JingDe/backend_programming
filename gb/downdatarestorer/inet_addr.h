@@ -1,10 +1,13 @@
 #ifndef INET_ADDR_H_
 #define INET_ADDR_H_
-//#include "base_define.h"
-#include "owlog.h"
+
+//#include "owlog.h"
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#include<string>
+
+using std::string;
 
 class InetAddr
 {
@@ -53,7 +56,7 @@ public:
     string toString() const;
 	
 
-	static OWLog m_logger;
+//	static OWLog m_logger;
 	//static OWMutexLock m_lock;
 	union{
 		struct in_addr  sin_addr;     //IPv4

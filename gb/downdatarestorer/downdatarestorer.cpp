@@ -53,19 +53,25 @@ DownDataRestorer::~DownDataRestorer()
 //	google::ShutdownGoogleLogging();	
 }
 
-int DownDataRestorer::Init(string redis_server_ip, uint16_t redis_server_port, int connection_num)
+int DownDataRestorer::Init(const string& redis_server_ip, uint16_t redis_server_port, int connection_num)
+{
+	LOG(INFO)<<"DownDataRestorer init now, redis ip "<<redis_server_ip<<", redis port "<<redis_server_port<<", connection num "<<connection_num;
+	RedisServerInfo redis_server(redis_server_ip, redis_server_port);
+	REDIS_SERVER_LIST redis_server_list({redis_server});
+
+	return Init(redis_server_list, connection_num);
+}
+
+
+int DownDataRestorer::Init(const REDIS_SERVER_LIST& redis_server_list, int connection_num)
 {
 	if(inited_)
 	{
 		LOG(WARNING)<<"init called repeatedly";
 		return DDR_FAIL;
 	}
-	LOG(INFO)<<"DownDataRestorer init now, redis ip "<<redis_server_ip<<", redis port "<<redis_server_port<<", connection num "<<connection_num;
 
-	RedisServerInfo redis_server(redis_server_ip, redis_server_port);
-	REDIS_SERVER_LIST redis_server_list({redis_server});
 //	data_restorer_threads_num_=connection_num;
-	uint32_t keepalive_time_secs=86400;
 
 	redis_client_=new RedisClient();
 	if(redis_client_==NULL)
@@ -73,8 +79,9 @@ int DownDataRestorer::Init(string redis_server_ip, uint16_t redis_server_port, i
 		LOG(ERROR)<<"create RedisClient failed";
 		return DDR_FAIL;
 	}
-	
-	if(redis_client_->init(redis_server_list, connection_num, keepalive_time_secs)==false)
+
+//	uint32_t keepalive_time_secs=86400;
+	if(redis_client_->init(redis_server_list, connection_num/*, keepalive_time_secs*/)==false)
 	{
 		LOG(ERROR)<<"init RedisClient failed";
 		return -1;

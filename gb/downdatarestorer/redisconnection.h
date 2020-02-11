@@ -65,7 +65,7 @@ private:
 	int32_t  m_doneNum;
 	int32_t  m_arrayLen;
 	bool   m_valid;
-	OWLog	m_logger;
+//	OWLog	m_logger;
 };
 
 #endif

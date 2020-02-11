@@ -9,8 +9,8 @@ const string DeviceMgr::s_key_prefix="deviceset";
 DeviceMgr::DeviceMgr(RedisClient* redis_client)
 	:redis_client_(redis_client),
 //	modify_mutex_(),
-	rwmutex_(),
-    logger_("common.test")
+	rwmutex_()/*,
+    logger_("common.test")*/
 {
 	LOG(INFO)<<"DeviceMgr constructed";
 }
@@ -59,17 +59,16 @@ int DeviceMgr::InsertDevice(const Device& device)
 
     if(!redis_client_->PrepareTransaction(&con))
     {
-        logger_.error("PrepareTransaction failed");
+//        logger_.error("PrepareTransaction failed");
     	LOG(ERROR)<<"PrepareTransaction failed";
     	goto FAIL;
     }
     if(!redis_client_->StartTransaction(con))
     {
-        logger_.error("StartTransaction failed");
+//        logger_.error("StartTransaction failed");
 	    LOG(ERROR)<<"StartTransaction failed";
     	goto FAIL;
     }
-    logger_.debug("to start transaction");
     if(!redis_client_->Set(con, s_key_prefix+device.GetDeviceId(), device))
     {
 	    LOG(ERROR)<<"Set failed";
@@ -92,9 +91,7 @@ int DeviceMgr::InsertDevice(const Device& device)
 FAIL:
     if(con)
     {
-    	logger_.debug("use connection %p", con);
         redis_client_->FinishTransaction(&con);
-        logger_.debug("use connection %p", con);
     }
     LOG(ERROR)<<"InsertDevice failed: "<<device.GetDeviceId();
     return -1;

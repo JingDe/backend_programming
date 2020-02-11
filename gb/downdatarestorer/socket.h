@@ -6,6 +6,9 @@
 #include <sys/types.h>
 #include <sys/types.h>
 #include <linux/unistd.h>
+#include<string>
+
+using std::string;
 
 const int INVALID_SOCKET_HANDLE = -1;
 
@@ -99,7 +102,7 @@ protected:
     int port;
 
     bool m_stream;	
-    OWLog m_logger;
+//    OWLog m_logger;
 };
 
 #endif /*SOCKET_H_*/

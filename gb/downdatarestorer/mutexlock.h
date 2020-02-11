@@ -13,6 +13,8 @@ public:
 	void Lock();
 	void Unlock();
 
+	pthread_mutex_t* mutex() { return &mutex_; }
+
 private:
 	pthread_mutex_t mutex_;
 

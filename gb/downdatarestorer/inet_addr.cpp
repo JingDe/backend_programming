@@ -3,11 +3,12 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <assert.h>
-//#include <base_define.h>
 #include<stdint.h>
 #include<exception>
+#include<stdexcept>
+#include"glog/logging.h"
 
-OWLog InetAddr::m_logger("clib.socket.inetaddr");
+//OWLog InetAddr::m_logger("clib.socket.inetaddr");
 //OWMutexLock InetAddr::m_lock;
 
 InetAddr::InetAddr(){
@@ -39,8 +40,9 @@ InetAddr InetAddr::getByName(const string& host)
 	struct addrinfo* result=NULL;
 	getaddrinfo(host.c_str(), 0, 0, &result);
 	if(result == NULL){
-		m_logger.error("Cannot get information about host(%s): %m", host.c_str());
-        throw std::exception();
+//		m_logger.error("Cannot get information about host(%s): %m", host.c_str());
+		PLOG(ERROR)<<"Cannot get information about host "<<host;
+        throw std::runtime_error("InetAddr Unknow host");
 //		throw OWException("InetAddr", "getByName", "Unknow host");
 	}
 
@@ -93,8 +95,8 @@ string InetAddr::getHostName() const {
 	}
 
 	if (strlen(hostname) == 0) {
-		m_logger.error("Cannot get host name: %d", address);
-        throw std::exception();
+//		m_logger.error("Cannot get host name: %d", address);
+        throw std::runtime_error("Cannot get host name");
 //		throw OWException("Cannot get host name");
 	}else{
 		return string(hostname);
@@ -137,7 +139,8 @@ bool InetAddr::isMulticastAddress() const {
 			return false;
 		}
 	}else{
-		m_logger.error("invalid net addr !");
+//		m_logger.error("invalid net addr !");
+		LOG(ERROR)<<"invalid net addr !";
 		return false;
 	}
 }

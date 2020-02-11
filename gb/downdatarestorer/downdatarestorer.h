@@ -7,7 +7,7 @@
 #include"executinginvitecmd.h"
 #include"mutexlock.h"
 #include"condvar.h"
-//#include"owlog.h"
+#include"redisclient.h"
 
 #include<cassert>
 #include<vector>
@@ -159,8 +159,9 @@ class DownDataRestorer{
 public:
     DownDataRestorer();
 	~DownDataRestorer();
-	
-    int Init(string redis_server_ip, uint16_t redis_server_port, int connection_num);
+
+	int Init(const string& redis_server_ip, uint16_t redis_server_port, int connection_num);
+    int Init(const REDIS_SERVER_LIST& redis_server_list, int connection_num);
     int Uninit();
     int Start();
     int Stop();

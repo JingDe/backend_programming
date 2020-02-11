@@ -1,11 +1,12 @@
+#include "redisconnection.h"
+#include"glog/logging.h"
 #include <sys/types.h>
 #include <unistd.h>
 #include <fcntl.h>
-#include "redisconnection.h"
 
 typedef bool (*ParseFunction)(void *parseBuf, int32_t parseLen, RedisReplyInfo & replyInfo);
 
-RedisConnection::RedisConnection(const string serverIp,uint32_t serverPort,uint32_t timeout):m_logger("clib.redisconnection")
+RedisConnection::RedisConnection(const string serverIp,uint32_t serverPort,uint32_t timeout)//:m_logger("clib.redisconnection")
 {
 	m_serverIp = serverIp;
 	m_serverPort = serverPort;
@@ -28,7 +29,8 @@ bool RedisConnection::connect()
 {
 	if (!m_socket.connect(m_serverIp, m_serverPort))
 	{
-		m_logger.warn("connection:[%p] connect to server:[%s:%u] failed.", this, m_serverIp.c_str(), m_serverPort);
+//		m_logger.warn("connection:[%p] connect to server:[%s:%u] failed.", this, m_serverIp.c_str(), m_serverPort);
+		LOG(ERROR)<<"connection:["<<this<<"] connect to server:["<<m_serverIp<<":"<<m_serverPort<<"] failed.";
 		return false;
 	}
 	m_socket.setSoTimeout(m_timeout);
@@ -46,11 +48,13 @@ bool RedisConnection::doRedisCommand(list < RedisCmdParaInfo > & paraList,int32_
 	checkConnectionStatus();
 	if (m_socket.fd == INVALID_SOCKET_HANDLE)
 	{
-		m_logger.warn("connection:[%p] socket may be closed by peer.", this);
+//		m_logger.warn("connection:[%p] socket may be closed by peer.", this);
+		LOG(ERROR)<<"connection:["<<this<<"] socket may be closed by peer.";
 		//need connect again.
 		if(!connect())
 		{
-			m_logger.warn("connection:[%p] reconnect to server failed.", this);
+//			m_logger.warn("connection:[%p] reconnect to server failed.", this);
+			LOG(ERROR)<<"connection:["<<this<<"] reconnect to server failed.";
 			return false;
 		}
 	}
@@ -59,10 +63,12 @@ bool RedisConnection::doRedisCommand(list < RedisCmdParaInfo > & paraList,int32_
 	memset(commandBuf, 0, paraLen);
 	int32_t cmdLen = 0;
 	createRedisCommand(paraList, &commandBuf, cmdLen);
-	m_logger.debug("connection:[%p] send redis command:[%s] to server:[%s:%u].", this, commandBuf, m_serverIp.c_str(), m_serverPort);
+//	m_logger.debug("connection:[%p] send redis command:[%s] to server:[%s:%u].", this, commandBuf, m_serverIp.c_str(), m_serverPort);
+	LOG(INFO)<<"connection:["<<this<<"] send redis command:["<<commandBuf<<"] to server:["<<m_serverIp<<":"<<m_serverPort<<"].";
 	if(!send(commandBuf, cmdLen))
 	{
-		m_logger.warn("connection:[%p] send command:[%s] to redis:%s:%u failed.", this, commandBuf, m_serverIp.c_str(), m_serverPort);
+//		m_logger.warn("connection:[%p] send command:[%s] to redis:%s:%u failed.", this, commandBuf, m_serverIp.c_str(), m_serverPort);
+		LOG(ERROR)<<"connection:["<<this<<"] send command:["<<commandBuf<<"] to redis:"<<m_serverIp<<":"<<m_serverPort<<" failed.";
 		free(commandBuf);
 		commandBuf = NULL;
 		return false;
@@ -102,7 +108,8 @@ bool RedisConnection::recv(RedisReplyInfo & replyInfo, ReplyParserType parserTyp
 		int32_t recvLen = m_socket.read(recvBuf, REDIS_READ_BUFF_SIZE-1, 3);
 		if (recvLen < 0)
 		{
-			m_logger.warn("connection:[%p] failed to read socket", this);
+//			m_logger.warn("connection:[%p] failed to read socket", this);
+			LOG(ERROR)<<"connection:["<<this<<"] failed to read socket";
 			if (m_unparseBuf != NULL)
 			{
 				free(m_unparseBuf);
@@ -172,7 +179,8 @@ bool RedisConnection::recv(RedisReplyInfo & replyInfo, ReplyParserType parserTyp
 
 bool RedisConnection::parseScanReply(char *parseBuf, int32_t parseLen, RedisReplyInfo & replyInfo)
 {
-	m_logger.debug("parseScanReply, connection:[%p] start to parse redis response:[%s], parseLen:%d.", this, parseBuf, parseLen);
+//	m_logger.debug("parseScanReply, connection:[%p] start to parse redis response:[%s], parseLen:%d.", this, parseBuf, parseLen);
+	LOG(INFO)<<"parseScanReply, connection:["<<this<<"] start to parse redis response:["<<parseBuf<<"], parseLen: "<<parseLen;
 	const char * const end = parseBuf + parseLen;
 	char *p=NULL;
 	char buf[256]; // enough to contain key
@@ -189,17 +197,20 @@ bool RedisConnection::parseScanReply(char *parseBuf, int32_t parseLen, RedisRepl
 				case '-':
 					m_parseState = REDIS_PARSE_RESULT;
 					replyInfo.replyType = RedisReplyType::REDIS_REPLY_ERROR;
-					m_logger.debug("reply ERR");
+//					m_logger.debug("reply ERR");
+					LOG(WARNING)<<"reply ERR";
 					parseBuf++;
 					break;
 				case '*': // assert *2
 					m_parseState = REDIS_PARSE_ARRAYLENGTH;
 					replyInfo.replyType = RedisReplyType::REDIS_REPLY_ARRAY;
-					m_logger.debug("reply ok");
+//					m_logger.debug("reply ok");
+					LOG(INFO)<<"reply ok";
 					parseBuf++;
 					break;
 				default:
-					m_logger.error("parse type error, %c, %s", *parseBuf, parseBuf);
+//					m_logger.error("parse type error, %c, %s", *parseBuf, parseBuf);
+					LOG(ERROR)<<"parse type error, "<<*parseBuf<<", "<<parseBuf;
 					m_valid=true;
 					return false;
 			}
@@ -212,7 +223,8 @@ bool RedisConnection::parseScanReply(char *parseBuf, int32_t parseLen, RedisRepl
 				memset(buf, 0, sizeof(buf));
 				memcpy(buf, parseBuf, p-parseBuf);
 				replyInfo.resultString = buf; // get error msg
-				m_logger.debug("parse get ERR :%s", buf);
+//				m_logger.debug("parse get ERR :%s", buf);
+				LOG(INFO)<<"parse get ERR: "<<buf;
 				m_valid = true;
 				return true;
 			}
@@ -232,14 +244,16 @@ bool RedisConnection::parseScanReply(char *parseBuf, int32_t parseLen, RedisRepl
 				if (arrayNum != 2)
 				{
 					m_valid = true;
-					m_logger.error("array num %d must be 2, buf %s, parseBuf %s", arrayNum, buf, parseBuf);
+//					m_logger.error("array num %d must be 2, buf %s, parseBuf %s", arrayNum, buf, parseBuf);
+					LOG(ERROR)<<"array num "<<arrayNum<<" must be 2, buf "<<buf<<", parseBuf "<<parseBuf;
 					return false;
 				}
 				else
 				{
 					m_parseState=REDIS_PARSE_CURSORLEN;
 					parseBuf = p+2;
-					m_logger.debug("parse arrayNum 2");
+//					m_logger.debug("parse arrayNum 2");
+					LOG(INFO)<<"parse arrayNum 2";
 				}
 			}
 			else
@@ -255,7 +269,8 @@ bool RedisConnection::parseScanReply(char *parseBuf, int32_t parseLen, RedisRepl
 			}
 			else
 			{
-				m_logger.error("parse cursorlen error, %c, parseBuf %s", *parseBuf, parseBuf);
+//				m_logger.error("parse cursorlen error, %c, parseBuf %s", *parseBuf, parseBuf);
+				LOG(ERROR)<<"parse cursorlen error, "<<*parseBuf<<", parseBuf "<<parseBuf;
 				m_valid=true;
 				return false;
 			}
@@ -267,7 +282,8 @@ bool RedisConnection::parseScanReply(char *parseBuf, int32_t parseLen, RedisRepl
 				int cursorlen = atoi(buf);				
 				if (cursorlen <0 )
 				{
-					m_logger.error("reply error, cursorlen is %d, buf %s, parseBuf %s", cursorlen, buf, parseBuf);
+//					m_logger.error("reply error, cursorlen is %d, buf %s, parseBuf %s", cursorlen, buf, parseBuf);
+					LOG(ERROR)<<"reply error, cursorlen is "<<cursorlen<<", buf "<<buf<<", parseBuf "<<parseBuf;
 					m_valid=true;
 					return false;
 				}
@@ -292,7 +308,8 @@ bool RedisConnection::parseScanReply(char *parseBuf, int32_t parseLen, RedisRepl
 				int cursor = atoi(buf);				
 				if (cursor <0 )
 				{
-					m_logger.error("reply error, cursor is %d, buf %s, parseBuf %s", cursor, buf, parseBuf);
+//					m_logger.error("reply error, cursor is %d, buf %s, parseBuf %s", cursor, buf, parseBuf);
+					LOG(ERROR)<<"reply error, cursor is "<<cursor<<", buf "<<buf<<", parseBuf "<<parseBuf;
 					m_valid=true;
 					return false;
 				}
@@ -300,7 +317,8 @@ bool RedisConnection::parseScanReply(char *parseBuf, int32_t parseLen, RedisRepl
 				{
 					m_parseState = REDIS_PARSE_KEYSLEN;
 					replyInfo.intValue=cursor; // get new cursor
-					m_logger.debug("get cursor %d", cursor);
+//					m_logger.debug("get cursor %d", cursor);
+					LOG(INFO)<<"get cursor "<<cursor;
 					parseBuf = p+2;
 				}
 			}
@@ -313,7 +331,8 @@ bool RedisConnection::parseScanReply(char *parseBuf, int32_t parseLen, RedisRepl
 		{
 			if(*parseBuf != '*')
 			{
-				m_logger.error("parse keyslen error, %c, parseBuf %s", *parseBuf, parseBuf);
+//				m_logger.error("parse keyslen error, %c, parseBuf %s", *parseBuf, parseBuf);
+				LOG(ERROR)<<"parse keyslen error, "<<*parseBuf<<", parseBuf %s"<<parseBuf;
 				m_valid=true;
 				return false;
 			}
@@ -326,20 +345,23 @@ bool RedisConnection::parseScanReply(char *parseBuf, int32_t parseLen, RedisRepl
 				m_arrayNum = atoi(buf);				
 				if(m_arrayNum < 0)
 				{
-					m_logger.error("reply error, array num is %d, buf %s, parseBuf %s", m_arrayNum, buf, parseBuf);
+//					m_logger.error("reply error, array num is %d, buf %s, parseBuf %s", m_arrayNum, buf, parseBuf);
+					LOG(ERROR)<<"reply error, array num is "<<m_arrayNum<<", buf "<<buf<<", parseBuf "<<parseBuf;
 					m_valid=true;
 					return false;
 				}
 				else if (m_arrayNum == 0)
 				{
 					m_valid = true;
-					m_logger.debug("empty result, ok");
+//					m_logger.debug("empty result, ok");
+					LOG(INFO)<<"empty result, ok";
 					return true;
 				}
 				else
 				{
 					m_parseState = REDIS_PARSE_KEYLEN;
-					m_logger.debug("prepare to parse %d keys", m_arrayNum);
+//					m_logger.debug("prepare to parse %d keys", m_arrayNum);
+					LOG(INFO)<<"prepare to parse "<<m_arrayNum<<" keys";
 					parseBuf = p+2;
 				}
 			}
@@ -356,7 +378,8 @@ bool RedisConnection::parseScanReply(char *parseBuf, int32_t parseLen, RedisRepl
 			}
 			else
 			{
-				m_logger.error("parse keylen error, %c, parseBuf %s", *parseBuf, parseBuf);
+//				m_logger.error("parse keylen error, %c, parseBuf %s", *parseBuf, parseBuf);
+				LOG(ERROR)<<"parse keyslen error, "<<*parseBuf<<", parseBuf %s"<<parseBuf;
 				m_valid=true;
 				return false;
 			}
@@ -368,13 +391,15 @@ bool RedisConnection::parseScanReply(char *parseBuf, int32_t parseLen, RedisRepl
 				int keylen = atoi(buf); // TODO save keylen in m_arrayLen				
 				if (keylen <0 )
 				{
-					m_logger.error("reply error, keylen is %d, buf %s, parseBuf %s", keylen, buf, parseBuf);
+//					m_logger.error("reply error, keylen is %d, buf %s, parseBuf %s", keylen, buf, parseBuf);
+					LOG(ERROR)<<"reply error, keylen is "<<keylen<<", buf "<<buf<<", parseBuf "<<parseBuf;
 					m_valid=true;
 					return false;
 				}
 				else
 				{
-					m_logger.debug("get keylen %d", keylen);
+//					m_logger.debug("get keylen %d", keylen);
+					LOG(ERROR)<<"get keylen "<<keylen;
 					m_parseState = REDIS_PARSE_KEY;
 					parseBuf = p+2;
 				}
@@ -405,11 +430,13 @@ bool RedisConnection::parseScanReply(char *parseBuf, int32_t parseLen, RedisRepl
 				{
 					m_parseState = REDIS_PARSE_KEYLEN;
 					parseBuf += keylen+2; // parseBuf = p+2;
-					m_logger.debug("done %d, sum %d", m_doneNum, m_arrayNum);
+//					m_logger.debug("done %d, sum %d", m_doneNum, m_arrayNum);
+					LOG(ERROR)<<"done "<<m_doneNum<<", sum "<<m_arrayNum;
 				}
 				else
 				{
-					m_logger.debug("get all %d keys ok", m_arrayNum);
+//					m_logger.debug("get all %d keys ok", m_arrayNum);
+					LOG(INFO)<<"get all "<<m_arrayNum<<" keys ok";
 					m_valid=true;
 					return true;
 				}
@@ -421,7 +448,8 @@ bool RedisConnection::parseScanReply(char *parseBuf, int32_t parseLen, RedisRepl
 		}
 		else
 		{
-			m_logger.error("unknown parse state %d", m_parseState);
+//			m_logger.error("unknown parse state %d", m_parseState);
+			LOG(ERROR)<<"unknown parse state "<<m_parseState;
 			m_valid=true;
 			return false;
 		}
@@ -443,7 +471,8 @@ check_buf:
 
 bool RedisConnection::parse(char * parseBuf,int32_t parseLen,RedisReplyInfo & replyInfo)
 {
-	m_logger.debug("connection:[%p] start to parse redis response:[%s], parseLen:%d.", this, parseBuf, parseLen);
+//	m_logger.debug("connection:[%p] start to parse redis response:[%s], parseLen:%d.", this, parseBuf, parseLen);
+	LOG(INFO)<<"connection:["<<this<<"] start to parse redis response:["<<parseBuf<<"], parseLen: "<<parseLen;
 	const char * const end = parseBuf + parseLen;
 	char *p = NULL;
 	if (m_parseState == REDIS_PARSE_UNKNOWN_STATE && parseBuf != NULL)
@@ -483,7 +512,8 @@ bool RedisConnection::parse(char * parseBuf,int32_t parseLen,RedisReplyInfo & re
 							break;
 						default:
 							replyInfo.replyType = RedisReplyType::REDIS_REPLY_UNKNOWN;
-							m_logger.warn("recv unknown type redis response.");
+//							m_logger.warn("recv unknown type redis response.");
+							LOG(ERROR)<<"recv unknown type redis response.";
 							return false;
 
 					}
@@ -704,7 +734,8 @@ void RedisConnection::checkConnectionStatus()
 		int nRead = ::read(m_socket.fd, buf, sizeof(buf));
 		if (nRead == 0) 
 		{
-			m_logger.debug("connection:[%p] the connection to %s:%d has been closed by peer before", this, m_socket.m_connectToHost.c_str(), m_socket.m_connectToPort);
+//			m_logger.debug("connection:[%p] the connection to %s:%d has been closed by peer before", this, m_socket.m_connectToHost.c_str(), m_socket.m_connectToPort);
+			LOG(INFO)<<"connection:["<<this<<"] the connection to "<<m_socket.m_connectToHost<<":"<<m_socket.m_connectToPort<<" has been closed by peer before";
 			m_socket.close();
 		}
 		fcntl(m_socket.fd, F_SETFL, flags);

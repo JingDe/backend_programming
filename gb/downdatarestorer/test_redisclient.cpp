@@ -3,7 +3,7 @@
 #include"device.h"
 #include"glog/logging.h"
 #include"glog/raw_logging.h"
-#include"owlog.h"
+//#include"owlog.h"
 #include<string>
 #include<list>
 #include<iostream>
@@ -73,6 +73,55 @@ bool TestTransactionSetAdd()
 
     return true;
 }
+
+bool TestDelTransactionInCluster()
+{
+	RedisClient client;
+    LOG(INFO)<<"construct RedisClient ok";
+
+	RedisServerInfo server0("192.168.12.59", 7000);
+	RedisServerInfo server1("192.168.12.59", 7001);
+	RedisServerInfo server2("192.168.12.59", 7002);
+	RedisServerInfo server3("192.168.12.59", 7003);
+	RedisServerInfo server4("192.168.12.59", 7004);
+	RedisServerInfo server5("192.168.12.59", 7005);
+	REDIS_SERVER_LIST servers({server0, server1, server2, server3, server4, server5});
+	uint32_t conn_num=8;
+//	uint32_t keepalive_time=-1;
+	if(client.init(servers, conn_num/*, keepalive_time*/)==false)
+	{
+		LOG(ERROR)<<"client init failed";
+		return false;
+	}
+
+	RedisConnection *con=NULL;
+	do{
+	    if(!client.PrepareTransaction(&con))
+	    	break;
+	    	
+	    if(!client.StartTransaction(con))
+	    	break;
+	    if(!client.Srem(con, "testset", "member1"))
+	    	break;
+	    if(!client.Del(con, "member1"))
+	    	break;
+	    if(!client.ExecTransaction(con))
+	    	break;
+	    	
+	    client.FinishTransaction(&con);
+	    LOG(INFO)<<"transaction success";
+	    		    
+    }while(0);
+
+    if(con)
+    {
+    	LOG(ERROR)<<"transaction failed";
+    	client.FinishTransaction(&con);
+    }
+
+    return true;
+}
+
 
 bool TestTransactionSetDel()
 {
@@ -419,16 +468,18 @@ int main(int argc, char** argv)
         printf("log config filename %s\n", log_config_filename.c_str());
     }
 
-    OWLog::config(log_config_filename);
+//    OWLog::config(log_config_filename);
 
 //	TestTransactionSetAdd();
 //	TestTransactionSetDel();
 
-	printf("********************\n");
-    TestDownDataRestorerDevice();
-    
-	printf("********************\n");
-    TestDownDataRestorerExecutingInviteCmd();
+//	printf("********************\n");
+//    TestDownDataRestorerDevice();
+//    
+//	printf("********************\n");
+//    TestDownDataRestorerExecutingInviteCmd();
+
+	TestDelTransactionInCluster();
     
     return 0;
 }

@@ -1,5 +1,5 @@
 #include "dbstream.h"
-
+#include"glog/logging.h"
 
 void DBOutStream::save(void *p, int size)
 {
@@ -9,7 +9,8 @@ void DBOutStream::save(void *p, int size)
 		char *newBuf = new char[m_capacity];
 		if (newBuf == NULL) {
 			//fprintf(stderr,"failed to new memory in DBOutStream::checkCapacity");
-			m_logger.warn("failed to new memory in DBOutStream::checkCapacity");
+//			m_logger.warn("failed to new memory in DBOutStream::checkCapacity");
+			LOG(ERROR)<<"failed to new memory in DBOutStream::checkCapacity";
 			return;
 		}
 		memset(newBuf, 0, m_capacity);
@@ -119,7 +120,8 @@ void DBInStream::load(void *p, int size)
 {
 	if ( m_cursor + size > m_data + m_datalen ) {
 		//fprintf(stderr,"can't load data from db! Did developer change db fields format?");
-		m_logger.warn("can't load data from db! Did developer change db fields format?");
+//		m_logger.warn("can't load data from db! Did developer change db fields format?");
+		LOG(ERROR)<<"can't load data from db! Did developer change db fields format?";
 		m_loadError = 1;
 		return;
 	}

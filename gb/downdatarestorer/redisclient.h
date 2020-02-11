@@ -153,7 +153,7 @@ public:
 
 	RedisClient();
 	~RedisClient();
-	bool init(REDIS_SERVER_LIST& serverList, uint32_t connectionNum, uint32_t keepaliveTime);
+	bool init(const REDIS_SERVER_LIST& serverList, uint32_t connectionNum, uint32_t keepaliveTime=-1);
     bool freeRedisClient();
 //    void checkState();
 	bool getSerial(const string& key, DBSerialize &serial);
@@ -277,7 +277,7 @@ private:
 	uint32_t  m_keepaliveTime;
 	REDIS_SLOT_MAP m_slotMap;
 	map<string, RedisCluster*> m_unusedHandlers;
-	OWLog	m_logger;
+//	OWLog	m_logger;
 	RWMutex	m_rwClusterMutex;
 //	RWMutex m_rwProxyMutex;
 	RWMutex	m_rwSlotMutex;

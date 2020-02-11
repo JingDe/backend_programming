@@ -10,7 +10,7 @@
 #include <bitset>
 #include <string.h>
 //#include "compile.h"
-#include "owlog.h"
+//#include "owlog.h"
 
 using namespace std;
 
@@ -21,7 +21,8 @@ typedef list<string> StrList; //wyb modify
 class DBOutStream 
 {
 public:
-	DBOutStream():m_logger("clib.dbstream.out") {
+	DBOutStream()/*:m_logger("clib.dbstream.out") */
+	{
 		m_capacity = MAX_BLOCK_SIZE;
 		m_data = new char[m_capacity];
 		memset(m_data, 0, m_capacity);
@@ -60,7 +61,7 @@ private:
 	char *m_data;
 	char *m_cursor;
 	int m_capacity;
-	OWLog	m_logger;
+//	OWLog	m_logger;
 
 };
 
@@ -68,7 +69,8 @@ private:
 class DBInStream 
 {
 public:
-	DBInStream(void *d, int n):m_logger("clib.dbstream.in") {
+	DBInStream(void *d, int n)/*:m_logger("clib.dbstream.in") */
+	{
 		m_cursor = m_data = (char *) d;
 		m_datalen = n;
 		m_loadError = 0;
@@ -98,7 +100,7 @@ private:
 	char *m_data;
 	char *m_cursor;
 	int m_datalen;
-	OWLog	m_logger;
+//	OWLog	m_logger;
 };
 
 

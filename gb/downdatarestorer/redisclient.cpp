@@ -6,7 +6,7 @@
 #include<cassert>
 
 
-RedisClient::RedisClient():m_logger("cdn.common.redisclient")
+RedisClient::RedisClient()//:m_logger("cdn.common.redisclient")
 {
 	m_clusterMap.clear();
 	m_serverList.clear();
@@ -47,7 +47,7 @@ bool RedisClient::freeRedisClient()
     return true;
 }
 
-bool RedisClient::init(REDIS_SERVER_LIST& serverList,uint32_t connectionNum,uint32_t keepaliveTime)
+bool RedisClient::init(const REDIS_SERVER_LIST& serverList,uint32_t connectionNum,uint32_t keepaliveTime)
 {
     if(m_connected==true)
     {
@@ -324,7 +324,8 @@ bool RedisClient::setSerialWithLock(const string & key, const DBSerialize& seria
 	freeCommandList(execParaList);
 	if (!success)
 	{
-		m_logger.warn("update data error,key[%s]",key.c_str());
+//		m_logger.warn("update data error,key[%s]",key.c_str());
+		LOG(ERROR)<<"update data error,key["<<key<<"]";
         return false;
 	}
 	return success;
