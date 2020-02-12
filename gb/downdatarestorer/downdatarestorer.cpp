@@ -15,7 +15,7 @@ DownDataRestorer::DownDataRestorer()
 	inited_(false),
 	started_(false),
     force_thread_exit_(false),
-	data_restorer_threads_num_(0),
+	data_restorer_background_threads_num_(0),
 	data_restorer_threads_(),
 	data_restorer_threads_exit_latch(NULL),
 	device_mgr_(NULL),
@@ -24,7 +24,8 @@ DownDataRestorer::DownDataRestorer()
 	operations_queue_mutex_(),
 	operations_queue_not_empty_condvar(&operations_queue_mutex_),
 	operations_queue_(),
-	worker_thread_num_(8)
+	worker_thread_num_(0),
+	redis_mode_(STAND_ALONE)
 {
 //	google::InitGoogleLogging("downdatarestorer");
 //	FLAGS_logtostderr=false;
@@ -53,17 +54,23 @@ DownDataRestorer::~DownDataRestorer()
 //	google::ShutdownGoogleLogging();	
 }
 
-int DownDataRestorer::Init(const string& redis_server_ip, uint16_t redis_server_port, int connection_num)
+int DownDataRestorer::Init(const string& redis_server_ip, uint16_t redis_server_port, int worker_thread_num)
 {
-	LOG(INFO)<<"DownDataRestorer init now, redis ip "<<redis_server_ip<<", redis port "<<redis_server_port<<", connection num "<<connection_num;
+	if(inited_)
+	{
+		LOG(WARNING)<<"init called repeatedly";
+		return DDR_FAIL;
+	}
+	
+	LOG(INFO)<<"DownDataRestorer init now, redis ip "<<redis_server_ip<<", redis port "<<redis_server_port<<", worker_thread num "<<worker_thread_num;
 	RedisServerInfo redis_server(redis_server_ip, redis_server_port);
 	REDIS_SERVER_LIST redis_server_list({redis_server});
 
-	return Init(redis_server_list, connection_num);
+	return Init(redis_server_list, worker_thread_num);
 }
 
 
-int DownDataRestorer::Init(const REDIS_SERVER_LIST& redis_server_list, int connection_num)
+int DownDataRestorer::Init(const REDIS_SERVER_LIST& redis_server_list, int worker_thread_num)
 {
 	if(inited_)
 	{
@@ -71,7 +78,19 @@ int DownDataRestorer::Init(const REDIS_SERVER_LIST& redis_server_list, int conne
 		return DDR_FAIL;
 	}
 
-//	data_restorer_threads_num_=connection_num;
+	worker_thread_num_=worker_thread_num;
+	
+	if(redis_server_list.size()==1)
+	{
+		redis_mode_=STAND_ALONE;
+	}
+	else
+	{
+		redis_mode_=CLUSTER;
+	}
+	LOG_IF(INFO, redis_mode_==STAND_ALONE)<<"redis mode is STAND_ALONE";
+	LOG_IF(INFO, redis_mode_==CLUSTER)<<"redis mode is CLUSTER";
+	LOG_IF(INFO, redis_mode_==SENTINEL)<<"redis mode is SENTINEL";
 
 	redis_client_=new RedisClient();
 	if(redis_client_==NULL)
@@ -80,12 +99,19 @@ int DownDataRestorer::Init(const REDIS_SERVER_LIST& redis_server_list, int conne
 		return DDR_FAIL;
 	}
 
+	// connection_num RedisConnection, for worker_thread_num workers AND 1 background_thread
+	data_restorer_background_threads_num_=1; 
+	int connection_num=worker_thread_num_+data_restorer_background_threads_num_;
+	LOG(INFO)<<"background_restorer_thread num is "<<data_restorer_background_threads_num_;
+	LOG(INFO)<<"worker_thead num is "<<worker_thread_num_;
+	LOG(INFO)<<"redis_connection num is "<<connection_num;
 //	uint32_t keepalive_time_secs=86400;
 	if(redis_client_->init(redis_server_list, connection_num/*, keepalive_time_secs*/)==false)
 	{
 		LOG(ERROR)<<"init RedisClient failed";
 		return -1;
 	}
+	
 	inited_=true;
 	return DDR_OK;
 }
@@ -117,11 +143,11 @@ int DownDataRestorer::Start()
 	}
 	LOG(INFO)<<"DownDataRestorer Start now";
 
-	data_restorer_threads_num_=1;
-	data_restorer_threads_.reserve(data_restorer_threads_num_);
+	
+	data_restorer_threads_.reserve(data_restorer_background_threads_num_);
 	int ret=0;
 	pthread_t thread_id;
-	for(int i=0; i<data_restorer_threads_num_; i++)
+	for(int i=0; i<data_restorer_background_threads_num_; i++)
 	{		
 		ret=pthread_create(&thread_id, NULL, DataRestorerThreadFuncWrapper, this);
 		if(ret!=0)
@@ -147,11 +173,9 @@ int DownDataRestorer::Start()
 		return DDR_FAIL;
 	}
 
-	device_mgr_=new DeviceMgr(redis_client_);
-	channel_mgr_=new ChannelMgr(redis_client_);
-	// TODO
-	int worker_thread_num=GetWorkerThreadNum();
-	executing_invite_cmd_mgr_=new ExecutingInviteCmdMgr(redis_client_, worker_thread_num);
+	device_mgr_=new DeviceMgr(redis_client_, redis_mode_);
+	channel_mgr_=new ChannelMgr(redis_client_, redis_mode_);
+	executing_invite_cmd_mgr_=new ExecutingInviteCmdMgr(redis_client_, redis_mode_, worker_thread_num_);
 	if(!device_mgr_  ||  !channel_mgr_  ||  !executing_invite_cmd_mgr_)
 	{
 		return DDR_FAIL;
@@ -161,11 +185,10 @@ int DownDataRestorer::Start()
 	return DDR_OK;
 }
 
-// TODO
-void DownDataRestorer::SetWorkerThreadNum(int num)
-{
-	worker_thread_num_=num;
-}
+//void DownDataRestorer::SetWorkerThreadNum(int num)
+//{
+//	worker_thread_num_=num;
+//}
 
 int DownDataRestorer::GetWorkerThreadNum()
 {
@@ -392,14 +415,65 @@ int DownDataRestorer::UpdateDeviceList(const list<Device>& devices)
 	return DDR_OK;
 }
 
-/*
-int LoadChannelList(list<Channel>& channels);
-int SelectChannelList(Channel& channel);
-int InsertChannelList(const Channel& channel);
-int DeleteChannelList(const Channel& channel);
-int ClearChannelList();
-int UpdateChannelList(const list<Channel>& channels);
-*/
+int DownDataRestorer::LoadChannelList(list<Channel>& channels)
+{
+    assert(started_);
+    channel_mgr_->LoadChannels(channels);
+    return DDR_OK;
+}
+
+int DownDataRestorer::SelectChannelList(const string& channel_id, Channel& channel)
+{
+    assert(started_);
+    if(channel_mgr_->SearchChannel(channel_id, channel)<0)
+        return DDR_FAIL;
+    return DDR_OK;
+}
+
+int DownDataRestorer::InsertChannelList(const Channel& channel)
+{
+    assert(started_);
+    MutexLockGuard guard(&operations_queue_mutex_);
+    DataRestorerOperation operation(DataRestorerOperation::INSERT, DataRestorerOperation::CHANNEL, const_cast<Channel*>(&channel), -1);
+    operations_queue_.push(operation);
+    operations_queue_not_empty_condvar.SignalAll();
+    return DDR_OK;
+}
+
+int DownDataRestorer::DeleteChannelList(const Channel& channel)
+{
+    assert(started_);
+    MutexLockGuard guard(&operations_queue_mutex_);
+    DataRestorerOperation operation(DataRestorerOperation::DELETE, DataRestorerOperation::CHANNEL, const_cast<Channel*>(&channel), -1);
+    operations_queue_.push(operation);
+    operations_queue_not_empty_condvar.SignalAll();
+    return DDR_OK;
+}
+
+int DownDataRestorer::ClearChannelList()
+{
+    assert(started_);
+    MutexLockGuard guard(&operations_queue_mutex_);
+    DataRestorerOperation operation(DataRestorerOperation::CLEAR, DataRestorerOperation::CHANNEL, NULL, -1);
+    operations_queue_.push(operation);
+    operations_queue_not_empty_condvar.SignalAll();
+    return DDR_OK;
+}
+
+int DownDataRestorer::UpdateChannelList(const list<Channel>& channels)
+{
+    assert(started_);
+    MutexLockGuard guard(&operations_queue_mutex_);
+    list<void*> channel_list;
+    for(list<Channel>::const_iterator it=channels.begin(); it!=channels.end(); ++it)
+    {
+        channel_list.push_back(const_cast<Channel*>(&(*it)));
+    }
+    DataRestorerOperation operation(DataRestorerOperation::UPDATE, DataRestorerOperation::CHANNEL, channel_list, -1);
+    operations_queue_.push(operation);
+    operations_queue_not_empty_condvar.SignalAll();
+    return DDR_OK;
+}
 
 int DownDataRestorer::LoadExecutingInviteCmdList(vector<ExecutingInviteCmdList>& executing_invite_cmd_lists)
 {

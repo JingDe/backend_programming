@@ -6,8 +6,9 @@
 const string ChannelMgr::s_set_key="channelset";
 const string ChannelMgr::s_key_prefix="channelset";
 
-ChannelMgr::ChannelMgr(RedisClient* redis_client)
+ChannelMgr::ChannelMgr(RedisClient* redis_client, RedisMode redis_mode)
 	:redis_client_(redis_client),
+	redis_mode_(redis_mode),
 	rwmutex_()
 //	modify_mutex_()
 {
@@ -46,6 +47,39 @@ int ChannelMgr::SearchChannel(const string& channel_id, Channel& channel)
 
 int ChannelMgr::InsertChannel(const Channel& channel)
 {
+	if(redis_mode_==STAND_ALONE)
+		return InsertChannelInTransaction(channel);
+	else //if(redis_mode_==CLUSTER)
+		return InsertChannelInCluster(channel);
+}
+
+
+int ChannelMgr::InsertChannelInCluster(const Channel& channel)
+{
+//	MutexLockGuard guard(&modify_mutex_);
+	WriteGuard guard(rwmutex_);
+
+	if(redis_client_->setSerial(s_key_prefix+channel.GetChannelId(), channel)==false)
+	{
+		return -1;
+	}
+	
+	if(redis_client_->sadd(s_set_key, channel.GetChannelId())==true)
+	{
+		return 0;
+	}
+	else
+	{
+		if(redis_client_->del(s_key_prefix+channel.GetChannelId())==false)
+		{
+			LOG(ERROR)<<"insert channel"<<channel.GetChannelId()<<" failed, undo set failed";
+		}
+		return -1;
+	}
+}
+
+int ChannelMgr::InsertChannelInTransaction(const Channel& channel)
+{
 //	MutexLockGuard guard(&modify_mutex_);
 	WriteGuard guard(rwmutex_);
 	
@@ -60,12 +94,12 @@ int ChannelMgr::InsertChannel(const Channel& channel)
 	    LOG(ERROR)<<"StartTransaction failed";
     	goto FAIL;
     }
-    if(!redis_client_->Set(con, s_key_prefix+channel.GetId(), channel))
+    if(!redis_client_->Set(con, s_key_prefix+channel.GetChannelId(), channel))
     {
 	    LOG(ERROR)<<"Set failed";
     	goto FAIL;
     }
-    if(!redis_client_->Sadd(con, s_set_key, channel.GetId()))
+    if(!redis_client_->Sadd(con, s_set_key, channel.GetChannelId()))
     {
 	    LOG(ERROR)<<"Sadd failed";
     	goto FAIL;
@@ -77,7 +111,7 @@ int ChannelMgr::InsertChannel(const Channel& channel)
     }
             
     redis_client_->FinishTransaction(&con);
-    LOG(INFO)<<"InsertChannel success: "<<channel.GetId();
+    LOG(INFO)<<"InsertChannel success: "<<channel.GetChannelId();
 	return 0;
 
 FAIL:
@@ -85,11 +119,42 @@ FAIL:
     {                                                                            
         redis_client_->FinishTransaction(&con);
     }
-    LOG(ERROR)<<"InsertChannel failed: "<<channel.GetId();
+    LOG(ERROR)<<"InsertChannel failed: "<<channel.GetChannelId();
     return -1;
 }
 
 int ChannelMgr::DeleteChannel(const Channel& channel)
+{
+	if(redis_mode_==STAND_ALONE)
+		return DeleteChannelInTransaction(channel);
+	else //if(redis_mode_==CLUSTER)
+		return DeleteChannelInCluster(channel);
+}
+
+int ChannelMgr::DeleteChannelInCluster(const Channel& channel)
+{
+//	MutexLockGuard guard(&modify_mutex_);
+	WriteGuard guard(rwmutex_);
+
+	if(redis_client_->del(s_key_prefix+channel.GetChannelId())==false)
+		return -1;
+	
+	if(redis_client_->srem(s_set_key, channel.GetChannelId())==true)
+	{
+		LOG(INFO)<<"delete device "<<channel.GetChannelId()<<" ok";
+		return 0;
+	}
+	else
+	{
+		if(redis_client_->setSerial(s_key_prefix+channel.GetChannelId(), channel)==false)
+		{
+			LOG(ERROR)<<"delete channel"<<channel.GetChannelId()<<" failed, undo del failed";
+		}
+		return -1;
+	}
+}
+
+int ChannelMgr::DeleteChannelInTransaction(const Channel& channel)
 {
 //	MutexLockGuard guard(&modify_mutex_);
 	WriteGuard guard(rwmutex_);
@@ -105,12 +170,12 @@ int ChannelMgr::DeleteChannel(const Channel& channel)
 	    LOG(ERROR)<<"StartTransaction failed";
     	goto FAIL;
     }
-    if(!redis_client_->Del(con, s_key_prefix+channel.GetId()))
+    if(!redis_client_->Del(con, s_key_prefix+channel.GetChannelId()))
     {
 	    LOG(ERROR)<<"Del failed";
     	goto FAIL;
     }
-    if(!redis_client_->Srem(con, s_set_key, channel.GetId()))
+    if(!redis_client_->Srem(con, s_set_key, channel.GetChannelId()))
     {
 	    LOG(ERROR)<<"Srem failed";
     	goto FAIL;
@@ -122,7 +187,7 @@ int ChannelMgr::DeleteChannel(const Channel& channel)
     }
             
     redis_client_->FinishTransaction(&con);
-    LOG(INFO)<<"DeleteChannel success: "<<channel.GetId();
+    LOG(INFO)<<"DeleteChannel success: "<<channel.GetChannelId();
 	return 0;
 
 FAIL:
@@ -130,7 +195,7 @@ FAIL:
     {                                                                            
         redis_client_->FinishTransaction(&con);
     }
-    LOG(ERROR)<<"DeleteChannel failed: "<<channel.GetId();
+    LOG(ERROR)<<"DeleteChannel failed: "<<channel.GetChannelId();
     return -1;
 }
 
@@ -139,6 +204,11 @@ int ChannelMgr::ClearChannels()
 //	MutexLockGuard guard(&modify_mutex_);
 	WriteGuard guard(rwmutex_);
 	
+	return ClearChannelsWithLockHeld();
+}
+
+int ChannelMgr::ClearChannelsWithLockHeld()
+{	
 	list<string> channel_id_list;
 	redis_client_->smembers(s_set_key, channel_id_list);
 	redis_client_->del(s_set_key);
@@ -153,11 +223,13 @@ int ChannelMgr::UpdateChannels(const list<Channel>& channels)
 {
 //	MutexLockGuard guard(&modify_mutex_);
 	WriteGuard guard(rwmutex_);
+
+	ClearChannelsWithLockHeld();
 	
 	for(list<Channel>::const_iterator it=channels.begin(); it!=channels.end(); ++it)
 	{
-		redis_client_->sadd(s_set_key, it->GetId());
-		redis_client_->setSerial(s_key_prefix+it->GetId(), *it);
+		redis_client_->sadd(s_set_key, it->GetChannelId());
+		redis_client_->setSerial(s_key_prefix+it->GetChannelId(), *it);
 	}
     return 0;
 }
@@ -166,12 +238,14 @@ int ChannelMgr::UpdateChannels(const list<void*>& channels)
 {
 //	MutexLockGuard guard(&modify_mutex_);
 	WriteGuard guard(rwmutex_);
+
+	ClearChannelsWithLockHeld();
 	
 	for(list<void*>::const_iterator it=channels.begin(); it!=channels.end(); ++it)
 	{
 		Channel* channel=(Channel*)(*it);
-		redis_client_->sadd(s_set_key, channel->GetId());
-		redis_client_->setSerial(s_key_prefix+channel->GetId(), *channel);
+		redis_client_->sadd(s_set_key, channel->GetChannelId());
+		redis_client_->setSerial(s_key_prefix+channel->GetChannelId(), *channel);
 	}
     return 0;
 }

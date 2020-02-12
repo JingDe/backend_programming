@@ -56,7 +56,7 @@ void Timer::svc() {
 			}
 //			int64_t executeTime = System::currentTimeMillis() - start; // ms
 			int64_t executeTime = time(NULL) - start; // s
-			int64_t intervalMillis = m_intervalSeconds*1000; // s
+//			int64_t intervalMillis = m_intervalSeconds*1000; // ms
 			
 			if(executeTime > m_intervalSeconds/*intervalMillis*/){
 				m_logger.warn("timer executed too slow, m_intervalSeconds is %llu, but use time:%llu ms", m_intervalSeconds, executeTime);

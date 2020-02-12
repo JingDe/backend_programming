@@ -168,12 +168,12 @@ bool TestTransactionSetDel()
 
 void print(const list<Device>& devices)
 {
-	printf("print devices: [%d]\n", (int)devices.size());
+	LOG(INFO)<<"print devices: ["<<devices.size()<<"]";
 	for(list<Device>::const_iterator it=devices.begin(); it!=devices.end(); ++it)
 	{
-		printf("deviceId=%s, ", it->GetDeviceId().c_str());
+		LOG(INFO)<<"deviceId="<<it->GetDeviceId()<<",";
 	}
-	printf("\n");
+	LOG(INFO)<<"";
 }
 
 void ShowDevices(DownDataRestorer& ddr)
@@ -185,14 +185,28 @@ void ShowDevices(DownDataRestorer& ddr)
 
 void TestDownDataRestorerDevice()
 {
-    OWLog logger("common.test");
 	DownDataRestorer ddr;
+#if 0
 	ddr.Init(redis_ip, redis_port, 8);
+#else
+	RedisServerInfo server0("192.168.12.59", 7000);
+	RedisServerInfo server1("192.168.12.59", 7001);
+	RedisServerInfo server2("192.168.12.59", 7002);
+	RedisServerInfo server3("192.168.12.59", 7003);
+	RedisServerInfo server4("192.168.12.59", 7004);
+	RedisServerInfo server5("192.168.12.59", 7005);
+	REDIS_SERVER_LIST servers({server0, server1, server2, server3, server4, server5});
+	ddr.Init(servers, 8);
+#endif
+	if(ddr.Inited()==false)
+		return;
+		
 	ddr.Start();
 
+	LOG(INFO)<<"TestDownDataRestorerDevice start";
+	
 	int device_count=ddr.GetDeviceCount();
-	logger.debug("devices size: %d", device_count);
-	std::cout<<"devices size: "<<device_count<<std::endl;
+	LOG(INFO)<<"devices size: "<<device_count;
 
 	Device device1("device_id_1");
 	ddr.InsertDeviceList(device1);
@@ -200,21 +214,20 @@ void TestDownDataRestorerDevice()
 	sleep(3);
 	
 	device_count=ddr.GetDeviceCount();
-	logger.debug("after insert, devices size: %d", device_count);
-	std::cout<<"after insert, devices size: "<<device_count<<std::endl;
+	LOG(INFO)<<"after insert, devices size: "<<device_count;
 
-	printf("after insert, before search, to check redis-cli\n");
+	LOG(INFO)<<"after insert, before search, to check redis-cli";
 //	getchar();
 	//getc(stdin);
 
 	Device device;
 	if(ddr.SelectDeviceList("device_id_1", device)==DDR_OK)
 	{
-		printf("search device_id_1 success\n");
+		LOG(INFO)<<"search device_id_1 success";
 	}
 	else
 	{
-		printf("search device_id_1 failed\n");
+		LOG(INFO)<<"search device_id_1 failed";
 	}
 //	getchar();
 
@@ -229,29 +242,134 @@ void TestDownDataRestorerDevice()
 	
 	ShowDevices(ddr);
 
+	LOG(INFO)<<"to delete device1";
 	ddr.DeleteDeviceList(device1);
 
 	sleep(3);
 	ShowDevices(ddr);
 
+	LOG(INFO)<<"to clear";
 	ddr.ClearDeviceList();
 	sleep(3);
 	
 	device_count=ddr.GetDeviceCount();
-	logger.debug("after clear, devices size: %d", device_count);
-	std::cout<<"after clear, devices size: "<<device_count<<std::endl;
+	LOG(INFO)<<"after clear, devices size: "<<device_count;
 	ShowDevices(ddr);
 
+	LOG(INFO)<<"to update";
 	list<Device> devices({device1, device3});
 	ddr.UpdateDeviceList(devices);
 
 	sleep(3);
-	printf("after update\n");
+	LOG(INFO)<<"after update";
 	ShowDevices(ddr);
 
 	ddr.Stop();
 	ddr.Uninit();
 }
+
+void print(const list<Channel>& channels)
+{
+	LOG(INFO)<<"print channels: ["<<channels.size()<<"]";
+	for(list<Channel>::const_iterator it=channels.begin(); it!=channels.end(); ++it)
+	{
+		LOG(INFO)<<"channelId="<<it->GetChannelId()<<",";
+	}
+	LOG(INFO)<<"";
+}
+
+void ShowChannels(DownDataRestorer& ddr)
+{
+	list<Channel> channels;
+	ddr.LoadChannelList(channels);
+	print(channels);
+}
+
+void TestDownDataRestorerChannel()
+{
+	DownDataRestorer ddr;
+#if 0
+	ddr.Init(redis_ip, redis_port, 8);
+#else
+	RedisServerInfo server0("192.168.12.59", 7000);
+	RedisServerInfo server1("192.168.12.59", 7001);
+	RedisServerInfo server2("192.168.12.59", 7002);
+	RedisServerInfo server3("192.168.12.59", 7003);
+	RedisServerInfo server4("192.168.12.59", 7004);
+	RedisServerInfo server5("192.168.12.59", 7005);
+	REDIS_SERVER_LIST servers({server0, server1, server2, server3, server4, server5});
+	ddr.Init(servers, 8);
+#endif
+	if(ddr.Inited()==false)
+		return;
+		
+	ddr.Start();
+
+	LOG(INFO)<<"TestDownDataRestorerChannel start";
+	
+	int channel_count=ddr.GetChannelCount();
+	LOG(INFO)<<"channels size: "<<channel_count;
+
+	Channel channel1("channel_id_1", "channel_id_1");
+	ddr.InsertChannelList(channel1);
+
+	sleep(3);
+	
+	channel_count=ddr.GetChannelCount();
+	LOG(INFO)<<"after insert, channels size: "<<channel_count;
+
+	LOG(INFO)<<"after insert, before search, to check redis-cli";
+//	getchar();
+	//getc(stdin);
+
+	Channel channel;
+	if(ddr.SelectChannelList("channel_id_1channel_id_1", channel)==DDR_OK)
+	{
+		LOG(INFO)<<"search channel_id_1 success";
+	}
+	else
+	{
+		LOG(INFO)<<"search channel_id_1 failed";
+	}
+//	getchar();
+
+	Channel channel2("channel_id_2", "channel_id_2");
+	ddr.InsertChannelList(channel2);
+
+	Channel channel3("channel_id_3", "channel_id_3");
+	ddr.InsertChannelList(channel3);
+
+	Channel channel4("channel_id_4", "channel_id_4");
+	ddr.InsertChannelList(channel4);
+	
+	ShowChannels(ddr);
+
+	LOG(INFO)<<"to delete channel1";
+	ddr.DeleteChannelList(channel1);
+
+	sleep(3);
+	ShowChannels(ddr);
+
+	LOG(INFO)<<"to clear";
+	ddr.ClearChannelList();
+	sleep(3);
+	
+	channel_count=ddr.GetChannelCount();
+	LOG(INFO)<<"after clear, channels size: "<<channel_count;
+	ShowChannels(ddr);
+
+	LOG(INFO)<<"to update";
+	list<Channel> channels({channel1, channel3});
+	ddr.UpdateChannelList(channels);
+
+	sleep(3);
+	LOG(INFO)<<"after update";
+	ShowChannels(ddr);
+
+	ddr.Stop();
+	ddr.Uninit();
+}
+
 
 void PrintCmdList(const ExecutingInviteCmdList& cmdlist, int set_no)
 {
@@ -367,14 +485,28 @@ void* WorkerThread1Func(void* arg)
 void TestDownDataRestorerExecutingInviteCmd()
 {
 	DownDataRestorer ddr;
-	ddr.SetWorkerThreadNum(2);
-	ddr.Init(redis_ip, redis_port, 2);
-	ddr.Start();
+	
+#if 0
+	ddr.Init(redis_ip, redis_port, 8);
+#else
+	RedisServerInfo server0("192.168.12.59", 7000);
+	RedisServerInfo server1("192.168.12.59", 7001);
+	RedisServerInfo server2("192.168.12.59", 7002);
+	RedisServerInfo server3("192.168.12.59", 7003);
+	RedisServerInfo server4("192.168.12.59", 7004);
+	RedisServerInfo server5("192.168.12.59", 7005);
+	REDIS_SERVER_LIST servers({server0, server1, server2, server3, server4, server5});
+	ddr.Init(servers, 8);
+#endif
 
+	if(ddr.Inited()==false)
+		return;
+
+	ddr.Start();
 	g_ddr=&ddr;
 
 	int worker_thread_no_0=0;
-	printf("in main, %d, %p\n", worker_thread_no_0, &worker_thread_no_0);
+	LOG(INFO)<<"in main, "<<worker_thread_no_0<<", "<<&worker_thread_no_0;
 	pthread_t t0=StartWorkerThread(worker_thread_no_0, WorkerThread0Func);
 	int worker_thread_no_1=1;
 //	pthread_t t1=StartWorkerThread(worker_thread_no_1, WorkerThread1Func);
@@ -388,7 +520,7 @@ void TestDownDataRestorerExecutingInviteCmd()
 	}
 
 	sleep(10);
-	LOG(INFO)<<"main thread CLEAR all\n";
+	LOG(INFO)<<"main thread CLEAR all";
 	ddr.ClearExecutingInviteCmdList();
 
 	{
@@ -473,13 +605,16 @@ int main(int argc, char** argv)
 //	TestTransactionSetAdd();
 //	TestTransactionSetDel();
 
-//	printf("********************\n");
-//    TestDownDataRestorerDevice();
-//    
-//	printf("********************\n");
-//    TestDownDataRestorerExecutingInviteCmd();
 
-	TestDelTransactionInCluster();
+//    TestDownDataRestorerDevice();
+
+//	LOG(INFO)<<"********************";
+//    TestDownDataRestorerChannel();
+
+
+    TestDownDataRestorerExecutingInviteCmd();
+
+//	TestDelTransactionInCluster();
     
     return 0;
 }

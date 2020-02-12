@@ -5,7 +5,7 @@
 #include <queue>
 
 #include "socket.h"
-#include "owlog.h"
+//#include "owlog.h"
 #include "redisbase.h"
 
 #define REDIS_READ_BUFF_SIZE 4096

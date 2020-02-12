@@ -153,6 +153,8 @@ struct DataRestorerOperation{
 	}
 };
 
+
+
 class DownDataRestorer{
 //	typedef list<ExecutingInviteCmd> ExecutingInviteCmdList;
 
@@ -160,8 +162,8 @@ public:
     DownDataRestorer();
 	~DownDataRestorer();
 
-	int Init(const string& redis_server_ip, uint16_t redis_server_port, int connection_num);
-    int Init(const REDIS_SERVER_LIST& redis_server_list, int connection_num);
+	int Init(const string& redis_server_ip, uint16_t redis_server_port, int worker_thread_num);
+    int Init(const REDIS_SERVER_LIST& redis_server_list, int worker_thread_num);
     int Uninit();
     int Start();
     int Stop();
@@ -195,7 +197,8 @@ public:
 	int GetChannelCount();
 	int GetExecutingInviteCmdCount(int worker_thread_no);
 
-	void SetWorkerThreadNum(int num);
+//	void SetWorkerThreadNum(int num);
+	bool Inited() { return inited_; }
 
 private:
     static void* DataRestorerThreadFuncWrapper(void* arg);
@@ -206,7 +209,7 @@ private:
 	bool inited_;
 	bool started_;
     bool force_thread_exit_;	
-	int data_restorer_threads_num_; // same as RedisClient m_connectionNum
+	int data_restorer_background_threads_num_; // same as RedisClient m_connectionNum
 	vector<pthread_t> data_restorer_threads_;
 	CountDownLatch* data_restorer_threads_exit_latch;
 	
@@ -219,7 +222,7 @@ private:
 	queue<DataRestorerOperation> operations_queue_;
 
 	int worker_thread_num_;
-    //OWLog logger_;
+    RedisMode redis_mode_;
 };
 
 #endif

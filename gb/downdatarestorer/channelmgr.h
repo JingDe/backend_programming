@@ -4,6 +4,7 @@
 #include"channel.h"
 //#include"mutexlock.h"
 #include"rwmutex.h"
+#include"downdatarestorerdef.h"
 #include<list>
 #include<string>
 
@@ -14,7 +15,7 @@ class RedisClient;
 
 class ChannelMgr{
 public:
-	ChannelMgr(RedisClient*);
+	ChannelMgr(RedisClient*, RedisMode);
 
 	int LoadChannels(list<Channel>& channels);
 	int SearchChannel(const string& channel_id, Channel& channel);
@@ -26,7 +27,14 @@ public:
 	int GetChannelCount();
 
 private:
+	int InsertChannelInTransaction(const Channel& channel);
+	int InsertChannelInCluster(const Channel& channel);
+	int DeleteChannelInTransaction(const Channel& channel);
+	int DeleteChannelInCluster(const Channel& channel);
+	int ClearChannelsWithLockHeld();
+
 	RedisClient* redis_client_;
+	RedisMode redis_mode_;
 //	MutexLock modify_mutex_;
 	RWMutex rwmutex_;
 

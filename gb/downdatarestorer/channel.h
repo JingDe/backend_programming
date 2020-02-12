@@ -8,8 +8,10 @@ using std::string;
 
 class Channel : public DBSerialize {
 public:
-
-	string GetId() const {
+	Channel();
+	Channel(const string& device_id, const string& channel_device_id);
+	
+	string GetChannelId() const {
 		return device_id_+channel_device_id_;
 	}
 

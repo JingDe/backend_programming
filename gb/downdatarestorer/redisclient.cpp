@@ -2,6 +2,7 @@
 #include "redisconnection.h"
 #include"glog/logging.h"
 #include"util.h"
+#include"redismonitor.h"
 #include <algorithm>
 #include<cassert>
 
@@ -16,6 +17,7 @@ RedisClient::RedisClient()//:m_logger("cdn.common.redisclient")
 	m_slotMap.clear();
 	m_unusedHandlers.clear();
     m_connected=false;
+    m_redisMonitor=NULL;
 
 //    m_logger.debug("construct RedisClient ok");
 	LOG(INFO)<<"construct RedisClient ok";
@@ -47,7 +49,7 @@ bool RedisClient::freeRedisClient()
     return true;
 }
 
-bool RedisClient::init(const REDIS_SERVER_LIST& serverList,uint32_t connectionNum,uint32_t keepaliveTime)
+bool RedisClient::init(const REDIS_SERVER_LIST& serverList, uint32_t connectionNum,uint32_t keepaliveTime)
 {
     if(m_connected==true)
     {
@@ -78,6 +80,12 @@ bool RedisClient::init(const REDIS_SERVER_LIST& serverList,uint32_t connectionNu
 			LOG(ERROR)<<"init redis cluster failed.";
 			return false;
 		}
+		// start RedisMonitor
+		m_redisMonitor=new RedisMonitor(this);
+		if(m_redisMonitor==NULL)
+		{
+			LOG(ERROR)<<"create RedisMonitor failed";
+		}
 	}
 	else
 	{
@@ -90,6 +98,7 @@ bool RedisClient::init(const REDIS_SERVER_LIST& serverList,uint32_t connectionNu
 //		m_logger.info("init the redis proxy or redis server %s, %d ok", m_redisProxy.connectIp.c_str(), m_redisProxy.connectPort);
 		LOG(INFO)<<"init the redis proxy or redis server "<<m_redisProxy.connectIp<<", "<<m_redisProxy.connectPort<<" ok";
 	}
+	
     m_connected=true;
 	return true;
 }
@@ -161,11 +170,11 @@ bool RedisClient::initRedisProxy()
 	if (!m_redisProxy.clusterHandler->initConnectPool(m_redisProxy.connectIp, m_redisProxy.connectPort, m_redisProxy.connectionNum, m_redisProxy.keepaliveTime))
 	{
 //		m_logger.warn("init proxy:[%s] connect pool failed.", m_redisProxy.proxyId.c_str());
-		LOG(ERROR)<<"init proxy:["<<m_redisProxy.proxyId<<"] connect pool failed.";
+		LOG(ERROR)<<"init redis-server:["<<m_redisProxy.proxyId<<"] connect pool failed.";
 		return false;
 	}
 //	m_logger.debug("init proxy:[%s] connect pool ok.", m_redisProxy.proxyId.c_str());
-	LOG(INFO)<<"init proxy:["<<m_redisProxy.proxyId<<"] connect pool ok.";
+	LOG(INFO)<<"init redis-server:["<<m_redisProxy.proxyId<<"] connect pool ok.";
 	return true;
 }
 
@@ -526,7 +535,7 @@ bool RedisClient::doRedisCommandProxy(const string & key,
 			if(replyInfo.replyType == RedisReplyType::REDIS_REPLY_INTEGER && replyInfo.intValue == 1)
 			{
 //				m_logger.debug("del key:%s from redis db success.",key.c_str());
-				LOG(ERROR)<<"del key:"<<key<<" from redis db success.";
+				LOG(INFO)<<"del key:"<<key<<" from redis db success.";
 				freeReplyInfo(replyInfo);
 				return true;
 			}
@@ -534,7 +543,7 @@ bool RedisClient::doRedisCommandProxy(const string & key,
 			else if(replyInfo.replyType == RedisReplyType::REDIS_REPLY_INTEGER && replyInfo.intValue == 0)
 			{
 //				m_logger.warn("del key:%s from redis db failed.",key.c_str());
-				LOG(ERROR)<<"del key:"<<key<<" from redis db failed.";
+				LOG(WARNING)<<"del key:"<<key<<" from redis db failed.";
 				freeReplyInfo(replyInfo);
 				return false;
 			}
@@ -901,7 +910,7 @@ REDIS_COMMAND:
 					else if(replyInfo.replyType == RedisReplyType::REDIS_REPLY_INTEGER && replyInfo.intValue == 0)
 					{
 //						m_logger.warn("del key:%s from redis db failed.",key.c_str());
-						LOG(ERROR)<<"del key:"<<key<<" from redis db failed.";
+						LOG(WARNING)<<"del key:"<<key<<" from redis db failed.";
 						freeReplyInfo(replyInfo);
 						return false;
 					}

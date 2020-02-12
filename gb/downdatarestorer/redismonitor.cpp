@@ -1,8 +1,10 @@
 #include "redismonitor.h"
+#include"glog/logging.h"
 
 RedisMonitor::RedisMonitor(RedisClient* redis_client)
 	:m_redisClient(redis_client)
 {	
+	LOG(INFO)<<"construct RedisMonitor ok";
 }
 
 RedisMonitor::~RedisMonitor()

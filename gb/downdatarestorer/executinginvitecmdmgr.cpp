@@ -8,8 +8,9 @@
 const string ExecutingInviteCmdMgr::s_set_key_prefix="executinginvitecmdset";
 const string ExecutingInviteCmdMgr::s_key_prefix="executinginvitecmdset";
 
-ExecutingInviteCmdMgr::ExecutingInviteCmdMgr(RedisClient* redis_client, int worker_thread_num)
+ExecutingInviteCmdMgr::ExecutingInviteCmdMgr(RedisClient* redis_client, RedisMode redis_mode, int worker_thread_num)
 	:redis_client_(redis_client),
+	redis_mode_(redis_mode),
 	worker_thread_num_(worker_thread_num),
 	rwmutexes_(NULL)
 //	modify_mutex_list_(NULL)
@@ -92,11 +93,45 @@ int ExecutingInviteCmdMgr::Search(const string& executing_invite_cmd_id, Executi
 	return -1;
 }
 
-
 int ExecutingInviteCmdMgr::Insert(const ExecutingInviteCmd& cmd, int worker_thread_no)
 {
 	if(worker_thread_no<0  ||  worker_thread_no>=worker_thread_num_)
 		return -1;
+
+	if(redis_mode_==STAND_ALONE)
+		return InsertInTransaction(cmd, worker_thread_no);
+	else //if(redis_mode_==CLUSTER)
+		return InsertInCluster(cmd, worker_thread_no);
+}
+
+
+int ExecutingInviteCmdMgr::InsertInCluster(const ExecutingInviteCmd& cmd, int worker_thread_no)
+{
+//	MutexLockGuard guard(&modify_mutex_list_[worker_thread_no]);
+	WriteGuard guard(rwmutexes_[worker_thread_no]);
+
+	if(redis_client_->setSerial(s_key_prefix+ToString(worker_thread_no)+cmd.GetId(), cmd)==false)
+	{
+		return -1;
+	}
+	
+	if(redis_client_->sadd(s_set_key_prefix+ToString(worker_thread_no), cmd.GetId())==true)
+	{
+		return 0;
+	}
+	else
+	{
+		if(redis_client_->del(s_key_prefix+cmd.GetId())==false)
+		{
+			LOG(ERROR)<<"insert cmd"<<cmd.GetId()<<" failed, undo set failed";
+		}
+		return -1;
+	}
+}
+
+
+int ExecutingInviteCmdMgr::InsertInTransaction(const ExecutingInviteCmd& cmd, int worker_thread_no)
+{
 //	MutexLockGuard guard(&modify_mutex_list_[worker_thread_no]);
 	WriteGuard guard(rwmutexes_[worker_thread_no]);
 	
@@ -144,6 +179,37 @@ int ExecutingInviteCmdMgr::Delete(const ExecutingInviteCmd& cmd, int worker_thre
 {
 	if(worker_thread_no<0  ||  worker_thread_no>=worker_thread_num_)
 		return -1;
+	if(redis_mode_==STAND_ALONE)
+		return DeleteInTransaction(cmd, worker_thread_no);
+	else //if(redis_mode_==CLUSTER)
+		return DeleteInCluster(cmd, worker_thread_no);
+}
+
+int ExecutingInviteCmdMgr::DeleteInCluster(const ExecutingInviteCmd& cmd, int worker_thread_no)
+{
+//	MutexLockGuard guard(&modify_mutex_list_[worker_thread_no]);
+	WriteGuard guard(rwmutexes_[worker_thread_no]);
+
+	if(redis_client_->del(s_key_prefix+ToString(worker_thread_no)+cmd.GetId())==false)
+		return -1;
+	
+	if(redis_client_->srem(s_set_key_prefix+ToString(worker_thread_no), cmd.GetId())==true)
+	{
+		LOG(INFO)<<"delete cmd "<<cmd.GetId()<<" ok";
+		return 0;
+	}
+	else
+	{
+		if(redis_client_->setSerial(s_key_prefix+cmd.GetId(), cmd)==false)
+		{
+			LOG(ERROR)<<"delete cmd"<<cmd.GetId()<<" failed, undo del failed";
+		}
+		return -1;
+	}
+}
+
+int ExecutingInviteCmdMgr::DeleteInTransaction(const ExecutingInviteCmd& cmd, int worker_thread_no)
+{
 //	MutexLockGuard guard(&modify_mutex_list_[worker_thread_no]);
 	WriteGuard guard(rwmutexes_[worker_thread_no]);
 	
@@ -203,10 +269,10 @@ int ExecutingInviteCmdMgr::Clear(int worker_thread_no)
 //	MutexLockGuard guard(&modify_mutex_list_[worker_thread_no]);
 	WriteGuard guard(rwmutexes_[worker_thread_no]);
 	
-	list<string> device_id_list;
-	redis_client_->smembers(s_set_key_prefix+ToString(worker_thread_no), device_id_list);
+	list<string> cmd_id_list;
+	redis_client_->smembers(s_set_key_prefix+ToString(worker_thread_no), cmd_id_list);
 	redis_client_->del(s_set_key_prefix+ToString(worker_thread_no));
-	for(list<string>::iterator it=device_id_list.begin(); it!=device_id_list.end(); it++)
+	for(list<string>::iterator it=cmd_id_list.begin(); it!=cmd_id_list.end(); it++)
 	{
 		redis_client_->del(s_key_prefix+ToString(worker_thread_no)+*it);
 	}
@@ -218,10 +284,10 @@ int ExecutingInviteCmdMgr::ClearWithLockHeld(int worker_thread_no)
 {	
 	if(worker_thread_no<0  ||  worker_thread_no>=worker_thread_num_)
 		return -1;
-	list<string> device_id_list;
-	redis_client_->smembers(s_set_key_prefix+ToString(worker_thread_no), device_id_list);
+	list<string> cmd_id_list;
+	redis_client_->smembers(s_set_key_prefix+ToString(worker_thread_no), cmd_id_list);
 	redis_client_->del(s_set_key_prefix+ToString(worker_thread_no));
-	for(list<string>::iterator it=device_id_list.begin(); it!=device_id_list.end(); it++)
+	for(list<string>::iterator it=cmd_id_list.begin(); it!=cmd_id_list.end(); it++)
 	{
 		redis_client_->del(s_key_prefix+ToString(worker_thread_no)+*it);
 	}

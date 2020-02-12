@@ -8,7 +8,7 @@
 #include "redisbase.h"
 #include "redisconnection.h"
 #include "rediscluster.h"
-#include "owlog.h"
+//#include "owlog.h"
 #include "rwmutex.h"
 
 
@@ -18,6 +18,7 @@
 using namespace std;
 
 class RedisConnection;
+class RedisMonitor;
 
 typedef struct RedisServerInfoTag
 {
@@ -282,6 +283,7 @@ private:
 //	RWMutex m_rwProxyMutex;
 	RWMutex	m_rwSlotMutex;
     bool m_connected;
+    RedisMonitor* m_redisMonitor;
 };
 
 #endif
