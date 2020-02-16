@@ -4,7 +4,8 @@
 #include"channel.h"
 //#include"mutexlock.h"
 #include"rwmutex.h"
-#include"downdatarestorerdef.h"
+//#include"downdatarestorerdef.h"
+#include"redisbase.h"
 #include<list>
 #include<string>
 

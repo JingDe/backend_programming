@@ -25,7 +25,7 @@ DownDataRestorer::DownDataRestorer()
 	operations_queue_not_empty_condvar(&operations_queue_mutex_),
 	operations_queue_(),
 	worker_thread_num_(0),
-	redis_mode_(STAND_ALONE)
+	redis_mode_(STAND_ALONE_OR_PROXY_MODE)
 {
 //	google::InitGoogleLogging("downdatarestorer");
 //	FLAGS_logtostderr=false;
@@ -44,12 +44,6 @@ DownDataRestorer::~DownDataRestorer()
 		Stop();
 	if(inited_)
 		Uninit();
-	if(device_mgr_)
-		delete device_mgr_;
-	if(channel_mgr_)
-		delete channel_mgr_;
-	if(executing_invite_cmd_mgr_)
-		delete executing_invite_cmd_mgr_;
 		
 //	google::ShutdownGoogleLogging();	
 }
@@ -69,7 +63,6 @@ int DownDataRestorer::Init(const string& redis_server_ip, uint16_t redis_server_
 	return Init(redis_server_list, worker_thread_num);
 }
 
-
 int DownDataRestorer::Init(const REDIS_SERVER_LIST& redis_server_list, int worker_thread_num)
 {
 	if(inited_)
@@ -82,16 +75,17 @@ int DownDataRestorer::Init(const REDIS_SERVER_LIST& redis_server_list, int worke
 	
 	if(redis_server_list.size()==1)
 	{
-		redis_mode_=STAND_ALONE;
+		redis_mode_=STAND_ALONE_OR_PROXY_MODE;
 	}
 	else
 	{
-		redis_mode_=CLUSTER;
+		redis_mode_=CLUSTER_MODE;
 	}
-	LOG_IF(INFO, redis_mode_==STAND_ALONE)<<"redis mode is STAND_ALONE";
-	LOG_IF(INFO, redis_mode_==CLUSTER)<<"redis mode is CLUSTER";
-	LOG_IF(INFO, redis_mode_==SENTINEL)<<"redis mode is SENTINEL";
+	LOG_IF(INFO, redis_mode_==STAND_ALONE_OR_PROXY_MODE)<<"redis mode is STAND_ALONE_OR_PROXY_MODE";
+	LOG_IF(INFO, redis_mode_==CLUSTER_MODE)<<"redis mode is CLUSTER_MODE";
+	LOG_IF(INFO, redis_mode_==SENTINEL_MODE)<<"redis mode is SENTINEL_MODE";
 
+	assert(redis_client_=NULL);
 	redis_client_=new RedisClient();
 	if(redis_client_==NULL)
 	{
@@ -109,7 +103,9 @@ int DownDataRestorer::Init(const REDIS_SERVER_LIST& redis_server_list, int worke
 	if(redis_client_->init(redis_server_list, connection_num/*, keepalive_time_secs*/)==false)
 	{
 		LOG(ERROR)<<"init RedisClient failed";
-		return -1;
+		delete redis_client_;
+		redis_client_=NULL;
+		return DDR_FAIL;
 	}
 	
 	inited_=true;
@@ -121,6 +117,7 @@ int DownDataRestorer::Uninit()
 	if(inited_  &&  redis_client_)
 	{
 		redis_client_->freeRedisClient();
+		delete redis_client_;
 		redis_client_=NULL;
 	}
 	LOG(INFO)<<"DownDataRestorer Uninit now";
@@ -142,6 +139,29 @@ int DownDataRestorer::Start()
 		return DDR_FAIL;
 	}
 	LOG(INFO)<<"DownDataRestorer Start now";
+
+	device_mgr_=new DeviceMgr(redis_client_, redis_mode_);
+	channel_mgr_=new ChannelMgr(redis_client_, redis_mode_);
+	executing_invite_cmd_mgr_=new ExecutingInviteCmdMgr(redis_client_, redis_mode_, worker_thread_num_);
+	if(!device_mgr_  ||  !channel_mgr_	||	!executing_invite_cmd_mgr_)
+	{
+		if(device_mgr_)
+		{
+			delete device_mgr_;
+			device_mgr_=NULL;
+		}
+		if(channel_mgr_)
+		{
+			delete channel_mgr_;
+			channel_mgr_=NULL;
+		}
+		if(executing_invite_cmd_mgr_)
+		{
+			delete executing_invite_cmd_mgr_;
+			executing_invite_cmd_mgr_=NULL;
+		}
+		return DDR_FAIL;
+	}
 
 	
 	data_restorer_threads_.reserve(data_restorer_background_threads_num_);
@@ -166,29 +186,30 @@ int DownDataRestorer::Start()
 	}
 	//data_restorer_threads_.shrink_to_fit();
     data_restorer_threads_.resize(data_restorer_threads_.size());
+    
+//    assert(data_restorer_threads_exit_latch==NULL);
+//	if(data_restorer_threads_exit_latch)
+//		delete data_restorer_threads_exit_latch;
 	data_restorer_threads_exit_latch=new CountDownLatch(data_restorer_threads_.size());
+	if(data_restorer_threads_exit_latch==NULL)
+	{
+		LOG(ERROR)<<"new data_restorer_threads_exit_latch failed";
+		return DDR_FAIL;
+	}
 	if(data_restorer_threads_exit_latch->IsValid()==false)
 	{
 		LOG(ERROR)<<"init CountDownLatch failed";
-		return DDR_FAIL;
-	}
+		delete data_restorer_threads_exit_latch;
+		data_restorer_threads_exit_latch=NULL;
 
-	device_mgr_=new DeviceMgr(redis_client_, redis_mode_);
-	channel_mgr_=new ChannelMgr(redis_client_, redis_mode_);
-	executing_invite_cmd_mgr_=new ExecutingInviteCmdMgr(redis_client_, redis_mode_, worker_thread_num_);
-	if(!device_mgr_  ||  !channel_mgr_  ||  !executing_invite_cmd_mgr_)
-	{
+		KillDataRestorerThread();
+		
 		return DDR_FAIL;
 	}
 	
 	started_=true;
 	return DDR_OK;
 }
-
-//void DownDataRestorer::SetWorkerThreadNum(int num)
-//{
-//	worker_thread_num_=num;
-//}
 
 int DownDataRestorer::GetWorkerThreadNum()
 {
@@ -208,8 +229,35 @@ int DownDataRestorer::Stop()
 	operations_queue_not_empty_condvar.SignalAll();
 	data_restorer_threads_exit_latch->Wait();
 	
+	delete data_restorer_threads_exit_latch;
+	data_restorer_threads_exit_latch=NULL;
+
+	if(device_mgr_)
+	{
+		delete device_mgr_;
+		device_mgr_=NULL;
+	}
+	if(channel_mgr_)
+	{
+		delete channel_mgr_;
+		channel_mgr_=NULL;
+	}
+	if(executing_invite_cmd_mgr_)
+	{
+		delete executing_invite_cmd_mgr_;
+		executing_invite_cmd_mgr_=NULL;
+	}
+	
 	started_=false;
 	return DDR_OK;
+}
+
+void DownDataRestorer::KillDataRestorerThread()
+{
+	for(size_t i=0; i<data_restorer_threads_.size(); i++)
+	{
+		pthread_cancel(data_restorer_threads_[i]);
+	}
 }
 
 void* DownDataRestorer::DataRestorerThreadFuncWrapper(void* arg)

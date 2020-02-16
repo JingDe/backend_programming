@@ -69,6 +69,12 @@ typedef struct RedisReplyInfoTag
 	list<ReplyArrayInfo> arrayList;
 }RedisReplyInfo;
 
+enum RedisMode{
+	STAND_ALONE_OR_PROXY_MODE,
+	CLUSTER_MODE,
+	SENTINEL_MODE,
+};
+
 bool createRedisCommand(list<RedisCmdParaInfo> &paraList, char **cmdString, int32_t& cmdLen);
 bool parseRedisReply(char* replyString, RedisReplyInfo& replyInfo);
 bool parseArrayInfo(char **arrayString, ReplyArrayInfo& arrayInfo);

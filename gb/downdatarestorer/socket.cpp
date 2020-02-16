@@ -2,13 +2,13 @@
 #include <sys/types.h>
 #include "socket.h"
 #include"glog/logging.h"
-//#include "thread/threadpool.h"
 #include <errno.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <poll.h>
 #include <string.h>
 #include<sys/syscall.h>
+#include<sys/epoll.h>
 
 #define gettid() syscall(__NR_gettid)
 
@@ -482,6 +482,65 @@ int Socket::read2(void * buf, size_t maxlen, int timeout)
 	}
 	
 	return len_read;
+}
+
+bool Socket::WatchReadEvent(int& epollfd)
+{
+	int epfd=epoll_create(1);
+	if(epfd<0) 
+	{
+		PLOG(ERROR)<<"epoll_create failed";
+		return false;
+	}
+
+	struct epoll_event ev;
+	ev.events=EPOLLIN;
+	ev.data.fd=fd;
+	if(epoll_ctl(epfd, EPOLL_CTL_ADD, fd, &ev)<0)
+	{
+		PLOG(ERROR)<<"epoll_ctl ADD failed";
+		::close(epfd);
+		return -1;
+	}
+
+	epollfd=epfd;
+	return true;	
+}
+
+bool Socket::WaitReadEvent(int epollfd)
+{
+	struct epoll_event event;
+	int nEvents=epoll_wait(epollfd, &event, 1, -1);
+	if(nEvents<0)
+	{
+		PLOG(ERROR)<<"epoll_wait failed";
+		return false;
+	}
+	if(nEvents!=1)
+	{
+		if(errno==EINTR)
+			LOG(INFO)<<"epoll_wait interrupted";
+		else
+			PLOG(INFO)<<"unknown error";
+		return false;
+	}
+
+	LOG(INFO)<<"event.events is "<<event.events;
+	// TODO EPOLLERR
+	if(event.events  &  (EPOLLIN | EPOLLPRI | EPOLLRDNORM | POLLRDBAND | EPOLLRDHUP))
+	{
+		return true;
+	}
+	else
+	{		
+		return false;
+	}
+}
+
+bool Socket::UnWatchEvent(int handler)
+{
+	::close(handler);
+	return true;
 }
 
 int Socket::read(void * buf, size_t maxlen, int timeout) {

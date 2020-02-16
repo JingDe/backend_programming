@@ -10,11 +10,4 @@ class ExecutingInviteCmd;
 typedef list<ExecutingInviteCmd> ExecutingInviteCmdList;
 
 
-enum RedisMode{
-	STAND_ALONE=0,
-	CLUSTER,
-	SENTINEL,
-};
-
-
 #endif

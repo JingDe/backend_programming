@@ -38,6 +38,12 @@ void Timer::start(int32_t intervalSeconds, int32_t delay, int32_t repeatTime) {
 	}
 }
 
+void Timer::cancel() {
+	if(m_isStarted)
+		closeThd();
+    m_isStarted = false;
+}
+
 void Timer::svc() {
 	m_repeatCount = 0;
 	if (m_delay > 0)

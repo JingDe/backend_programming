@@ -18,11 +18,17 @@ RedisConnection::RedisConnection(const string serverIp,uint32_t serverPort,uint3
 	m_arrayNum = 0;
 	m_doneNum = 0;
 	m_arrayLen = 0;
+	m_canRelease=true;
 }
 
 RedisConnection::~RedisConnection()
 {
 	m_socket.close();
+}
+
+void RedisConnection::SetCanRelease(bool canRelease)
+{
+	m_canRelease=canRelease;
 }
 
 bool RedisConnection::connect()
@@ -64,7 +70,7 @@ bool RedisConnection::doRedisCommand(list < RedisCmdParaInfo > & paraList,int32_
 	int32_t cmdLen = 0;
 	createRedisCommand(paraList, &commandBuf, cmdLen);
 //	m_logger.debug("connection:[%p] send redis command:[%s] to server:[%s:%u].", this, commandBuf, m_serverIp.c_str(), m_serverPort);
-	LOG(INFO)<<"connection:["<<this<<"] send redis command:["<<commandBuf<<"] to server:["<<m_serverIp<<":"<<m_serverPort<<"].";
+//	LOG(INFO)<<"connection:["<<this<<"] send redis command:["<<commandBuf<<"] to server:["<<m_serverIp<<":"<<m_serverPort<<"].";
 	if(!send(commandBuf, cmdLen))
 	{
 //		m_logger.warn("connection:[%p] send command:[%s] to redis:%s:%u failed.", this, commandBuf, m_serverIp.c_str(), m_serverPort);
@@ -81,6 +87,21 @@ bool RedisConnection::doRedisCommand(list < RedisCmdParaInfo > & paraList,int32_
 bool RedisConnection::send(char * request,uint32_t sendLen)
 {
 	return m_socket.writeFull((void*)request, sendLen);
+}
+
+bool RedisConnection::ListenMessage(int& handler)
+{
+	return m_socket.WatchReadEvent(handler);
+}
+
+bool RedisConnection::WaitMessage(int handler)
+{
+	return m_socket.WaitReadEvent(handler);
+}
+
+bool RedisConnection::StopListen(int handler)
+{
+	return m_socket.UnWatchEvent(handler);
 }
 
 bool RedisConnection::recv(RedisReplyInfo & replyInfo, ReplyParserType parserType)

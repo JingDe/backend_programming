@@ -8,7 +8,6 @@
 #include "redisbase.h"
 #include "redisconnection.h"
 #include "rediscluster.h"
-//#include "owlog.h"
 #include "rwmutex.h"
 
 
@@ -79,6 +78,7 @@ typedef struct RedisProxyInfoTag
 		connectionNum = 0;
 		keepaliveTime = 0;
 		clusterHandler = NULL;
+		isAlived=false;
 	}
 	string proxyId;
 	string connectIp;
@@ -86,6 +86,7 @@ typedef struct RedisProxyInfoTag
 	uint32_t connectionNum;
 	uint32_t keepaliveTime;
 	RedisCluster *clusterHandler;
+	bool isAlived;
 }RedisProxyInfo;
 
 
@@ -103,7 +104,6 @@ typedef struct RedisLockInfoTag
 
 typedef map<string, RedisClusterInfo> REDIS_CLUSTER_MAP;
 
-//slot info.
 typedef map<uint16_t, string> REDIS_SLOT_MAP; // key is slot, value is clusterId
 
 struct RedisCommandType
@@ -136,6 +136,9 @@ struct RedisCommandType
 		REDIS_COMMAND_SMEMBERS,
 
         REDIS_COMMAND_DBSIZE,
+
+        REDIS_COMMAND_SENTINEL_GET_MASTER_ADDR,
+        REDIS_COMMAND_INFO_REPLICATION,
 	};
 };
 
@@ -147,16 +150,13 @@ public:
 		SCAN_NOLOOP,
 	};
 
-	enum RedisMode{
-		CLUSTER_MODE,
-		PROXY_MODE,
-	};
-
 	RedisClient();
 	~RedisClient();
-	bool init(const REDIS_SERVER_LIST& serverList, uint32_t connectionNum, uint32_t keepaliveTime=-1);
+	bool init(const string& serverIp, uint32_t serverPort, uint32_t connectionNum);
+	bool init(const REDIS_SERVER_LIST& clusterList, uint32_t connectionNum);
+	bool init(const REDIS_SERVER_LIST& sentinelList, const string& masterName, uint32_t connectionNum);
+	bool init(RedisMode redis_mode, const REDIS_SERVER_LIST& serverList, const string& masterName, uint32_t connectionNum, uint32_t keepaliveTime=-1);
     bool freeRedisClient();
-//    void checkState();
 	bool getSerial(const string& key, DBSerialize &serial);
 	bool getSerialWithLock(const string& key, DBSerialize &serial, RedisLockInfo& lockInfo);
 	bool find(const string& key);
@@ -174,8 +174,6 @@ public:
 	bool getKeys(const string& queryKey, list<string>& keys);
 //	bool getSerials(const string& key, map<string,RedisSerialize> &serials);
 	
-
-
 	bool zadd(const string& key,const string& member, int score);
 	bool zrem(const string& key,const string& member);
 	bool zincby(const string& key,const string& member,int increment);
@@ -191,7 +189,6 @@ public:
 	int scard(const string& key);
 	bool sismember(const string& key, const string& member);
 	bool smembers(const string& key, list<string>& members);
-//	bool clearBySet(string dbPre) ;
 
 	bool isRunAsCluster() { return m_redisMode==CLUSTER_MODE; }
 
@@ -217,6 +214,16 @@ public:
 	bool Del(RedisConnection*, const string&);
 	bool Sadd(RedisConnection*, const string& key, const string& member);
 	bool Srem(RedisConnection*, const string& key, const string& member);
+
+	bool StartSentinelHealthCheckTask();
+	bool SubscribeSwitchMaster(RedisCluster* cluster);
+	static void* SubscribeSwitchMasterThreadFun(void* arg);
+	bool ParseSwithMasterMessage(const RedisReplyInfo& replyInfo, RedisServerInfo& masterAddr);
+	bool DoSwitchMaster(const RedisServerInfo& masterAddr);
+
+	void DoTestOfSentinelSlavesCommand();
+	bool SentinelGetSlavesInfo(RedisCluster* cluster, vector<RedisServerInfo>& slavesAddr);
+	bool ParseSentinelSlavesReply(const RedisReplyInfo& replyInfo, vector<RedisServerInfo>& slavesInfo);
 	
 private:
     bool getClusterIdFromRedirectReply(const string& redirectInfo, string& clusterId);
@@ -253,6 +260,7 @@ private:
 
 	bool doRedisCommand(const string& key, int32_t commandLen, list<RedisCmdParaInfo> &commandList, int commandType, DBSerialize* serial = NULL, int* count=NULL);
 	bool doRedisCommandProxy(const string& key, int32_t commandLen, list<RedisCmdParaInfo> &commandList, int commandType, DBSerialize* serial = NULL, int* count=NULL);
+	bool doRedisCommandMaster(const string& key, int32_t commandLen, list<RedisCmdParaInfo> &commandList, int commandType, DBSerialize* serial = NULL, int* count=NULL);
 	bool doRedisCommandCluster(const string& key, int32_t commandLen, list<RedisCmdParaInfo> &commandList, int commandType, DBSerialize* serial = NULL, int* count=NULL);
 	
 	bool doRedisCommandWithLock(const string& key, int32_t commandLen, list<RedisCmdParaInfo> &commandList, int commandType, RedisLockInfo& lockInfo, bool getSerial = false, DBSerialize* serial = NULL);
@@ -260,6 +268,7 @@ private:
 	bool doCommandArray(const string & key,int32_t commandLen,list < RedisCmdParaInfo > & commandList, int commandType, list<string>& members);
 	bool doCommandArrayCluster(const string & key,int32_t commandLen,list < RedisCmdParaInfo > & commandList, int commandType, list<string>& members);
 	bool doCommandArrayProxy(const string & key,int32_t commandLen,list < RedisCmdParaInfo > & commandist, int commandType, list<string>& members);
+	bool doCommandArrayMaster(const string & key,int32_t commandLen,list < RedisCmdParaInfo > & commandist, int commandType, list<string>& members);
 
 	// for Transaction API
 	bool doTransactionCommandInConnection(int32_t commandLen, list<RedisCmdParaInfo> &commandList, int commandType, RedisConnection* con);
@@ -267,23 +276,45 @@ private:
 	bool parseQueuedResponseReply(RedisReplyInfo & replyInfo);
 	bool parseExecReply(RedisReplyInfo & replyInfo);
 	
-
+	bool initSentinels();
+	bool initMasterSlaves();
+	bool SentinelGetMasterAddrByName(RedisCluster* cluster, RedisServerInfo& serverInfo);
+	bool ParseSentinelGetMasterReply(const RedisReplyInfo& replyInfo, RedisServerInfo& serverInfo);
+	bool MasterGetReplicationSlavesInfo(RedisCluster* cluster, vector<RedisServerInfo>& slaves);
+	bool ParseInfoReplicationReply(const RedisReplyInfo& replyInfo);
+	bool freeSentinels();
+	bool freeMasterSlaves();
+	bool ParseSubsribeSwitchMasterReply(const RedisReplyInfo& replyInfo);
+	
 private:
-	REDIS_SERVER_LIST m_serverList;
-	REDIS_CLUSTER_MAP m_clusterMap;
-	RedisProxyInfo m_redisProxy;
-	int32_t m_redisMode;
-	// uint32_t m_cursor; // cursor for scan
-	uint32_t	m_connectionNum;
-	uint32_t  m_keepaliveTime;
-	REDIS_SLOT_MAP m_slotMap;
-	map<string, RedisCluster*> m_unusedHandlers;
-//	OWLog	m_logger;
-	RWMutex	m_rwClusterMutex;
-//	RWMutex m_rwProxyMutex;
-	RWMutex	m_rwSlotMutex;
-    bool m_connected;
+	// for all RedisMode
+	RedisMode m_redisMode;
+	uint32_t m_connectionNum;
+	uint32_t m_keepaliveTime;
+	bool m_connected;
+		
+	// for STAND_ALONE_OR_PROXY_MODE
+    RedisProxyInfo m_redisProxy;
+//	RWMutex m_rwProxyMutex;	
+    
+    // for CLUSTER_MODE
+    REDIS_SERVER_LIST m_serverList; // redis data nodes
+    REDIS_SLOT_MAP m_slotMap;
+    RWMutex	m_rwSlotMutex;
+    REDIS_CLUSTER_MAP m_clusterMap; // key=clusterId=ip:port
+    RWMutex	m_rwClusterMutex;
+    map<string, RedisCluster*> m_unusedHandlers;    
     RedisMonitor* m_redisMonitor;
+    
+    // for SENTINEL_MODE
+    REDIS_SERVER_LIST m_sentinelList; // redis sentinel nodes addr
+    string m_masterName;
+    map<string, RedisProxyInfo> m_sentinelHandlers;
+    RedisServerInfo m_initMasterAddr;
+    map<string, RedisProxyInfo> m_dataNodes; // key: clusterId
+    string m_masterClusterId;
+    RWMutex m_rwMasterMutex;
+    
 };
 
 #endif

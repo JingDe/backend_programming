@@ -19,10 +19,7 @@ public:
 	 */
 	void start(int32_t intervalSeconds, int32_t delay = 0, int32_t repeatTime = -1);
 
-	void cancel() {
-		closeThd();
-	        m_isStarted = false;
-	}
+	void cancel();
 
 	virtual void svc(void);
 	virtual bool resetIntervalTime(int32_t intervalSeconds);

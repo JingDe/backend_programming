@@ -28,8 +28,8 @@ bool TestTransactionSetAdd()
 	RedisServerInfo server(redis_ip, redis_port);
 	REDIS_SERVER_LIST servers({server});
 	uint32_t conn_num=10;
-	uint32_t keepalive_time=60;
-	if(client.init(servers, conn_num, keepalive_time)==false)
+//	uint32_t keepalive_time=60;
+	if(client.init(redis_ip, redis_port, conn_num)==false)
 	{
 		printf("client init failed\n");
 		return false;
@@ -128,11 +128,11 @@ bool TestTransactionSetDel()
     RedisClient client;
     printf("construct RedisClient ok\n");
 
-	RedisServerInfo server(redis_ip, redis_port);
-	REDIS_SERVER_LIST servers({server});
+//	RedisServerInfo server(redis_ip, redis_port);
+//	REDIS_SERVER_LIST servers({server});
 	uint32_t conn_num=10;
-	uint32_t keepalive_time=60;
-	if(client.init(servers, conn_num, keepalive_time)==false)
+//	uint32_t keepalive_time=60;
+	if(client.init(redis_ip, redis_port, conn_num)==false)
 	{
 		printf("client init failed\n");
 		return false;
@@ -583,22 +583,39 @@ public:
 	}
 };
 
+void TestSentinelSlaves()
+{
+	// "sentienl slaves"
+	RedisClient client;
+
+	RedisServerInfo sentinel1("192.168.12.59", 26379);
+	RedisServerInfo sentinel2("192.168.12.59", 26380);
+	RedisServerInfo sentinel3("192.168.12.59", 26381);
+	REDIS_SERVER_LIST serverList({sentinel1, sentinel2, sentinel3});
+	string master_name="mymaster";
+	if(!client.init(serverList, master_name, 2))
+		return;
+
+	client.DoTestOfSentinelSlavesCommand();
+
+	return ;
+}
 
 int main(int argc, char** argv)
 {
 	Glogger glog;
 
-    string log_config_filename="log.conf";
-    if(argc<2)
-    {
-        printf("usage: %s configFileName\n", argv[0]);
-        printf("default: %s\n", log_config_filename.c_str());
-    }
-    else
-    {
-        log_config_filename=argv[1];
-        printf("log config filename %s\n", log_config_filename.c_str());
-    }
+//    string log_config_filename="log.conf";
+//    if(argc<2)
+//    {
+//        printf("usage: %s configFileName\n", argv[0]);
+//        printf("default: %s\n", log_config_filename.c_str());
+//    }
+//    else
+//    {
+//        log_config_filename=argv[1];
+//        printf("log config filename %s\n", log_config_filename.c_str());
+//    }
 
 //    OWLog::config(log_config_filename);
 
@@ -612,9 +629,12 @@ int main(int argc, char** argv)
 //    TestDownDataRestorerChannel();
 
 
-    TestDownDataRestorerExecutingInviteCmd();
+//    TestDownDataRestorerExecutingInviteCmd();
 
 //	TestDelTransactionInCluster();
+
+
+    TestSentinelSlaves();
     
     return 0;
 }

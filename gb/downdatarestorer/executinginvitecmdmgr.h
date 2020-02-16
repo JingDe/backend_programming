@@ -5,6 +5,7 @@
 #include"executinginvitecmd.h"
 #include"rwmutex.h"
 #include"downdatarestorerdef.h"
+#include"redisbase.h"
 
 class RedisClient;
 class MutexLock;

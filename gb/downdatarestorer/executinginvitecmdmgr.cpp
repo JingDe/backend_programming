@@ -98,9 +98,9 @@ int ExecutingInviteCmdMgr::Insert(const ExecutingInviteCmd& cmd, int worker_thre
 	if(worker_thread_no<0  ||  worker_thread_no>=worker_thread_num_)
 		return -1;
 
-	if(redis_mode_==STAND_ALONE)
+	if(redis_mode_==STAND_ALONE_OR_PROXY_MODE)
 		return InsertInTransaction(cmd, worker_thread_no);
-	else //if(redis_mode_==CLUSTER)
+	else //if(redis_mode_==CLUSTER_MODE)
 		return InsertInCluster(cmd, worker_thread_no);
 }
 
@@ -179,9 +179,9 @@ int ExecutingInviteCmdMgr::Delete(const ExecutingInviteCmd& cmd, int worker_thre
 {
 	if(worker_thread_no<0  ||  worker_thread_no>=worker_thread_num_)
 		return -1;
-	if(redis_mode_==STAND_ALONE)
+	if(redis_mode_==STAND_ALONE_OR_PROXY_MODE)
 		return DeleteInTransaction(cmd, worker_thread_no);
-	else //if(redis_mode_==CLUSTER)
+	else //if(redis_mode_==CLUSTER_MODE)
 		return DeleteInCluster(cmd, worker_thread_no);
 }
 

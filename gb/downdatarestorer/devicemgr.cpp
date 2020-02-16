@@ -53,9 +53,9 @@ int DeviceMgr::SearchDevice(const string& device_id, Device& device)
 
 int DeviceMgr::InsertDevice(const Device& device)
 {
-	if(redis_mode_==STAND_ALONE)
+	if(redis_mode_==STAND_ALONE_OR_PROXY_MODE)
 		return InsertDeviceInTransaction(device);
-	else //if(redis_mode_==CLUSTER)
+	else //if(redis_mode_==CLUSTER_MODE)
 		return InsertDeviceInCluster(device);
 }
 
@@ -132,9 +132,9 @@ FAIL:
 
 int DeviceMgr::DeleteDevice(const Device& device)
 {
-	if(redis_mode_==STAND_ALONE)
+	if(redis_mode_==STAND_ALONE_OR_PROXY_MODE)
 		return DeleteDeviceInTransaction(device);
-	else //if(redis_mode_==CLUSTER)
+	else //if(redis_mode_==CLUSTER_MODE)
 		return DeleteDeviceInCluster(device);
 }
 

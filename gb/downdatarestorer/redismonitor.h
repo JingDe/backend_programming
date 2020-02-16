@@ -14,6 +14,7 @@ public:
 	RedisMonitor(RedisClient* redis_client);
 	~RedisMonitor();
 	virtual void run(void);	
+
 private:	
 //	OWLog				m_logger;
 	RedisClient			*m_redisClient;

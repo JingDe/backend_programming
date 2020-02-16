@@ -40,11 +40,19 @@ public:
 //	bool doRedisCommand(list<RedisCmdParaInfo> &paraList, int32_t paraLen, RedisReplyInfo& replyInfo, ParseFunction parser=NULL);
 	bool doRedisCommand(list<RedisCmdParaInfo> &paraList, int32_t paraLen, RedisReplyInfo& replyInfo, ReplyParserType parserType=COMMON_PARSER);
 	bool close();
-	
-private:
-	bool send(char* request, uint32_t sendLen);
 	bool recv(RedisReplyInfo& replyInfo, ReplyParserType parserType=COMMON_PARSER);
 
+	bool CanRelease()
+	{
+		return m_canRelease;
+	}
+	void SetCanRelease(bool canRelease);
+	bool ListenMessage(int& handler);
+	bool WaitMessage(int handler);
+	bool StopListen(int handler);
+
+private:
+	bool send(char* request, uint32_t sendLen);
 	void checkConnectionStatus();
 	bool parse(char* parseBuf, int32_t parseLen, RedisReplyInfo& replyInfo);
 	bool parseScanReply(char *parseBuf, int32_t parseLen, RedisReplyInfo & replyInfo);
@@ -64,8 +72,8 @@ private:
 	int32_t  m_arrayNum;
 	int32_t  m_doneNum;
 	int32_t  m_arrayLen;
-	bool   m_valid;
-//	OWLog	m_logger;
+	bool   	m_valid;
+	bool 	m_canRelease;
 };
 
 #endif

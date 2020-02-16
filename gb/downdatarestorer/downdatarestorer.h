@@ -8,6 +8,7 @@
 #include"mutexlock.h"
 #include"condvar.h"
 #include"redisclient.h"
+#include"redisbase.h"
 
 #include<cassert>
 #include<vector>
@@ -204,6 +205,7 @@ private:
     static void* DataRestorerThreadFuncWrapper(void* arg);
     void DataRestorerThreadFunc();
 	int GetWorkerThreadNum();
+	void KillDataRestorerThread();
 	
 	RedisClient* redis_client_;
 	bool inited_;

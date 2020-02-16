@@ -6,20 +6,27 @@
 #include <algorithm>
 #include<cassert>
 
-
-RedisClient::RedisClient()//:m_logger("cdn.common.redisclient")
+RedisClient::RedisClient()
+	:m_redisMode(STAND_ALONE_OR_PROXY_MODE),
+	m_connectionNum(0),
+	m_keepaliveTime(-1),
+	m_connected(false),
+	m_redisProxy(),
+	m_serverList(),
+	m_slotMap(),
+	m_rwSlotMutex(),
+	m_clusterMap(),
+	m_rwClusterMutex(),
+	m_unusedHandlers(),
+	m_redisMonitor(NULL),
+	m_sentinelList(),
+	m_masterName(),
+	m_sentinelHandlers(),
+	m_initMasterAddr(),
+	m_dataNodes(),
+	m_masterClusterId(),
+	m_rwMasterMutex()
 {
-	m_clusterMap.clear();
-	m_serverList.clear();
-	m_redisMode=CLUSTER_MODE;
-	m_connectionNum = 0;
-	m_keepaliveTime = 0;
-	m_slotMap.clear();
-	m_unusedHandlers.clear();
-    m_connected=false;
-    m_redisMonitor=NULL;
-
-//    m_logger.debug("construct RedisClient ok");
 	LOG(INFO)<<"construct RedisClient ok";
 }
 
@@ -33,39 +40,78 @@ bool RedisClient::freeRedisClient()
 {
     if(m_connected==false)
     {
-//        m_logger.error("why RedisClient freeRedisClient called when m_connected is false");
-		LOG(ERROR)<<"why RedisClient freeRedisClient called when m_connected is false";
+		LOG(WARNING)<<"why RedisClient freeRedisClient called when m_connected is false";
         return false;
     }
-	if(m_redisMode==CLUSTER_MODE)
-	{
-		freeRedisCluster();
-	}
-	else
+    
+	if(m_redisMode==STAND_ALONE_OR_PROXY_MODE)
 	{
 		freeRedisProxy();
 	}
+	else if(m_redisMode==CLUSTER_MODE)
+	{
+		freeRedisCluster();
+		if(m_redisMonitor)
+		{
+			m_redisMonitor->cancel();
+			delete m_redisMonitor;
+			m_redisMonitor=NULL;
+		}
+	}
+	else if(m_redisMode==SENTINEL_MODE)
+	{
+		freeSentinels();
+		freeMasterSlaves();
+	}
+	
     m_connected=false;
     return true;
 }
 
-bool RedisClient::init(const REDIS_SERVER_LIST& serverList, uint32_t connectionNum,uint32_t keepaliveTime)
+bool RedisClient::init(const string& serverIp, uint32_t serverPort, uint32_t connectionNum)
+{	
+	RedisServerInfo server(serverIp, serverPort);
+	REDIS_SERVER_LIST serverList({server});
+	return init(STAND_ALONE_OR_PROXY_MODE, serverList, "", connectionNum);
+}
+
+bool RedisClient::init(const REDIS_SERVER_LIST& clusterList, uint32_t connectionNum)
+{
+	return init(CLUSTER_MODE, clusterList, "", connectionNum);
+}
+
+bool RedisClient::init(const REDIS_SERVER_LIST& sentinelList, const string& masterName, uint32_t connectionNum)
+{
+	return init(SENTINEL_MODE, sentinelList, masterName, connectionNum);
+}
+
+bool RedisClient::init(RedisMode redis_mode, const REDIS_SERVER_LIST& serverList, const string& masterName, uint32_t connectionNum, uint32_t keepaliveTime)
 {
     if(m_connected==true)
     {
-//        m_logger.error("why RedisClient init called, when m_connected is true");
-		LOG(ERROR)<<"why RedisClient init called, when m_connected is true";
+		LOG(WARNING)<<"why RedisClient init called, when m_connected is true";
         return false;
     }
-	//first do cluster nodes
-	m_serverList = serverList;
-	if(m_serverList.size()==1)
-	{
-		m_redisMode=PROXY_MODE; // proxy or just one redis server instance
-	}
+
+	m_redisMode=redis_mode;
+	m_masterName=masterName;
+	if(m_redisMode==SENTINEL_MODE)
+		m_sentinelList=serverList;
+	else
+		m_serverList = serverList;
 	m_connectionNum = connectionNum;
 	m_keepaliveTime = keepaliveTime;
-	if(m_redisMode==CLUSTER_MODE)
+
+	if(m_redisMode==STAND_ALONE_OR_PROXY_MODE)
+	{
+		if (!initRedisProxy())
+		{
+			LOG(ERROR)<<"init redis proxy failed.";
+			return false;
+		}
+		LOG(INFO)<<"init the redis proxy or redis server "<<m_redisProxy.connectIp<<", "<<m_redisProxy.connectPort<<" ok";
+	}
+	else if(m_redisMode==CLUSTER_MODE)
 	{
 		if (!getRedisClusterNodes())
 		{
@@ -73,34 +119,166 @@ bool RedisClient::init(const REDIS_SERVER_LIST& serverList, uint32_t connectionN
 			LOG(ERROR)<<"get redis cluster info failed.please check redis config.";
 			return false;
 		}
-		//init cluster.
+
 		if (!initRedisCluster())
 		{
 //			m_logger.warn("init redis cluster failed.");
 			LOG(ERROR)<<"init redis cluster failed.";
 			return false;
 		}
-		// start RedisMonitor
+		
 		m_redisMonitor=new RedisMonitor(this);
 		if(m_redisMonitor==NULL)
 		{
-			LOG(ERROR)<<"create RedisMonitor failed";
+			LOG(WARNING)<<"create RedisMonitor failed";
 		}
+		else
+		{
+			m_redisMonitor->start(5);
+		}
+	}
+	else if(m_redisMode==SENTINEL_MODE)
+	{
+		if(!initSentinels())
+		{
+			LOG(ERROR)<<"init sentinels failed";
+			return false;
+		}
+		if(!initMasterSlaves())
+		{
+			LOG(ERROR)<<"init master and slaves connection failed";
+			return false;
+		}
+		
+		LOG(INFO)<<"init redis sentinels ok";
 	}
 	else
 	{
-		if (!initRedisProxy())
-		{
-//			m_logger.warn("init redis proxy failed.");
-			LOG(ERROR)<<"init redis proxy failed.";
-			return false;
-		}
-//		m_logger.info("init the redis proxy or redis server %s, %d ok", m_redisProxy.connectIp.c_str(), m_redisProxy.connectPort);
-		LOG(INFO)<<"init the redis proxy or redis server "<<m_redisProxy.connectIp<<", "<<m_redisProxy.connectPort<<" ok";
+		LOG(ERROR)<<"unsupported redis mode "<<m_redisMode;
+		return false;
 	}
 	
     m_connected=true;
 	return true;
+}
+
+bool RedisClient::initRedisProxy()
+{
+//    WriteGuard guard(m_rwProxyMutex);
+	m_redisProxy.connectIp=m_serverList.front().serverIp;
+	m_redisProxy.connectPort=m_serverList.front().serverPort;
+	m_redisProxy.proxyId=m_redisProxy.connectIp+":"+toStr(m_redisProxy.connectPort);
+	m_redisProxy.connectionNum=m_connectionNum;
+	m_redisProxy.keepaliveTime=m_keepaliveTime;
+
+    if(m_redisProxy.clusterHandler != NULL)
+    {
+//        m_logger.error("why m_redisProxy.clusterHandler not NULL when initRedisProxy");
+		LOG(WARNING)<<"why m_redisProxy.clusterHandler not NULL when initRedisProxy";
+        freeRedisProxy();
+    }
+	m_redisProxy.clusterHandler = new RedisCluster();
+    if(m_redisProxy.clusterHandler==NULL)
+    {
+        return false;
+    }
+	if (!m_redisProxy.clusterHandler->initConnectPool(m_redisProxy.connectIp, m_redisProxy.connectPort, m_redisProxy.connectionNum, m_redisProxy.keepaliveTime))
+	{
+//		m_logger.warn("init proxy:[%s] connect pool failed.", m_redisProxy.proxyId.c_str());
+		LOG(ERROR)<<"init redis-server:["<<m_redisProxy.proxyId<<"] connect pool failed.";
+		delete m_redisProxy.clusterHandler; 
+		m_redisProxy.clusterHandler=NULL;
+		return false;
+	}
+//	m_logger.debug("init proxy:[%s] connect pool ok.", m_redisProxy.proxyId.c_str());
+	LOG(INFO)<<"init redis-server:["<<m_redisProxy.proxyId<<"] connect pool ok.";
+	return true;
+}
+
+
+bool RedisClient::getRedisClusterNodes()
+{
+	assert(m_redisMode==CLUSTER_MODE);
+	bool success = false;
+	list<RedisCmdParaInfo> paraList;
+	int32_t paraLen = 0;
+	fillCommandPara("cluster", 7, paraList);
+	fillCommandPara("nodes", 5, paraList);
+	paraLen += 30;
+	REDIS_SERVER_LIST::iterator iter;
+	for (iter = m_serverList.begin(); iter != m_serverList.end(); iter++)
+	{
+		RedisServerInfo serverInfo = (*iter);
+		
+		RedisConnection *connection = new RedisConnection(serverInfo.serverIp, serverInfo.serverPort, m_keepaliveTime);
+		if (!connection->connect())
+		{
+//			m_logger.warn("connect to serverIp:[%s] serverPort:[%d] failed.", serverInfo.serverIp.c_str(), serverInfo.serverPort);
+			LOG(WARNING)<<"connect to serverIp:["<<serverInfo.serverIp<<"] serverPort:["<<serverInfo.serverPort<<"] failed.";
+			continue;
+		}
+		//send cluster nodes.
+		RedisReplyInfo replyInfo;
+		if (!connection->doRedisCommand(paraList, paraLen, replyInfo))
+		{
+//			m_logger.warn("do get cluster nodes failed.");
+			LOG(WARNING)<<"do get cluster nodes failed.";
+			continue;
+		}
+		if (replyInfo.replyType == RedisReplyType::REDIS_REPLY_ERROR)
+		{
+//			m_logger.warn("recv redis error response:[%s].", replyInfo.resultString.c_str());
+			LOG(ERROR)<<"recv redis error response:["<<replyInfo.resultString<<"].";
+			connection->close();
+			delete connection;
+			freeReplyInfo(replyInfo);
+			freeCommandList(paraList);
+			return false;
+		}
+		if (replyInfo.replyType != RedisReplyType::REDIS_REPLY_STRING)
+		{
+//			m_logger.warn("recv redis wrong reply type:[%d].", replyInfo.replyType);
+			LOG(ERROR)<<"recv redis wrong reply type:["<<replyInfo.replyType<<"].";
+			connection->close();
+			delete connection;
+			freeReplyInfo(replyInfo);
+			freeCommandList(paraList);
+			return false;
+		}
+		//check if master,slave parameter may be not newest.
+		list<ReplyArrayInfo>::iterator arrayIter = replyInfo.arrayList.begin();
+//		string str = (*arrayIter).arrayValue;
+//		if (str.find("myself,slave") != string::npos)
+//		{
+//			m_logger.info("the redis cluster:[%s:%d] is slave. not use it reply,look for master.", serverInfo.serverIp.c_str(), serverInfo.serverPort);
+//			freeReplyInfo(replyInfo);
+//			connection->close();
+//			delete connection;
+//			continue;
+//		}
+		REDIS_CLUSTER_MAP clusterMap;
+		if (!parseClusterInfo(replyInfo, clusterMap))
+		{
+//			m_logger.error("parse cluster info from redis reply failed.");
+			LOG(ERROR)<<"parse cluster info from redis reply failed.";
+			connection->close();
+			delete connection;
+			freeReplyInfo(replyInfo);
+			freeCommandList(paraList);
+			return false;
+		}
+		{
+			WriteGuard guard(m_rwClusterMutex);
+			m_clusterMap = clusterMap;
+		}
+		freeReplyInfo(replyInfo);
+		connection->close();
+		delete connection;
+		success = true;
+		break;
+	}	
+	freeCommandList(paraList);
+	return success;
 }
 
 bool RedisClient::initRedisCluster()
@@ -114,6 +292,8 @@ bool RedisClient::initRedisCluster()
 		{
 //			m_logger.warn("init cluster:[%s] connect pool failed.", (*clusterIter).first.c_str());
 			LOG(ERROR)<<"init cluster:["<<(*clusterIter).first<<"] connect pool failed.";
+			delete ((*clusterIter).second).clusterHandler;
+			((*clusterIter).second).clusterHandler=NULL;
 			return false;
 		}
 		//fill slot map
@@ -135,46 +315,402 @@ bool RedisClient::initRedisCluster()
 	return true;
 }
 
-//void RedisClient::checkState()
-//{
-//    if(m_redisMode==PROXY_MODE)
-//    {
-//        m_logger.info("m_redisProxy : proxyId %s, connectIp %s, connnecPort %d, connectionNum %d, keepaliveTime %d, clusterHandler %x", m_redisProxy.proxyId.c_str(), m_redisProxy.connectIp.c_str(), m_redisProxy.connectPort, m_redisProxy.connectionNum, m_redisProxy.keepaliveTime, m_redisProxy.clusterHandler);
-//        if(m_redisProxy.clusterHandler==NULL)
-//            m_logger.error("redis client proxy check failed");
-//    }
-//    else
-//        m_logger.info("CLUSTER MODE");
-//}
-
-bool RedisClient::initRedisProxy()
+bool RedisClient::initSentinels()
 {
-//    WriteGuard guard(m_rwProxyMutex);
-	m_redisProxy.connectIp=m_serverList.front().serverIp;
-	m_redisProxy.connectPort=m_serverList.front().serverPort;
-	m_redisProxy.proxyId=m_redisProxy.connectIp+":"+toStr(m_redisProxy.connectPort);
-	m_redisProxy.connectionNum=m_connectionNum;
-	m_redisProxy.keepaliveTime=m_keepaliveTime;
-
-    if(m_redisProxy.clusterHandler != NULL)
-    {
-//        m_logger.error("why m_redisProxy.clusterHandler not NULL when initRedisProxy");
-		LOG(ERROR)<<"why m_redisProxy.clusterHandler not NULL when initRedisProxy";
-        freeRedisProxy();
-    }
-	m_redisProxy.clusterHandler = new RedisCluster();
-    if(m_redisProxy.clusterHandler==NULL)
-    {
-        return false;
-    }
-	if (!m_redisProxy.clusterHandler->initConnectPool(m_redisProxy.connectIp, m_redisProxy.connectPort, m_redisProxy.connectionNum, m_redisProxy.keepaliveTime))
+	bool masterNodeGot=false;
+	int aliveSentinel=0;
+	bool switchMasterSubsribed=false;
+	for(REDIS_SERVER_LIST::const_iterator it=m_sentinelList.begin(); it!=m_sentinelList.end(); ++it)
 	{
-//		m_logger.warn("init proxy:[%s] connect pool failed.", m_redisProxy.proxyId.c_str());
-		LOG(ERROR)<<"init redis-server:["<<m_redisProxy.proxyId<<"] connect pool failed.";
+		RedisProxyInfo sentinalHandler;
+		sentinalHandler.connectIp=it->serverIp;
+		sentinalHandler.connectPort=it->serverPort;
+		sentinalHandler.proxyId=it->serverIp+":"+toStr(sentinalHandler.connectPort);
+		sentinalHandler.isAlived=false;
+		sentinalHandler.clusterHandler=new RedisCluster;
+		if(sentinalHandler.clusterHandler==NULL)
+		{
+			LOG(ERROR)<<"new RedisCluster failed";			
+		}
+		else
+		{
+			// one for control and check, like ckquorum; one for subscribe +switch-master
+			int connection_num_to_sentinel=2;
+			if (!sentinalHandler.clusterHandler->initConnectPool(sentinalHandler.connectIp, sentinalHandler.connectPort, connection_num_to_sentinel, m_keepaliveTime))
+			{
+				LOG(ERROR)<<"init sentinel:["<<sentinalHandler.proxyId<<"] connect pool failed.";
+			}
+			else
+			{
+				sentinalHandler.isAlived=true;
+				aliveSentinel++;
+			}
+		}
+
+		m_sentinelHandlers[sentinalHandler.proxyId]=sentinalHandler;
+
+		if(!sentinalHandler.isAlived)
+			continue;
+
+		if(!SubscribeSwitchMaster(sentinalHandler.clusterHandler))
+		{
+			LOG(ERROR)<<"sentinel "<<sentinalHandler.proxyId<<" subscribe +switch-master failed";
+		}
+		else
+		{
+			switchMasterSubsribed=true;
+		}
+
+		if(!masterNodeGot)
+		{
+			if(SentinelGetMasterAddrByName(sentinalHandler.clusterHandler, m_initMasterAddr))
+			{
+				masterNodeGot=true;
+			}
+		}
+	}
+	LOG(INFO)<<"config sentinel size is "<<m_sentinelList.size()<<", connected sentinel is "<<aliveSentinel;
+
+	if(!StartSentinelHealthCheckTask())
+	{
+		LOG(WARNING)<<"fail to start sentinel health check task";
+	}
+	
+	if(!masterNodeGot)
+	{
+		LOG(ERROR)<<"get master addr failed";
+		goto CLEAR_SENTINELS;
+	}
+
+	if(!switchMasterSubsribed)
+	{
+		LOG(ERROR)<<"subscribe +switch-master failed";
+		goto CLEAR_SENTINELS;
+	}
+
+	return true;
+
+CLEAR_SENTINELS:
+	for(map<string, RedisProxyInfo>::iterator it=m_sentinelHandlers.begin(); it!=m_sentinelHandlers.end(); ++it)
+	{
+		if(it->second.clusterHandler)
+		{
+			it->second.clusterHandler->freeConnectPool();
+			delete it->second.clusterHandler;
+		}
+	}
+	m_sentinelHandlers.clear();
+	return false;
+}
+
+bool RedisClient::StartSentinelHealthCheckTask()
+{
+	// ping
+
+	// subsribe +switch-master
+	
+
+	return true;
+}
+
+struct SwitchMasterThreadArgType
+{
+	RedisConnection* con;
+	RedisClient* client;
+};
+
+bool RedisClient::SubscribeSwitchMaster(RedisCluster* cluster)
+{
+	RedisConnection* con=cluster->getAvailableConnection();
+	if(con==NULL)
+	{
+		LOG(ERROR)<<"cannot acquire a redis connection";
 		return false;
 	}
-//	m_logger.debug("init proxy:[%s] connect pool ok.", m_redisProxy.proxyId.c_str());
-	LOG(INFO)<<"init redis-server:["<<m_redisProxy.proxyId<<"] connect pool ok.";
+	con->SetCanRelease(false);
+
+	list<RedisCmdParaInfo> paraList;
+	int32_t paraLen = 0;
+	string cmd1="subscribe";
+	fillCommandPara(cmd1.c_str(), cmd1.size(), paraList);
+	paraLen += cmd1.size()+10;
+	string cmd2="+switch-master";
+	fillCommandPara(cmd2.c_str(), cmd2.size(), paraList);
+	paraLen += cmd2.size()+10;
+
+		
+	RedisReplyInfo replyInfo;
+	bool success=con->doRedisCommand(paraList, paraLen, replyInfo);
+	if(!success)
+	{
+		LOG(ERROR)<<"do cmd subscribe +switch-master failed";
+		return false;
+	}
+
+	if(!ParseSubsribeSwitchMasterReply(replyInfo))
+	{
+		LOG(INFO)<<"subscribe +switch-master failed";
+		return false;
+	}
+
+	pthread_t thread_id;
+	SwitchMasterThreadArgType arg;
+	arg.con=con;
+	arg.client=this;
+	if(pthread_create(&thread_id, NULL, SubscribeSwitchMasterThreadFun, &arg))
+	{
+		PLOG(ERROR)<<"create subscribe +switch-master thread failed";
+		return false;
+	}
+	
+	return true;
+}
+
+void* RedisClient::SubscribeSwitchMasterThreadFun(void* arg)
+{
+	LOG(INFO)<<"subscribe +switch-master thread start";
+	SwitchMasterThreadArgType tmp=*(SwitchMasterThreadArgType*)arg;
+	
+	RedisClient* client=tmp.client;
+	RedisConnection* con=tmp.con;
+
+	int handler;
+	if(!con->ListenMessage(handler))
+	{
+		LOG(ERROR)<<"fail to listen switch-master mesages";
+		return 0;
+	}
+	while(true)
+	{
+		RedisReplyInfo replyInfo;
+		if(con->WaitMessage(handler))
+		{
+			con->recv(replyInfo);
+		}
+
+		RedisServerInfo masterAddr;		
+		if(!client->ParseSwithMasterMessage(replyInfo, masterAddr))
+		{
+			LOG(ERROR)<<"get new master failed";
+			continue;
+		}
+
+		client->DoSwitchMaster(masterAddr);
+	}
+
+	con->StopListen(handler);
+	
+	return NULL;
+}
+
+bool RedisClient::ParseSwithMasterMessage(const RedisReplyInfo& replyInfo, RedisServerInfo& masterAddr)
+{
+	LOG(INFO)<<"ParseSwithMasterMessage has replyType "<<replyInfo.replyType<<", resultString "<<replyInfo.resultString<<", intValue "<<replyInfo.intValue;
+
+	if (replyInfo.replyType == RedisReplyType::REDIS_REPLY_ERROR)
+	{
+		LOG(INFO)<<"get error reply.";
+		return false;
+	}
+
+	if (replyInfo.replyType != RedisReplyType::REDIS_REPLY_ARRAY)
+	{
+		LOG(INFO)<<"get string reply: "<<replyInfo.resultString;
+		return false;
+	}
+
+	if(replyInfo.arrayList.size()!=3)
+	{
+		return false;
+	}
+	int i=0;
+	list<ReplyArrayInfo>::const_iterator arrayIter;
+	for (arrayIter = replyInfo.arrayList.begin(); arrayIter != replyInfo.arrayList.end(); arrayIter++, i++)
+	{
+		LOG(INFO)<<"arrayList has replyType "<<(*arrayIter).replyType<<", arrayValue "<<arrayIter->arrayValue<<", arrayLen "<<arrayIter->arrayLen;
+		
+		if ((*arrayIter).replyType == RedisReplyType::REDIS_REPLY_STRING)
+		{
+			string message = (*arrayIter).arrayValue;
+			LOG(INFO)<<message;
+			//  "mymaster 192.168.12.59 7100 192.168.12.59 7102"
+			if(i==2)
+			{
+				string::size_type pos=message.rfind(' ');
+				if(pos==string::npos)
+					return false;
+				masterAddr.serverPort=atoi(message.substr(pos+1).c_str());
+				string::size_type pos2=pos-1;
+				pos=message.rfind(' ', pos2);
+				if(pos==string::npos)
+					return false;
+				masterAddr.serverIp=message.substr(pos, pos2-pos);
+				LOG(INFO)<<"get new master addr: "<<masterAddr.serverIp<<", "<<masterAddr.serverPort;
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+bool RedisClient::ParseSubsribeSwitchMasterReply(const RedisReplyInfo& replyInfo)
+{
+	LOG(INFO)<<"subscribe +switch-master has replyType "<<replyInfo.replyType<<", resultString "<<replyInfo.resultString<<", intValue "<<replyInfo.intValue;
+
+	if (replyInfo.replyType == RedisReplyType::REDIS_REPLY_ERROR)
+	{
+		LOG(INFO)<<"get error reply.";
+		return false;
+	}
+
+	if (replyInfo.replyType != RedisReplyType::REDIS_REPLY_ARRAY)
+	{
+		LOG(INFO)<<"get string reply: "<<replyInfo.resultString;
+		return false;
+	}
+
+	if(replyInfo.arrayList.size()!=3)
+	{
+		return false;
+	}
+	int i=0;
+	list<ReplyArrayInfo>::const_iterator arrayIter;
+	for (arrayIter = replyInfo.arrayList.begin(); arrayIter != replyInfo.arrayList.end(); arrayIter++, i++)
+	{
+		LOG(INFO)<<"arrayList has replyType "<<(*arrayIter).replyType<<", arrayValue "<<arrayIter->arrayValue<<", arrayLen "<<arrayIter->arrayLen;
+		
+		if ((*arrayIter).replyType == RedisReplyType::REDIS_REPLY_STRING)
+		{
+			string message = (*arrayIter).arrayValue;
+			LOG(INFO)<<message;
+			if(i==2   &&  message!=":1")
+			{
+				LOG(ERROR)<<"subscribe +switch-master return error: "<<message;
+				return false;
+			}
+		}
+	}
+	return true;
+}
+
+bool RedisClient::DoSwitchMaster(const RedisServerInfo& masterAddr)
+{
+	WriteGuard guard(m_rwMasterMutex);
+	m_masterClusterId=masterAddr.serverIp+":"+toStr(masterAddr.serverPort);
+
+	// TODO
+	if(m_dataNodes.count(m_masterClusterId)==0)
+	{
+		LOG(ERROR)<<"no info of new master: "<<m_masterClusterId;
+		return false;
+	}
+
+	RedisProxyInfo& masterInfo=m_dataNodes[m_masterClusterId];
+	if(masterInfo.isAlived)
+	{
+		LOG(INFO)<<"master "<<m_masterClusterId<<" has connected";
+		return true;
+	}
+
+	if(masterInfo.clusterHandler==NULL)
+	{
+		masterInfo.clusterHandler=new RedisCluster();
+		if(masterInfo.clusterHandler==NULL)
+			return false;
+	}
+
+	if(!masterInfo.clusterHandler->initConnectPool(masterInfo.connectIp, masterInfo.connectPort, m_connectionNum, m_keepaliveTime))
+	{
+		LOG(ERROR)<<"init master connection pool failed";
+		return false;
+	}
+	masterInfo.isAlived=true;
+	return true;
+}
+
+bool RedisClient::initMasterSlaves()
+{
+	vector<RedisServerInfo> slavesAddr;
+	RedisProxyInfo masterNode;
+	masterNode.connectIp=m_initMasterAddr.serverIp;
+	masterNode.connectPort=m_initMasterAddr.serverPort;
+	masterNode.proxyId=masterNode.connectIp+":"+toStr(masterNode.connectPort);
+	masterNode.isAlived=false;
+	masterNode.clusterHandler=new RedisCluster;
+	if(masterNode.clusterHandler==NULL)
+	{
+		return false;
+	}
+	if(masterNode.clusterHandler->initConnectPool(masterNode.connectIp, masterNode.connectPort, m_connectionNum, m_keepaliveTime))
+	{
+		LOG(ERROR)<<"init master node connection pool failed";
+		goto CLEAR_DATANODES;
+	}
+	
+	masterNode.isAlived=true;
+	m_dataNodes[masterNode.proxyId]=masterNode;
+
+//	if(!SentinelGetSlavesInfo(slavesAddr))
+//	{
+//		
+//	}
+	if(!MasterGetReplicationSlavesInfo(masterNode.clusterHandler, slavesAddr))
+	{
+		LOG(WARNING)<<"get slave nodes failed";
+		goto CLEAR_DATANODES;
+	}
+
+	LOG(INFO)<<"slaves count is "<<slavesAddr.size();
+	for(size_t i=0; i<slavesAddr.size(); i++)
+	{
+		RedisProxyInfo slave_node;
+		slave_node.connectIp=slavesAddr[i].serverIp;
+		slave_node.connectPort=slavesAddr[i].serverPort;
+		slave_node.proxyId=slave_node.connectIp+":"+toStr(slave_node.connectPort);
+		slave_node.isAlived=false;
+		slave_node.clusterHandler=new RedisCluster;
+		if(slave_node.clusterHandler==NULL)
+		{
+			LOG(ERROR)<<"new slave RedisCluster failed";
+		}
+		else if(!slave_node.clusterHandler->initConnectPool(slave_node.connectIp, slave_node.connectPort, m_connectionNum, m_keepaliveTime))
+		{
+			LOG(WARNING)<<"init slave connection pool failed";
+		}
+		else
+		{
+			slave_node.isAlived=true;
+		}
+
+		m_dataNodes[slave_node.proxyId]=slave_node;
+	}
+	return true;
+
+CLEAR_DATANODES:
+	for(map<string, RedisProxyInfo>::iterator it=m_dataNodes.begin(); it!=m_dataNodes.end(); ++it)
+	{
+		if(it->second.clusterHandler)
+		{
+			it->second.clusterHandler->freeConnectPool();
+			delete it->second.clusterHandler;
+		}
+	}
+	m_dataNodes.clear();
+	return false;
+}
+
+bool RedisClient::freeRedisProxy()
+{
+//	WriteGuard guard(m_rwProxyMutex);
+	if (m_redisProxy.clusterHandler != NULL)
+	{
+//        m_logger.info("freeRedisProxy call freeConnectionPool");
+		LOG(INFO)<<"freeRedisProxy call freeConnectionPool";
+		m_redisProxy.clusterHandler->freeConnectPool();
+        delete m_redisProxy.clusterHandler;
+		m_redisProxy.clusterHandler = NULL;
+	}
+
 	return true;
 }
 
@@ -192,22 +728,233 @@ bool RedisClient::freeRedisCluster()
 			clusterInfo.clusterHandler = NULL;
 		}
 	}
+	m_clusterMap.clear();
 	return true;
 }
 
-bool RedisClient::freeRedisProxy()
+bool RedisClient::freeSentinels()
 {
-//	WriteGuard guard(m_rwProxyMutex);
-	if (m_redisProxy.clusterHandler != NULL)
+	for(map<string, RedisProxyInfo>::iterator it=m_sentinelHandlers.begin(); it!=m_sentinelHandlers.end(); ++it)
 	{
-//        m_logger.info("freeRedisProxy call freeConnectionPool");
-		LOG(INFO)<<"freeRedisProxy call freeConnectionPool";
-		m_redisProxy.clusterHandler->freeConnectPool();
-        if(m_redisProxy.clusterHandler)
-    		delete m_redisProxy.clusterHandler;
-		m_redisProxy.clusterHandler = NULL;
+		if(it->second.clusterHandler)
+		{
+			it->second.clusterHandler->freeConnectPool();
+			delete it->second.clusterHandler;
+			it->second.clusterHandler=NULL;
+		}
+	}
+	m_sentinelHandlers.clear();
+	return true;
+}
+
+bool RedisClient::freeMasterSlaves()
+{
+	for(map<string, RedisProxyInfo>::iterator it=m_dataNodes.begin(); it!=m_dataNodes.end(); ++it)
+	{
+		if(it->second.clusterHandler)
+		{
+			if(it->second.isAlived)
+				it->second.clusterHandler->freeConnectPool();
+			delete it->second.clusterHandler;
+			it->second.clusterHandler=NULL;
+		}
+	}
+	m_dataNodes.clear();
+	return true;
+}
+
+bool RedisClient::SentinelGetMasterAddrByName(RedisCluster* cluster, RedisServerInfo& serverInfo)
+{
+	list<RedisCmdParaInfo> paraList;
+	int32_t paraLen = 0;
+	string cmd1="sentinel";
+	fillCommandPara(cmd1.c_str(), cmd1.size(), paraList);
+	paraLen += cmd1.size()+10;
+	string cmd2="get-master-addr-by-name";
+	fillCommandPara(cmd2.c_str(), cmd2.size(), paraList);
+	paraLen += cmd2.size()+10;
+	fillCommandPara(m_masterName.c_str(), m_masterName.length(), paraList);
+	paraLen += m_masterName.length() + 10;
+		
+	RedisReplyInfo replyInfo;
+	bool success=cluster->doRedisCommand(paraList, paraLen, replyInfo);
+	freeCommandList(paraList);
+	if(!success)
+	{
+		LOG(ERROR)<<"sentinel get-master-addr-by-name failed";
+		return false;
 	}
 
+	if(!ParseSentinelGetMasterReply(replyInfo, serverInfo))
+	{
+		freeReplyInfo(replyInfo);
+		return false;
+	}
+	else
+	{
+		freeReplyInfo(replyInfo);
+		return true;
+	}
+}
+
+bool RedisClient::ParseSentinelGetMasterReply(const RedisReplyInfo& replyInfo, RedisServerInfo& serverInfo)
+{
+	LOG(INFO)<<"sentinel get-master-addr-by-name command has replyType "<<replyInfo.replyType<<", resultString "<<replyInfo.resultString<<", intValue "<<replyInfo.intValue;
+
+	if (replyInfo.replyType == RedisReplyType::REDIS_REPLY_ERROR)
+	{
+		LOG(INFO)<<"get empty list or set.";
+		return false;
+	}
+
+	if (replyInfo.replyType != RedisReplyType::REDIS_REPLY_ARRAY)
+	{
+		LOG(ERROR)<<"recv redis wrong reply type:["<<replyInfo.replyType<<"].";
+		return false;
+	}
+
+	if(replyInfo.arrayList.size()!=2)
+	{
+		LOG(ERROR)<<"wrong result";
+		return false;
+	}
+	
+	list<ReplyArrayInfo>::const_iterator arrayIter=replyInfo.arrayList.begin();
+	serverInfo.serverIp=arrayIter->arrayValue;
+
+	arrayIter++;
+	LOG(INFO)<<"arrayList replyType "<<(*arrayIter).replyType<<", arrayValue "<<arrayIter->arrayValue<<", arrayLen "<<arrayIter->arrayLen;
+	serverInfo.serverPort=atoi(arrayIter->arrayValue);
+
+	LOG(INFO)<<"sentinel get-master-addr-by-name ok: "<<serverInfo.serverIp<<", "<<serverInfo.serverPort;
+	return true;
+}
+
+void RedisClient::DoTestOfSentinelSlavesCommand()
+{
+	for(map<string, RedisProxyInfo>::iterator it=m_sentinelHandlers.begin(); it!=m_sentinelHandlers.end(); ++it)
+	{
+		if(it->second.isAlived)
+		{
+			vector<RedisServerInfo> slavesAddr;
+			if(SentinelGetSlavesInfo(it->second.clusterHandler, slavesAddr))
+			{
+				LOG(INFO)<<"norah do test ok";
+				return;
+			}
+			else
+			{
+				LOG(INFO)<<"norah do test failed";
+			}
+		}
+	}
+}
+
+bool RedisClient::SentinelGetSlavesInfo(RedisCluster* cluster, vector<RedisServerInfo>& slavesAddr)
+{
+	list<RedisCmdParaInfo> paraList;
+	int32_t paraLen = 0;
+	string cmd1="sentinel";
+	fillCommandPara(cmd1.c_str(), cmd1.size(), paraList);
+	paraLen += cmd1.size()+10;
+	string cmd2="slaves";
+	fillCommandPara(cmd2.c_str(), cmd2.size(), paraList);
+	paraLen += cmd2.size()+10;
+	fillCommandPara(m_masterName.c_str(), m_masterName.length(), paraList);
+	paraLen += m_masterName.length() + 20;
+		
+	RedisReplyInfo replyInfo;
+	bool success=cluster->doRedisCommand(paraList, paraLen, replyInfo);
+	freeCommandList(paraList);
+	if(!success)
+	{
+		LOG(ERROR)<<"sentinel slaves failed";
+		return false;
+	}
+
+	if(!ParseSentinelSlavesReply(replyInfo, slavesAddr))
+	{
+		freeReplyInfo(replyInfo);
+		return false;
+	}
+	else
+	{
+		freeReplyInfo(replyInfo);
+		return true;
+	}
+}
+
+bool RedisClient::ParseSentinelSlavesReply(const RedisReplyInfo& replyInfo, vector<RedisServerInfo>& slavesInfo)
+{
+	LOG(INFO)<<"sentinel slalves command has replyType "<<replyInfo.replyType<<", resultString "<<replyInfo.resultString<<", intValue "<<replyInfo.intValue;
+
+	if (replyInfo.replyType == RedisReplyType::REDIS_REPLY_ERROR)
+	{
+		LOG(INFO)<<"get empty list or set.";
+		return false;
+	}
+
+	if (replyInfo.replyType != RedisReplyType::REDIS_REPLY_ARRAY)
+	{
+		LOG(ERROR)<<"recv redis wrong reply type:["<<replyInfo.replyType<<"].";
+		return false;
+	}
+
+	
+	
+	return true;
+}
+
+bool RedisClient::MasterGetReplicationSlavesInfo(RedisCluster* cluster, vector<RedisServerInfo>& slaves)
+{
+	list<RedisCmdParaInfo> paraList;
+	int32_t paraLen = 0;
+	string cmd="info";
+	fillCommandPara(cmd.c_str(), cmd.size(), paraList);
+	paraLen += cmd.size()+10;
+	cmd="replication";
+	fillCommandPara(cmd.c_str(), cmd.size(), paraList);
+	paraLen += cmd.size()+10;
+	fillCommandPara(m_masterName.c_str(), m_masterName.length(), paraList);
+	paraLen += m_masterName.length() + 10;
+		
+	RedisReplyInfo replyInfo;
+	bool success=cluster->doRedisCommand(paraList, paraLen, replyInfo);
+	freeCommandList(paraList);
+	if(!success)
+	{
+		LOG(ERROR)<<"do info replication command failed";
+		return false;
+	}
+
+	if(!ParseInfoReplicationReply(replyInfo))
+	{
+		freeReplyInfo(replyInfo);
+		return false;
+	}
+	else
+	{
+		freeReplyInfo(replyInfo);
+		return true;
+	}	
+}
+
+bool RedisClient::ParseInfoReplicationReply(const RedisReplyInfo& replyInfo)
+{
+	LOG(INFO)<<"info replication has replyType "<<replyInfo.replyType<<", resultString "<<replyInfo.resultString<<", intValue "<<replyInfo.intValue;
+
+	if (replyInfo.replyType == RedisReplyType::REDIS_REPLY_ERROR)
+	{
+		LOG(INFO)<<"get empty list or set.";
+		return false;
+	}
+
+	if (replyInfo.replyType != RedisReplyType::REDIS_REPLY_STRING)
+	{
+		LOG(ERROR)<<"recv redis wrong reply type:["<<replyInfo.replyType<<"].";
+		return false;
+	}
+	
 	return true;
 }
 
@@ -448,10 +1195,15 @@ bool RedisClient::doRedisCommand(const string & key,
 	{
 		return doRedisCommandCluster(key, commandLen, commandList, commandType, serial, count);
 	}
-	else
+	else if(m_redisMode==STAND_ALONE_OR_PROXY_MODE)
 	{
 		return doRedisCommandProxy(key, commandLen, commandList, commandType, serial, count);
 	}
+	else if(m_redisMode==SENTINEL_MODE)
+	{
+		return doRedisCommandMaster(key, commandLen, commandList, commandType, serial, count);
+	}
+	return false;
 }
 
 bool RedisClient::doRedisCommandProxy(const string & key,
@@ -734,6 +1486,291 @@ bool RedisClient::doRedisCommandProxy(const string & key,
 			break;
 		default:
 //			m_logger.warn("recv unknown command type:%d", commandType);
+			LOG(ERROR)<<"recv unknown command type: "<<commandType;
+			return false;
+		
+	}
+	freeReplyInfo(replyInfo);
+	return true;
+}
+
+
+bool RedisClient::doRedisCommandMaster(const string & key,
+							int32_t commandLen,
+							list < RedisCmdParaInfo > & commandList,
+							int commandType,
+							DBSerialize * serial, int* count)
+{
+	RedisReplyInfo replyInfo;
+	bool needRedirect;
+	string redirectInfo;
+
+	RedisProxyInfo &masterNode=m_dataNodes[m_masterName];
+	if(masterNode.clusterHandler==NULL  ||  masterNode.isAlived==false)
+	{
+		LOG(ERROR)<<"master node not alive";
+        return false;
+    }
+	if(!masterNode.clusterHandler->doRedisCommand(commandList, commandLen, replyInfo))
+	{
+		freeReplyInfo(replyInfo);
+		LOG(ERROR)<<"proxy: "<<masterNode.proxyId<<" do redis command failed.";
+		return false;
+	}
+
+	switch (commandType)
+	{
+		case RedisCommandType::REDIS_COMMAND_GET:
+			
+			if(!parseGetSerialReply(replyInfo,*serial,needRedirect,redirectInfo))
+			{
+				LOG(ERROR)<<"parse key:["<<key<<"] get string reply failed. reply string:"<<replyInfo.resultString<<".";
+				freeReplyInfo(replyInfo);
+				return false;
+			}
+			break;
+		case RedisCommandType::REDIS_COMMAND_SET:
+			if(!parseSetSerialReply(replyInfo,needRedirect,redirectInfo))
+			{
+				LOG(ERROR)<<"parse key:["<<key<<"] get string reply failed. reply string:"<<replyInfo.resultString<<".";
+				freeReplyInfo(replyInfo);
+				return false;
+			}
+			break;
+		case RedisCommandType::REDIS_COMMAND_EXISTS:
+			if(!parseFindReply(replyInfo,needRedirect,redirectInfo))
+			{
+				LOG(ERROR)<<"parse key:["<<key<<"] get string reply failed. reply string:"<<replyInfo.resultString<<".";
+				freeReplyInfo(replyInfo);
+				return false;
+			}
+			//find
+			if(replyInfo.replyType == RedisReplyType::REDIS_REPLY_INTEGER && replyInfo.intValue == 1)
+			{
+//				m_logger.debug("find key:%s in redis db",key.c_str());
+				LOG(ERROR)<<"find key:"<<key<<" in redis db";
+				freeReplyInfo(replyInfo);
+				return true;
+			}
+			//not find
+			else if(replyInfo.replyType == RedisReplyType::REDIS_REPLY_INTEGER && replyInfo.intValue == 0)
+			{
+//				m_logger.warn("not find key:%s in redis db",key.c_str());
+				LOG(ERROR)<<"not find key:"<<key<<" in redis db";
+				freeReplyInfo(replyInfo);
+				return false;
+			}
+			break;
+		case RedisCommandType::REDIS_COMMAND_DEL:
+			if(!parseFindReply(replyInfo,needRedirect,redirectInfo))
+			{
+//				m_logger.warn("parse key:[%s] del string reply failed. reply string:%s.", key.c_str(), replyInfo.resultString.c_str());
+				LOG(ERROR)<<"parse key:["<<key<<"] del string reply failed. reply string:"<<replyInfo.resultString<<".";
+				freeReplyInfo(replyInfo);
+				return false;
+			}
+			//del success
+			if(replyInfo.replyType == RedisReplyType::REDIS_REPLY_INTEGER && replyInfo.intValue == 1)
+			{
+//				m_logger.debug("del key:%s from redis db success.",key.c_str());
+				LOG(INFO)<<"del key:"<<key<<" from redis db success.";
+				freeReplyInfo(replyInfo);
+				return true;
+			}
+			//del failed
+			else if(replyInfo.replyType == RedisReplyType::REDIS_REPLY_INTEGER && replyInfo.intValue == 0)
+			{
+//				m_logger.warn("del key:%s from redis db failed.",key.c_str());
+				LOG(WARNING)<<"del key:"<<key<<" from redis db failed.";
+				freeReplyInfo(replyInfo);
+				return false;
+			}
+			break;
+		case RedisCommandType::REDIS_COMMAND_EXPIRE:
+			if(!parseFindReply(replyInfo,needRedirect,redirectInfo))
+			{
+//				m_logger.warn("parse key:[%s] set expire reply failed. reply string:%s.", key.c_str(), replyInfo.resultString.c_str());
+				LOG(ERROR)<<"parse key:["<<key<<"] set expire reply failed. reply string: "<<replyInfo.resultString;
+				freeReplyInfo(replyInfo);
+				return false;
+			}
+			//set expire success
+			if(replyInfo.replyType == RedisReplyType::REDIS_REPLY_INTEGER && replyInfo.intValue == 1)
+			{
+//				m_logger.debug("set key:%s expire success.",key.c_str());
+				LOG(INFO)<<"set key:"<<key<<" expire success.";
+				freeReplyInfo(replyInfo);
+				return true;
+			}
+			//set expire failed
+			else if(replyInfo.replyType == RedisReplyType::REDIS_REPLY_INTEGER && replyInfo.intValue == 0)
+			{
+//				m_logger.warn("set key:%s expire failed.",key.c_str());
+				LOG(ERROR)<<"set key:"<<key<<" expire failed.";
+				freeReplyInfo(replyInfo);
+				return false;
+			}
+			break;
+		case RedisCommandType::REDIS_COMMAND_ZADD:
+			if(!parseFindReply(replyInfo,needRedirect,redirectInfo))
+			{
+//				m_logger.warn("parse key:[%s] zset add reply failed. reply string:%s.", key.c_str(), replyInfo.resultString.c_str());
+				LOG(ERROR)<<"parse key:["<<key<<"] zset add reply failed. reply string: "<<replyInfo.resultString;
+				freeReplyInfo(replyInfo);
+				return false;
+			}
+			// success
+			if(replyInfo.replyType == RedisReplyType::REDIS_REPLY_INTEGER && replyInfo.intValue == 1)
+			{
+//				m_logger.debug("zset key:%s add success.",key.c_str());
+				LOG(INFO)<<"zset key:"<<key<<" add success.";
+				freeReplyInfo(replyInfo);
+				return true;
+			}
+			// failed
+			else if(replyInfo.replyType == RedisReplyType::REDIS_REPLY_INTEGER && replyInfo.intValue == 0)
+			{
+//				m_logger.debug("zset key:%s add done,maybe exists.",key.c_str());
+				LOG(WARNING)<<"zset key:"<<key<<" add done,maybe exists.";
+				freeReplyInfo(replyInfo);
+				return false;
+			}				
+			break;
+		case RedisCommandType::REDIS_COMMAND_ZREM:
+			if(!parseFindReply(replyInfo,needRedirect,redirectInfo))
+			{
+//				m_logger.warn("parse key:[%s] zset rem reply failed. reply string:%s.", key.c_str(), replyInfo.resultString.c_str());
+				LOG(ERROR)<<"parse key:["<<key<<"] zset rem reply failed. reply string: "<<replyInfo.resultString;
+				freeReplyInfo(replyInfo);
+				return false;
+			}
+			// success
+			if(replyInfo.replyType == RedisReplyType::REDIS_REPLY_INTEGER && replyInfo.intValue == 1)
+			{
+//				m_logger.debug("set key:%s rem success.",key.c_str());
+				freeReplyInfo(replyInfo);
+				return true;
+			}
+			// failed
+			else if(replyInfo.replyType == RedisReplyType::REDIS_REPLY_INTEGER && replyInfo.intValue == 0)
+			{
+//				m_logger.warn("set key:%s rem failed.",key.c_str());
+				LOG(ERROR)<<"set key:"<<key<<" rem failed.";
+				freeReplyInfo(replyInfo);
+				return false;
+			}
+
+			break;
+		case RedisCommandType::REDIS_COMMAND_ZINCRBY:
+			// success
+			if(replyInfo.replyType == RedisReplyType::REDIS_REPLY_STRING)
+			{
+//				m_logger.debug("set key:%s zincrby success.",key.c_str());
+				LOG(ERROR)<<"set key:"<<key<<" zincrby success.";
+				freeReplyInfo(replyInfo);
+				return true;
+			}
+			// failed
+			else
+			{
+//				m_logger.warn("set key:%s zincrby failed.",key.c_str());
+				LOG(ERROR)<<"set key: "<<key<<"zincrby failed.";
+				freeReplyInfo(replyInfo);
+				return false;
+			}
+			break;
+
+		case RedisCommandType::REDIS_COMMAND_ZREMRANGEBYSCORE:
+			if(!parseFindReply(replyInfo,needRedirect,redirectInfo))
+			{
+//				m_logger.warn("parse key:[%s] zset zremrangebyscore reply failed. reply string:%s.", key.c_str(), replyInfo.resultString.c_str());
+				LOG(ERROR)<<"parse key:["<<key<<"] zset zremrangebyscore reply failed. reply string:"<<replyInfo.resultString;
+				freeReplyInfo(replyInfo);
+				return false;
+			}
+			// success
+			if(replyInfo.replyType == RedisReplyType::REDIS_REPLY_INTEGER && replyInfo.intValue > 0)
+			{
+//				m_logger.debug("set key:%s zremrangebyscore success.",key.c_str());
+				LOG(INFO)<<"set key:"<<key<<" zremrangebyscore success.";
+				freeReplyInfo(replyInfo);
+				return true;
+			}
+			// failed
+			else if(replyInfo.replyType == RedisReplyType::REDIS_REPLY_INTEGER && replyInfo.intValue == 0)
+			{
+//				m_logger.warn("set key:%s zremrangebyscore failed.",key.c_str());
+				LOG(ERROR)<<"set key:"<<key<<" zremrangebyscore failed.";
+				freeReplyInfo(replyInfo);
+				return false;
+			}
+			break;
+		case RedisCommandType::REDIS_COMMAND_ZCOUNT:
+        case RedisCommandType::REDIS_COMMAND_DBSIZE:
+		case RedisCommandType::REDIS_COMMAND_ZCARD:
+		case RedisCommandType::REDIS_COMMAND_SCARD:
+		case RedisCommandType::REDIS_COMMAND_SADD:
+		case RedisCommandType::REDIS_COMMAND_SREM:
+		case RedisCommandType::REDIS_COMMAND_SISMEMBER:
+			if(!parseFindReply(replyInfo,needRedirect,redirectInfo))
+			{
+//				m_logger.warn("parse key:[%s] zset add reply failed. reply string:%s.", key.c_str(), replyInfo.resultString.c_str());
+				LOG(ERROR)<<"parse key:["<<key<<"] zset add reply failed. reply string:"<<replyInfo.resultString;
+				freeReplyInfo(replyInfo);
+				return false;
+			}
+			
+			if(replyInfo.replyType == RedisReplyType::REDIS_REPLY_INTEGER)
+			{
+				if(count)
+					*count = replyInfo.intValue;
+//				m_logger.info("key %s commandType %d success, return integer %d", key.c_str(), commandType, replyInfo.intValue);
+				LOG(INFO)<<"key "<<key<<" commandType "<<commandType<<" success, return integer "<<replyInfo.intValue;
+				freeReplyInfo(replyInfo);
+				return true;
+			}
+			else
+			{
+//				m_logger.warn("key %s commandType %d, return error", key.c_str(), commandType);
+				LOG(ERROR)<<"key "<<key<<" commandType "<<commandType<<", return error";
+				return false;
+			}
+			break;
+		case RedisCommandType::REDIS_COMMAND_ZSCORE:			
+			{	
+				if (replyInfo.replyType != RedisReplyType::REDIS_REPLY_STRING)
+				{
+//					m_logger.warn("recv redis wrong reply type:[%d].", replyInfo.replyType);
+					LOG(ERROR)<<"recv redis wrong reply type:["<<replyInfo.replyType<<"]";
+					freeReplyInfo(replyInfo);
+					return false;
+				}
+				list<ReplyArrayInfo>::iterator iter = replyInfo.arrayList.begin();
+				if (iter == replyInfo.arrayList.end())
+				{
+//					m_logger.warn("reply not have array info.");
+					LOG(ERROR)<<"reply not have array info.";
+					freeReplyInfo(replyInfo);
+					return false;
+				}
+				if ((*iter).replyType == RedisReplyType::REDIS_REPLY_NIL)
+				{
+//					m_logger.warn("get failed,the key not exist.");
+					LOG(ERROR)<<"get failed,the key not exist.";
+					freeReplyInfo(replyInfo);
+					return false;
+				}
+				char score_c[64] = {0};
+				memcpy(score_c,(*iter).arrayValue,(*iter).arrayLen);
+				if(count==NULL)
+					return false;
+				*count = atoi(score_c);
+//				m_logger.info("key:%s,score:%d",key.c_str(), *count);
+				LOG(INFO)<<"key:"<<key<<", score:"<<*count;
+				return true;	
+			}
+			break;
+		default:
 			LOG(ERROR)<<"recv unknown command type: "<<commandType;
 			return false;
 		
@@ -1374,10 +2411,15 @@ bool RedisClient::doCommandArray(const string & key,int32_t commandLen,list < Re
 	{
 		return doCommandArrayCluster(key, commandLen, commandList, commandType, members);
 	}
-	else
+	else if(m_redisMode==STAND_ALONE_OR_PROXY_MODE)
 	{
 		return doCommandArrayProxy(key, commandLen, commandList, commandType, members);
 	}
+	else if(m_redisMode==SENTINEL_MODE)
+	{
+		return doCommandArrayMaster(key, commandLen, commandList, commandType, members);
+	}
+	return false;
 }
 
 bool RedisClient::doCommandArrayProxy(const string & key,int32_t commandLen,list < RedisCmdParaInfo > & commandList, int commandType, list<string>& members)
@@ -1412,6 +2454,36 @@ bool RedisClient::doCommandArrayProxy(const string & key,int32_t commandLen,list
 	return ret;
 }
 
+
+bool RedisClient::doCommandArrayMaster(const string & key,int32_t commandLen,list < RedisCmdParaInfo > & commandList, int commandType, list<string>& members)
+{
+	RedisReplyInfo replyInfo;
+	bool ret=false;
+    
+    RedisProxyInfo &masterNode=m_dataNodes[m_masterName];
+	if(masterNode.clusterHandler==NULL  ||  masterNode.isAlived==false)
+	{
+		LOG(ERROR)<<"master node not alive";
+        return false;
+    }
+	if(!masterNode.clusterHandler->doRedisCommand(commandList, commandLen, replyInfo))
+	{
+		freeReplyInfo(replyInfo);
+		LOG(ERROR)<<"proxy:"<<masterNode.proxyId<<" do redis command failed.";
+		return false;
+	}
+	switch(commandType)
+	{
+		case RedisCommandType::REDIS_COMMAND_ZRANGEBYSCORE:
+		case RedisCommandType::REDIS_COMMAND_SMEMBERS:
+			ret=parseGetKeysReply(replyInfo, members);
+			break;
+		default:
+			LOG(ERROR)<<"unsupported commandType "<<commandType;
+			break;
+	}
+	return ret;
+}
 
 bool RedisClient::doCommandArrayCluster(const string & key,int32_t commandLen,list < RedisCmdParaInfo > & commandList, int commandType, list<string>& members)
 {
@@ -1963,89 +3035,6 @@ void RedisClient::releaseUnusedClusterHandler()
 	}
 }
 
-bool RedisClient::getRedisClusterNodes()
-{
-	assert(m_redisMode==CLUSTER_MODE);
-	bool success = false;
-	list<RedisCmdParaInfo> paraList;
-	int32_t paraLen = 0;
-	fillCommandPara("cluster", 7, paraList);
-	fillCommandPara("nodes", 5, paraList);
-	paraLen += 30;
-	REDIS_SERVER_LIST::iterator iter;
-	for (iter = m_serverList.begin(); iter != m_serverList.end(); iter++)
-	{
-		RedisServerInfo serverInfo = (*iter);
-		//m_logger.warn("EEEEEconnect to serverIp:[%s] serverPort:[%d].", serverInfo.serverIp.c_str(), serverInfo.serverPort);
-		
-		RedisConnection *connection = new RedisConnection(serverInfo.serverIp, serverInfo.serverPort, m_keepaliveTime);
-		if (!connection->connect())
-		{
-//			m_logger.warn("connect to serverIp:[%s] serverPort:[%d] failed.", serverInfo.serverIp.c_str(), serverInfo.serverPort);
-			LOG(WARNING)<<"connect to serverIp:["<<serverInfo.serverIp<<"] serverPort:["<<serverInfo.serverPort<<"] failed.";
-			continue;
-		}
-		//send cluster nodes.
-		RedisReplyInfo replyInfo;
-		if (!connection->doRedisCommand(paraList, paraLen, replyInfo))
-		{
-//			m_logger.warn("do get cluster nodes failed.");
-			LOG(WARNING)<<"do get cluster nodes failed.";
-			continue;
-		}
-		if (replyInfo.replyType == RedisReplyType::REDIS_REPLY_ERROR)
-		{
-//			m_logger.warn("recv redis error response:[%s].", replyInfo.resultString.c_str());
-			LOG(ERROR)<<"recv redis error response:["<<replyInfo.resultString<<"].";
-			connection->close();
-			delete connection;
-			freeReplyInfo(replyInfo);
-			freeCommandList(paraList);
-			return false;
-		}
-		if (replyInfo.replyType != RedisReplyType::REDIS_REPLY_STRING)
-		{
-//			m_logger.warn("recv redis wrong reply type:[%d].", replyInfo.replyType);
-			LOG(ERROR)<<"recv redis wrong reply type:["<<replyInfo.replyType<<"].";
-			connection->close();
-			delete connection;
-			freeReplyInfo(replyInfo);
-			freeCommandList(paraList);
-			return false;
-		}
-		//check if master,slave parameter may be not newest.
-		list<ReplyArrayInfo>::iterator arrayIter = replyInfo.arrayList.begin();
-		string str = (*arrayIter).arrayValue;
-//		if (str.find("myself,slave") != string::npos)
-//		{
-//			m_logger.info("the redis cluster:[%s:%d] is slave. not use it reply,look for master.", serverInfo.serverIp.c_str(), serverInfo.serverPort);
-//			freeReplyInfo(replyInfo);
-//			connection->close();
-//			delete connection;
-//			continue;
-//		}
-		REDIS_CLUSTER_MAP clusterMap;
-		if (!parseClusterInfo(replyInfo, clusterMap))
-		{
-//			m_logger.error("parse cluster info from redis reply failed.");
-			LOG(ERROR)<<"parse cluster info from redis reply failed.";
-			freeCommandList(paraList);
-			return false;
-		}
-		{
-			WriteGuard guard(m_rwClusterMutex);
-			m_clusterMap = clusterMap;
-		}
-		freeReplyInfo(replyInfo);
-		connection->close();
-		delete connection;
-		success = true;
-		break;
-	}	
-	freeCommandList(paraList);
-	return success;
-}
-
 bool RedisClient::parseClusterInfo(RedisReplyInfo & replyInfo,REDIS_CLUSTER_MAP & clusterMap)
 {
 	//get reply string
@@ -2233,7 +3222,7 @@ void RedisClient::parseSlotStr(string & slotStr,uint16_t & startSlotNum,uint16_t
 bool RedisClient::checkIfNeedRedirect(RedisReplyInfo & replyInfo,bool & needRedirect,string & redirectInfo)
 {
 	//assert(m_redisMode==CLUSTER_MODE);
-	if(m_redisMode == PROXY_MODE)
+	if(m_redisMode == STAND_ALONE_OR_PROXY_MODE)
 	{
 		return false;
 	}
@@ -2825,14 +3814,13 @@ bool RedisClient::smembers(const string& key, list<string>& members)
 }
 
 /*
-	API for transaction
+	API for transaction of STAND_ALONE_OR_PROXY_MODE
 */
 bool RedisClient::PrepareTransaction(RedisConnection** conn)
 {
-    if(m_redisMode==CLUSTER_MODE)
+    if(m_redisMode!=STAND_ALONE_OR_PROXY_MODE)
     {
-//        m_logger.error("transaction not supported in cluster mode");
-		LOG(ERROR)<<"transaction not supported in cluster mode";
+		LOG(ERROR)<<"transaction only supported in standalone mode";
         return false;
     }
     
@@ -2843,6 +3831,7 @@ bool RedisClient::PrepareTransaction(RedisConnection** conn)
 		LOG(ERROR)<<"cannot acquire a redis connection";
         return false;
     }
+    con->SetCanRelease(false);
     *conn=con;
 	return true;
 }
@@ -2884,12 +3873,11 @@ bool RedisClient::Unwatch(RedisConnection* con)
 
 bool RedisClient::StartTransaction(RedisConnection* con)
 {
-    if(m_redisMode==CLUSTER_MODE)
+    if(m_redisMode!=STAND_ALONE_OR_PROXY_MODE)
     {
-//        m_logger.error("transaction not supported in cluster mode");
-		LOG(ERROR)<<"transaction not supported in cluster mode";
+		LOG(ERROR)<<"transaction only supported in standalone mode";
         return false;
-    }    
+    }
 
 	bool success = false;
 	list<RedisCmdParaInfo> multiParaList;
@@ -2911,10 +3899,9 @@ bool RedisClient::StartTransaction(RedisConnection* con)
 
 bool RedisClient::DiscardTransaction(RedisConnection* con)
 {
-    if(m_redisMode==CLUSTER_MODE)
+    if(m_redisMode!=STAND_ALONE_OR_PROXY_MODE)
     {
-//        m_logger.error("transaction not supported in cluster mode");
-		LOG(ERROR)<<"transaction not supported in cluster mode";
+		LOG(ERROR)<<"transaction only supported in standalone mode";
         return false;
     }
 
@@ -2936,10 +3923,9 @@ bool RedisClient::DiscardTransaction(RedisConnection* con)
 
 bool RedisClient::ExecTransaction(RedisConnection* con)
 {
-    if(m_redisMode==CLUSTER_MODE)
+    if(m_redisMode!=STAND_ALONE_OR_PROXY_MODE)
     {
-//        m_logger.error("transaction not supported in cluster mode");
-		LOG(ERROR)<<"transaction not supported in cluster mode";
+		LOG(ERROR)<<"transaction only supported in standalone mode";
         return false;
     }
 
@@ -2967,10 +3953,9 @@ bool RedisClient::ExecTransaction(RedisConnection* con)
 
 bool RedisClient::FinishTransaction(RedisConnection** conn)
 {
-    if(m_redisMode==CLUSTER_MODE)
+    if(m_redisMode!=STAND_ALONE_OR_PROXY_MODE)
     {
-//        m_logger.error("transaction not supported in cluster mode");
-		LOG(ERROR)<<"transaction not supported in cluster mode";
+		LOG(ERROR)<<"transaction only supported in standalone mode";
         return false;
     }
 

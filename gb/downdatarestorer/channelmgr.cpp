@@ -47,9 +47,9 @@ int ChannelMgr::SearchChannel(const string& channel_id, Channel& channel)
 
 int ChannelMgr::InsertChannel(const Channel& channel)
 {
-	if(redis_mode_==STAND_ALONE)
+	if(redis_mode_==STAND_ALONE_OR_PROXY_MODE)
 		return InsertChannelInTransaction(channel);
-	else //if(redis_mode_==CLUSTER)
+	else //if(redis_mode_==CLUSTER_MODE)
 		return InsertChannelInCluster(channel);
 }
 
@@ -125,9 +125,9 @@ FAIL:
 
 int ChannelMgr::DeleteChannel(const Channel& channel)
 {
-	if(redis_mode_==STAND_ALONE)
+	if(redis_mode_==STAND_ALONE_OR_PROXY_MODE)
 		return DeleteChannelInTransaction(channel);
-	else //if(redis_mode_==CLUSTER)
+	else //if(redis_mode_==CLUSTER_MODE)
 		return DeleteChannelInCluster(channel);
 }
 

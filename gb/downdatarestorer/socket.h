@@ -71,6 +71,10 @@ public:
     int getSoTimeout() const;
     void setSoTimeout(int timeout);
 
+	bool WatchReadEvent(int& epollfd);
+	bool WaitReadEvent(int epollfd);
+    bool UnWatchEvent(int handler);
+
 private:
     int __bindv4(InetAddr host, int port);
     int __bindv6(InetAddr host, int port);

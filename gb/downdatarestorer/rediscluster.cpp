@@ -1,5 +1,6 @@
 #include "rediscluster.h"
 #include"util.h"
+#include"glog/logging.h"
 
 #define CONNECTION_RELEASE_TIME 10
 
@@ -31,7 +32,8 @@ bool RedisCluster::initConnectPool(const string & clusterIp,uint32_t clusterPort
 		RedisConnection *connection = new RedisConnection(clusterIp, clusterPort, keepaliveTime);
 		if(!connection->connect())
 		{
-//			m_logger.warn("connect to clusterIp:%s clusterPort:%d failed.", clusterIp.c_str(), clusterPort);
+			LOG(ERROR)<<"connect to clusterIp:"<<clusterIp<<" clusterPort:"<<clusterPort<<" failed.";
+			delete connection;
 			return false;
 		}
 		connection->m_available = true;
@@ -165,6 +167,38 @@ RedisConnection* RedisCluster::getAvailableConnection()
 			iter++;
 		}
 	}
+//	for (iter = m_connections.begin(); iter != m_connections.end(); iter++)
+//	{
+//		RedisConnection *conn = *iter;
+//		if (conn->m_available)
+//		{
+//			conn->m_available = false;
+//			conn->m_connectTime = currentTime;
+//			return conn;
+//		}
+//		else
+//		{
+//			if (currentTime >= (conn->m_connectTime + CONNECTION_RELEASE_TIME))
+//			{
+//				//need close it for clean watch key.
+//				conn->close();
+//				delete conn;
+//				conn = NULL;
+//				//recreate redis connection.
+//				conn = new RedisConnection(m_clusterIp, m_clusterPort, m_keepaliveTime);
+//				if(!conn->connect())
+//				{
+////					m_logger.warn("connect to clusterIp:%s clusterPort:%d failed.", m_clusterIp.c_str(), m_clusterPort);
+//					return NULL;
+//				}
+//				conn->m_available = false;
+//				conn->m_connectTime = currentTime;
+//				*iter = conn;
+//				return conn;
+//			}
+//		}
+//	}
+
 	for (iter = m_connections.begin(); iter != m_connections.end(); iter++)
 	{
 		RedisConnection *conn = *iter;
@@ -174,27 +208,29 @@ RedisConnection* RedisCluster::getAvailableConnection()
 			conn->m_connectTime = currentTime;
 			return conn;
 		}
-		else
+	}
+	for (iter = m_connections.begin(); iter != m_connections.end(); iter++)
+	{
+		RedisConnection *conn = *iter;
+		if (conn->CanRelease()  &&  currentTime >= (conn->m_connectTime + CONNECTION_RELEASE_TIME))
 		{
-			if (currentTime >= (conn->m_connectTime + CONNECTION_RELEASE_TIME))
+			//need close it for clean watch key.
+			conn->close();
+			delete conn;
+			conn = NULL;
+			//recreate redis connection.
+			conn = new RedisConnection(m_clusterIp, m_clusterPort, m_keepaliveTime);
+			if(!conn->connect())
 			{
-				//need close it for clean watch key.
-				conn->close();
-				delete conn;
-				conn = NULL;
-				//recreate redis connection.
-				conn = new RedisConnection(m_clusterIp, m_clusterPort, m_keepaliveTime);
-				if(!conn->connect())
-				{
-//					m_logger.warn("connect to clusterIp:%s clusterPort:%d failed.", m_clusterIp.c_str(), m_clusterPort);
-					return NULL;
-				}
-				conn->m_available = false;
-				conn->m_connectTime = currentTime;
-				*iter = conn;
-				return conn;
+				LOG(ERROR)<<"connect to clusterIp:"<<m_clusterIp<<" clusterPort:"<<m_clusterPort<<" failed.";
+				return NULL;
 			}
+			conn->m_available = false;
+			conn->m_connectTime = currentTime;
+			*iter = conn;
+			return conn;
 		}
+		
 	}
 	return NULL;
 }
