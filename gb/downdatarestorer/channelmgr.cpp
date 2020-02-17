@@ -3,8 +3,8 @@
 #include"mutexlockguard.h"
 #include"glog/logging.h"
 
-const string ChannelMgr::s_set_key="channelset";
-const string ChannelMgr::s_key_prefix="channelset";
+const string ChannelMgr::s_set_key="gbddrchannelset";
+const string ChannelMgr::s_key_prefix="gbddrchannelset";
 
 ChannelMgr::ChannelMgr(RedisClient* redis_client, RedisMode redis_mode)
 	:redis_client_(redis_client),

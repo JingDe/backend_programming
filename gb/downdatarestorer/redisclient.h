@@ -142,6 +142,21 @@ struct RedisCommandType
 	};
 };
 
+class RedisClient;
+
+struct SwitchMasterThreadArgType
+{
+	RedisConnection* con;
+	RedisClient* client;
+};
+
+struct CommandResult
+{
+	list<string>& members;
+	DBSerialize* serial;
+	int* count;
+};
+
 class RedisClient
 {
 public:
@@ -162,6 +177,7 @@ public:
 	bool find(const string& key);
 	bool delKeys(const string & delKeys);
 	bool setSerial(const string& key, const DBSerialize &serial);
+	bool setSerial(const string& key, const string& serial);
 	bool setSerialWithLock(const string& key, const DBSerialize &serial, RedisLockInfo& lockInfo);
 	bool setSerialWithExpire(const string& key, const DBSerialize &serial, uint32_t expireTime);
 	//need unwatch key.
@@ -258,17 +274,17 @@ private:
 	void updateClusterCursor(const string& clusterId, int newcursor);
 	bool getClusterIdBySlot(uint16_t slotNum, string& clusterId);
 
-	bool doRedisCommand(const string& key, int32_t commandLen, list<RedisCmdParaInfo> &commandList, int commandType, DBSerialize* serial = NULL, int* count=NULL);
-	bool doRedisCommandProxy(const string& key, int32_t commandLen, list<RedisCmdParaInfo> &commandList, int commandType, DBSerialize* serial = NULL, int* count=NULL);
-	bool doRedisCommandMaster(const string& key, int32_t commandLen, list<RedisCmdParaInfo> &commandList, int commandType, DBSerialize* serial = NULL, int* count=NULL);
-	bool doRedisCommandCluster(const string& key, int32_t commandLen, list<RedisCmdParaInfo> &commandList, int commandType, DBSerialize* serial = NULL, int* count=NULL);
+ 	bool doRedisCommand(const string & key, int32_t commandLen, list<RedisCmdParaInfo> & commandList, int commandType);
+ 	bool doRedisCommand(const string& key, int32_t commandLen, list<RedisCmdParaInfo> &commandList, int commandType, DBSerialize* serial);
+ 	bool doRedisCommand(const string& key, int32_t commandLen, list<RedisCmdParaInfo> &commandList, int commandType, int* count);
+	bool doRedisCommand(const string& key, int32_t commandLen, list<RedisCmdParaInfo> &commandList, int commandType, list<string>& members);
+	bool doRedisCommand(const string& key, int32_t commandLen, list<RedisCmdParaInfo> &commandList, int commandType, list<string>& members, DBSerialize* serial, int* count);
+	bool doRedisCommandProxy(const string& key, int32_t commandLen, list<RedisCmdParaInfo> &commandList, int commandType, list<string>& members, DBSerialize* serial, int* count);
+	bool doRedisCommandMaster(const string& key, int32_t commandLen, list<RedisCmdParaInfo> &commandList, int commandType, list<string>& members, DBSerialize* serial, int* count);
+	bool doRedisCommandCluster(const string& key, int32_t commandLen, list<RedisCmdParaInfo> &commandList, int commandType, list<string>& members, DBSerialize* serial, int* count);
 	
 	bool doRedisCommandWithLock(const string& key, int32_t commandLen, list<RedisCmdParaInfo> &commandList, int commandType, RedisLockInfo& lockInfo, bool getSerial = false, DBSerialize* serial = NULL);
 	bool doMultiCommand(int32_t commandLen, list<RedisCmdParaInfo> &commandList, RedisConnection** conn);
-	bool doCommandArray(const string & key,int32_t commandLen,list < RedisCmdParaInfo > & commandList, int commandType, list<string>& members);
-	bool doCommandArrayCluster(const string & key,int32_t commandLen,list < RedisCmdParaInfo > & commandList, int commandType, list<string>& members);
-	bool doCommandArrayProxy(const string & key,int32_t commandLen,list < RedisCmdParaInfo > & commandist, int commandType, list<string>& members);
-	bool doCommandArrayMaster(const string & key,int32_t commandLen,list < RedisCmdParaInfo > & commandist, int commandType, list<string>& members);
 
 	// for Transaction API
 	bool doTransactionCommandInConnection(int32_t commandLen, list<RedisCmdParaInfo> &commandList, int commandType, RedisConnection* con);
@@ -281,7 +297,7 @@ private:
 	bool SentinelGetMasterAddrByName(RedisCluster* cluster, RedisServerInfo& serverInfo);
 	bool ParseSentinelGetMasterReply(const RedisReplyInfo& replyInfo, RedisServerInfo& serverInfo);
 	bool MasterGetReplicationSlavesInfo(RedisCluster* cluster, vector<RedisServerInfo>& slaves);
-	bool ParseInfoReplicationReply(const RedisReplyInfo& replyInfo);
+	bool ParseInfoReplicationReply(const RedisReplyInfo& replyInfo, vector<RedisServerInfo>& slaves);
 	bool freeSentinels();
 	bool freeMasterSlaves();
 	bool ParseSubsribeSwitchMasterReply(const RedisReplyInfo& replyInfo);
@@ -314,7 +330,7 @@ private:
     map<string, RedisProxyInfo> m_dataNodes; // key: clusterId
     string m_masterClusterId;
     RWMutex m_rwMasterMutex;
-    
+    SwitchMasterThreadArgType m_threadArg;
 };
 
 #endif

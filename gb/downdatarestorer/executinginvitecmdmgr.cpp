@@ -5,8 +5,8 @@
 #include"mutexlockguard.h"
 #include"glog/logging.h"
 
-const string ExecutingInviteCmdMgr::s_set_key_prefix="executinginvitecmdset";
-const string ExecutingInviteCmdMgr::s_key_prefix="executinginvitecmdset";
+const string ExecutingInviteCmdMgr::s_set_key_prefix="gbddrexecutinginvitecmdset";
+const string ExecutingInviteCmdMgr::s_key_prefix="gbddrexecutinginvitecmdset";
 
 ExecutingInviteCmdMgr::ExecutingInviteCmdMgr(RedisClient* redis_client, RedisMode redis_mode, int worker_thread_num)
 	:redis_client_(redis_client),

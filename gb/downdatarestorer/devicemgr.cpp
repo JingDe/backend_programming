@@ -3,8 +3,8 @@
 #include"mutexlockguard.h"
 #include"glog/logging.h"
 
-const string DeviceMgr::s_set_key="deviceset";
-const string DeviceMgr::s_key_prefix="deviceset";
+const string DeviceMgr::s_set_key="gbddrdeviceset";
+const string DeviceMgr::s_key_prefix="gbddrdeviceset";
 
 DeviceMgr::DeviceMgr(RedisClient* redis_client, RedisMode redis_mode)
 	:redis_client_(redis_client),

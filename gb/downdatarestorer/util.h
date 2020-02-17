@@ -1,4 +1,4 @@
-#ifndef UTIL_H
+#ifndef UTIL_H_
 #define UTIL_H_
 
 #include<string>
@@ -19,6 +19,7 @@ inline string toStr(DataType data)
     ostr << data;
     return ostr.str();
 }
+
 
 uint16_t crc16(const char *buf, int len);
 time_t getCurrTimeSec();

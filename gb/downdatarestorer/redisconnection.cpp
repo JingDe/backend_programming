@@ -39,6 +39,10 @@ bool RedisConnection::connect()
 		LOG(ERROR)<<"connection:["<<this<<"] connect to server:["<<m_serverIp<<":"<<m_serverPort<<"] failed.";
 		return false;
 	}
+//	else
+//	{
+//		LOG(INFO)<<"connect to "<<m_serverIp<<":"<<m_serverPort<<" ok, fd is "<<m_socket.fd;
+//	}
 	m_socket.setSoTimeout(m_timeout);
 	return true;
 }

@@ -373,14 +373,11 @@ void TestDownDataRestorerChannel()
 
 void PrintCmdList(const ExecutingInviteCmdList& cmdlist, int set_no)
 {
-//	printf("start show the %d cmd set, [%d]\n", set_no, (int)cmdlist.size());
 	LOG(INFO)<<"start show the "<<set_no<<" cmd set, ["<<cmdlist.size()<<"]\n";
 	for(ExecutingInviteCmdList::const_iterator it=cmdlist.begin(); it!=cmdlist.end(); ++it)
 	{
-//		printf("%s,\t", it->GetId().c_str());
 		LOG(INFO)<<it->GetId().c_str()<<"\t";
 	}
-//	printf("\n");
 }
 
 void PrintCmdLists(const vector<ExecutingInviteCmdList>& cmdlists)
@@ -414,10 +411,8 @@ void ShowCmdList(int thread_no)
 
 void* WorkerThread0Func(void* arg)
 {
-	printf("in worker, %p\n", arg);
 	int thread_no=*(reinterpret_cast<int*>(arg));
-	printf("%d\n", thread_no);
-	printf("worker thread %d start\n", thread_no);
+	LOG(INFO)<<"worker thread %d start"<<thread_no;
 
 	ShowCmdList(thread_no);
 
@@ -428,7 +423,7 @@ void* WorkerThread0Func(void* arg)
 	g_ddr->InsertExecutingInviteCmdList(thread_no, cmd2);
 
 	sleep(3);
-	printf("after insert\n");
+	LOG(INFO)<<"after insert";
 	ShowCmdList(thread_no);
 	
 //	getchar();
@@ -436,11 +431,11 @@ void* WorkerThread0Func(void* arg)
 	ExecutingInviteCmd cmd;
 	if(g_ddr->SelectExecutingInviteCmdList(thread_no, "1", cmd)==DDR_OK)
 	{
-		printf("select ok: %s\n", cmd.GetId().c_str());
+		LOG(INFO)<<"select ok: "<<cmd.GetId();
 	}
 	else
 	{
-		printf("select failed\n");
+		LOG(INFO)<<"select failed";
 	}
 
 //	getchar();
@@ -448,7 +443,7 @@ void* WorkerThread0Func(void* arg)
 	g_ddr->DeleteExecutingInviteCmdList(thread_no, cmd1);
 
 	sleep(3);
-	printf("after delete\n");
+	LOG(INFO)<<"after delete";
 	ShowCmdList(thread_no);
 
 //	getchar();
@@ -457,19 +452,19 @@ void* WorkerThread0Func(void* arg)
 	g_ddr->UpdateExecutingInviteCmdList(thread_no, cmd_list);
 
 	sleep(3);
-	printf("after update\n");
+	LOG(INFO)<<"after update";
 	ShowCmdList(thread_no);
 
-	printf("before clear\n");
+	LOG(INFO)<<"before clear";
 //	getchar();
 
 	g_ddr->ClearExecutingInviteCmdList(thread_no);
 
 	sleep(3);
-	printf("after clear\n");
+	LOG(INFO)<<"after clear";
 	ShowCmdList(thread_no);
 
-	printf("worker thread %d exit\n", thread_no);	
+	LOG(INFO)<<"worker thread "<<thread_no<<" exit";	
 
 	return 0;
 }
@@ -524,6 +519,7 @@ void TestDownDataRestorerExecutingInviteCmd()
 	ddr.ClearExecutingInviteCmdList();
 
 	{
+		LOG(INFO)<<"main thread UPDATE now";
 		ExecutingInviteCmd cmd11(11);
 		ExecutingInviteCmd cmd12(12);
 		ExecutingInviteCmdList cmd_list1({cmd11, cmd12});
@@ -583,9 +579,26 @@ public:
 	}
 };
 
-void TestSentinelSlaves()
+//void TestSentinelSlaves()
+//{
+//	// "sentienl slaves"
+//	RedisClient client;
+//
+//	RedisServerInfo sentinel1("192.168.12.59", 26379);
+//	RedisServerInfo sentinel2("192.168.12.59", 26380);
+//	RedisServerInfo sentinel3("192.168.12.59", 26381);
+//	REDIS_SERVER_LIST serverList({sentinel1, sentinel2, sentinel3});
+//	string master_name="mymaster";
+//	if(!client.init(serverList, master_name, 2))
+//		return;
+//
+////	client.DoTestOfSentinelSlavesCommand();
+//
+//	return ;
+//}
+
+void TestRedisSentinelInit()
 {
-	// "sentienl slaves"
 	RedisClient client;
 
 	RedisServerInfo sentinel1("192.168.12.59", 26379);
@@ -593,12 +606,271 @@ void TestSentinelSlaves()
 	RedisServerInfo sentinel3("192.168.12.59", 26381);
 	REDIS_SERVER_LIST serverList({sentinel1, sentinel2, sentinel3});
 	string master_name="mymaster";
-	if(!client.init(serverList, master_name, 2))
+	if(!client.init(serverList, master_name, 4))
 		return;
 
-	client.DoTestOfSentinelSlavesCommand();
+}
 
-	return ;
+void TestRedisClusterInit()
+{
+	RedisClient client;
+
+	RedisServerInfo cluster1("192.168.12.59", 7000);
+	RedisServerInfo cluster2("192.168.12.59", 7001);
+	RedisServerInfo cluster3("192.168.12.59", 7002);
+	RedisServerInfo cluster4("192.168.12.59", 7003);
+	RedisServerInfo cluster5("192.168.12.59", 7004);
+	RedisServerInfo cluster6("192.168.12.59", 7005);
+	REDIS_SERVER_LIST serverList({cluster1, cluster2, cluster3,cluster4,cluster5,cluster6});
+	if(!client.init(serverList, 4))
+		return;
+
+}
+
+void TestRedisSentinelSetApi()
+{
+	RedisClient client;
+
+	RedisServerInfo sentinel1("192.168.12.59", 26379);
+	RedisServerInfo sentinel2("192.168.12.59", 26380);
+	RedisServerInfo sentinel3("192.168.12.59", 26381);
+	REDIS_SERVER_LIST serverList({sentinel1, sentinel2, sentinel3});
+	string master_name="mymaster";
+	if(!client.init(serverList, master_name, 4))
+		return;
+
+	client.sadd("sentinel01set", "sentinel01set_id01");
+	client.setSerial("sentinel01set_id01", "sentinel01set_id01_value01");
+
+}
+
+void TestRedisSentinelVersionDDR()
+{
+	DownDataRestorer ddr;	
+	string master_name="mymaster";
+	RedisServerInfo sentinel1("192.168.12.59", 26379);
+	RedisServerInfo sentinel2("192.168.12.59", 26380);
+	RedisServerInfo sentinel3("192.168.12.59", 26381);
+	REDIS_SERVER_LIST sentinels({sentinel1, sentinel2, sentinel3});
+	if(ddr.Init(sentinels, master_name, 3)==false)
+		return;
+	ddr.Start();
+
+	// 1
+	int device_count=ddr.GetDeviceCount();
+	LOG(INFO)<<"devices size: "<<device_count;
+
+	// 2
+	Device device1("device_id_1");
+	ddr.InsertDeviceList(device1);
+
+	sleep(3);
+	
+	device_count=ddr.GetDeviceCount();
+	LOG(INFO)<<"after insert, devices size: "<<device_count;
+
+//	LOG(INFO)<<"after insert, before search, to check redis-cli";
+
+	// 3
+	Device device;
+	if(ddr.SelectDeviceList("device_id_1", device)==DDR_OK)
+	{
+		LOG(INFO)<<"search device_id_1 success";
+	}
+	else
+	{
+		LOG(INFO)<<"search device_id_1 failed";
+	}
+//	getchar();
+
+	Device device2("device_id_2");
+	ddr.InsertDeviceList(device2);
+
+	Device device3("device_id_3");
+	ddr.InsertDeviceList(device3);
+
+	Device device4("device_id_4");
+	ddr.InsertDeviceList(device4);
+
+	// 4
+	sleep(3);
+	ShowDevices(ddr);
+
+	LOG(INFO)<<"to delete device1";
+
+	// 5
+	ddr.DeleteDeviceList(device1);
+
+	sleep(3);
+	ShowDevices(ddr);
+	
+
+	LOG(INFO)<<"to update";
+
+	// 6
+	list<Device> devices({device1, device3});
+	ddr.UpdateDeviceList(devices);
+
+	sleep(3);
+	LOG(INFO)<<"after update";
+	ShowDevices(ddr);
+
+	LOG(INFO)<<"to clear";
+
+	// 7
+	ddr.ClearDeviceList();
+	sleep(3);
+	device_count=ddr.GetDeviceCount();
+	LOG(INFO)<<"after clear, devices size: "<<device_count;
+	ShowDevices(ddr);
+	
+	ddr.Stop();
+	ddr.Uninit();	
+}
+
+void TestRedisSentinelVersionDDRCmd()
+{
+	DownDataRestorer ddr;	
+	string master_name="mymaster";
+	RedisServerInfo sentinel1("192.168.12.59", 26379);
+	RedisServerInfo sentinel2("192.168.12.59", 26380);
+	RedisServerInfo sentinel3("192.168.12.59", 26381);
+	REDIS_SERVER_LIST sentinels({sentinel1, sentinel2, sentinel3});
+	if(ddr.Init(sentinels, master_name, 3)==false)
+		return;
+	if(ddr.Start()==false)
+		return;
+
+	g_ddr=&ddr;
+
+	int worker_thread_no_0=0;
+	LOG(INFO)<<"in main, "<<worker_thread_no_0<<", "<<&worker_thread_no_0;
+	pthread_t t0=StartWorkerThread(worker_thread_no_0, WorkerThread0Func);
+	int worker_thread_no_1=1;
+//	pthread_t t1=StartWorkerThread(worker_thread_no_1, WorkerThread1Func);
+
+
+	sleep(3);
+	{
+		vector<ExecutingInviteCmdList> cmdlists;
+		ddr.LoadExecutingInviteCmdList(cmdlists);
+		PrintCmdLists(cmdlists);
+	}
+
+	sleep(10);
+	LOG(INFO)<<"main thread CLEAR all";
+	ddr.ClearExecutingInviteCmdList();
+
+	{
+		ExecutingInviteCmd cmd11(11);
+		ExecutingInviteCmd cmd12(12);
+		ExecutingInviteCmdList cmd_list1({cmd11, cmd12});
+		ExecutingInviteCmd cmd21(21);
+		ExecutingInviteCmd cmd22(22);
+		ExecutingInviteCmdList cmd_list2({cmd21, cmd22});
+		ExecutingInviteCmd cmd31(31);
+		ExecutingInviteCmd cmd32(32);
+		ExecutingInviteCmdList cmd_list3({cmd31, cmd32});
+		vector<ExecutingInviteCmdList> cmdlists({cmd_list1, cmd_list2, cmd_list3});
+		ddr.UpdateExecutingInviteCmdList(cmdlists);
+	}
+
+	sleep(3);
+
+	{
+	vector<ExecutingInviteCmdList> cmdlists;
+	ddr.LoadExecutingInviteCmdList(cmdlists);
+	PrintCmdLists(cmdlists);
+	}
+
+	pthread_join(t0, NULL);
+//	pthread_join(t1, NULL);
+
+	ddr.Stop();
+	ddr.Uninit();
+}
+
+
+void LoopProcessDevice(DownDataRestorer& ddr)
+{
+	int device_count=ddr.GetDeviceCount();
+	LOG(INFO)<<"devices size: "<<device_count;
+
+	Device device1("device_id_1");
+	ddr.InsertDeviceList(device1);
+
+	sleep(3);
+	
+	device_count=ddr.GetDeviceCount();
+	LOG(INFO)<<"after insert, devices size: "<<device_count;
+
+	LOG(INFO)<<"after insert, before search, to check redis-cli";
+//	getchar();
+	//getc(stdin);
+
+	Device device;
+	if(ddr.SelectDeviceList("device_id_1", device)==DDR_OK)
+	{
+		LOG(INFO)<<"search device_id_1 success";
+	}
+	else
+	{
+		LOG(INFO)<<"search device_id_1 failed";
+	}
+//	getchar();
+
+	Device device2("device_id_2");
+	ddr.InsertDeviceList(device2);
+
+	Device device3("device_id_3");
+	ddr.InsertDeviceList(device3);
+
+	Device device4("device_id_4");
+	ddr.InsertDeviceList(device4);
+	
+	ShowDevices(ddr);
+
+	LOG(INFO)<<"to delete device1";
+	ddr.DeleteDeviceList(device1);
+
+	sleep(3);
+	ShowDevices(ddr);
+
+	LOG(INFO)<<"to clear";
+	ddr.ClearDeviceList();
+	sleep(3);
+	
+	device_count=ddr.GetDeviceCount();
+	LOG(INFO)<<"after clear, devices size: "<<device_count;
+	ShowDevices(ddr);
+
+	LOG(INFO)<<"to update";
+	list<Device> devices({device1, device3});
+	ddr.UpdateDeviceList(devices);
+
+	sleep(3);
+	LOG(INFO)<<"after update";
+	ShowDevices(ddr);
+}
+
+void TestDDRInStandaloneMode()
+{
+	DownDataRestorer ddr;
+	if(ddr.Init(redis_ip, 6379, 4)==DDR_FAIL)
+		return;
+	if(ddr.Start()==DDR_FAIL)
+		return;
+
+	while(true)
+	{
+		LoopProcessDevice(ddr);
+
+		LOG(WARNING)<<"wait to loop";
+		sleep(10);
+	}
+
+	ddr.Stop();
+	ddr.Uninit();
 }
 
 int main(int argc, char** argv)
@@ -634,7 +906,19 @@ int main(int argc, char** argv)
 //	TestDelTransactionInCluster();
 
 
-    TestSentinelSlaves();
-    
+//    TestSentinelSlaves();
+
+//    TestRedisSentinelInit();
+
+//    TestRedisClusterInit();
+
+//	TestRedisSentinelSetApi();
+
+//	TestRedisSentinelVersionDDRDevice();
+
+//	TestRedisSentinelVersionDDRCmd();
+
+	TestDDRInStandaloneMode();
+	
     return 0;
 }

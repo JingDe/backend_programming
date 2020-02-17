@@ -7,6 +7,7 @@
 #include "socket.h"
 //#include "owlog.h"
 #include "redisbase.h"
+#include"util.h"
 
 #define REDIS_READ_BUFF_SIZE 4096
 using namespace std;
@@ -41,6 +42,11 @@ public:
 	bool doRedisCommand(list<RedisCmdParaInfo> &paraList, int32_t paraLen, RedisReplyInfo& replyInfo, ReplyParserType parserType=COMMON_PARSER);
 	bool close();
 	bool recv(RedisReplyInfo& replyInfo, ReplyParserType parserType=COMMON_PARSER);
+
+	string toString(){
+		string desc="server ip="+m_serverIp+", port="+toStr(m_serverPort);
+		return desc;
+	}
 
 	bool CanRelease()
 	{

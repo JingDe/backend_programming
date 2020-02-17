@@ -6,7 +6,7 @@
 #include"mutexlockguard.h"
 #include"redisclient.h"
 
-#include<cassert>
+//#include<cassert>
 
 #include"glog/logging.h"
 
@@ -48,6 +48,7 @@ DownDataRestorer::~DownDataRestorer()
 //	google::ShutdownGoogleLogging();	
 }
 
+// for STAND_ALONE
 int DownDataRestorer::Init(const string& redis_server_ip, uint16_t redis_server_port, int worker_thread_num)
 {
 	if(inited_)
@@ -60,9 +61,10 @@ int DownDataRestorer::Init(const string& redis_server_ip, uint16_t redis_server_
 	RedisServerInfo redis_server(redis_server_ip, redis_server_port);
 	REDIS_SERVER_LIST redis_server_list({redis_server});
 
-	return Init(redis_server_list, worker_thread_num);
+	return Init(STAND_ALONE_OR_PROXY_MODE, redis_server_list, "", worker_thread_num);
 }
 
+// for CLUSTER
 int DownDataRestorer::Init(const REDIS_SERVER_LIST& redis_server_list, int worker_thread_num)
 {
 	if(inited_)
@@ -71,21 +73,37 @@ int DownDataRestorer::Init(const REDIS_SERVER_LIST& redis_server_list, int worke
 		return DDR_FAIL;
 	}
 
+	return Init(CLUSTER_MODE, redis_server_list, "", worker_thread_num);
+}
+
+// for SENTINEL
+int DownDataRestorer::Init(const REDIS_SERVER_LIST& redis_server_list, const string& master_name, int worker_thread_num)
+{
+	if(inited_)
+	{
+		LOG(WARNING)<<"init called repeatedly";
+		return DDR_FAIL;
+	}
+
+	return Init(SENTINEL_MODE, redis_server_list, master_name, worker_thread_num);
+}
+
+int DownDataRestorer::Init(RedisMode redis_mode, const REDIS_SERVER_LIST& redis_server_list, const string& master_name, int worker_thread_num)
+{
+	if(inited_)
+	{
+		LOG(WARNING)<<"init called repeatedly";
+		return DDR_FAIL;
+	}
+
 	worker_thread_num_=worker_thread_num;
-	
-	if(redis_server_list.size()==1)
-	{
-		redis_mode_=STAND_ALONE_OR_PROXY_MODE;
-	}
-	else
-	{
-		redis_mode_=CLUSTER_MODE;
-	}
+
+	redis_mode_=redis_mode;
 	LOG_IF(INFO, redis_mode_==STAND_ALONE_OR_PROXY_MODE)<<"redis mode is STAND_ALONE_OR_PROXY_MODE";
 	LOG_IF(INFO, redis_mode_==CLUSTER_MODE)<<"redis mode is CLUSTER_MODE";
 	LOG_IF(INFO, redis_mode_==SENTINEL_MODE)<<"redis mode is SENTINEL_MODE";
 
-	assert(redis_client_=NULL);
+	assert(redis_client_==NULL);
 	redis_client_=new RedisClient();
 	if(redis_client_==NULL)
 	{
@@ -100,7 +118,7 @@ int DownDataRestorer::Init(const REDIS_SERVER_LIST& redis_server_list, int worke
 	LOG(INFO)<<"worker_thead num is "<<worker_thread_num_;
 	LOG(INFO)<<"redis_connection num is "<<connection_num;
 //	uint32_t keepalive_time_secs=86400;
-	if(redis_client_->init(redis_server_list, connection_num/*, keepalive_time_secs*/)==false)
+	if(redis_client_->init(redis_mode_, redis_server_list, master_name, connection_num/*, keepalive_time_secs*/)==false)
 	{
 		LOG(ERROR)<<"init RedisClient failed";
 		delete redis_client_;
@@ -162,7 +180,6 @@ int DownDataRestorer::Start()
 		}
 		return DDR_FAIL;
 	}
-
 	
 	data_restorer_threads_.reserve(data_restorer_background_threads_num_);
 	int ret=0;
@@ -377,11 +394,16 @@ void DownDataRestorer::DataRestorerThreadFunc()
 // TODO
 int DownDataRestorer::GetStat()
 {	
+	if(!started_)
+	{
+		LOG(WARNING)<<"DownDataRestorer not started yet";
+		return DDR_FAIL;
+	}
 	LOG(INFO)<<"DownDataRestorer stat: ";
 	LOG(INFO)<<"device count: "<<GetDeviceCount();
 	LOG(INFO)<<"channel count: "<<GetChannelCount();
-	int worker_thread_num=GetWorkerThreadNum();
-	for(int i=0; i<worker_thread_num; i++)
+	
+	for(int i=0; i<worker_thread_num_; i++)
 	{
 		LOG(INFO)<<"ExecutingInviteCmdList["<<i<<"] count: "<<GetExecutingInviteCmdCount(i);
 	}
@@ -390,29 +412,32 @@ int DownDataRestorer::GetStat()
 
 int DownDataRestorer::GetDeviceCount()
 {
+	CHECK(started_)<<"please start DownDataRestorer first";
 	return device_mgr_->GetDeviceCount();
 }
 
 int DownDataRestorer::GetChannelCount()
 {
+	CHECK(started_)<<"please start DownDataRestorer first";
 	return channel_mgr_->GetChannelCount();
 }
 
 int DownDataRestorer::GetExecutingInviteCmdCount(int worker_thread_no)
 {
+	CHECK(started_)<<"please start DownDataRestorer first";
 	return executing_invite_cmd_mgr_->GetExecutingInviteCmdListSize(worker_thread_no);
 }
 
 int DownDataRestorer::LoadDeviceList(list<Device>& devices)
 {
-	assert(started_);
+	CHECK(started_)<<"please start DownDataRestorer first";
 	device_mgr_->LoadDevices(devices);
 	return DDR_OK;
 }
 
 int DownDataRestorer::SelectDeviceList(const string& device_id, Device& device)
 {
-	assert(started_);
+	CHECK(started_)<<"please start DownDataRestorer first";
 	if(device_mgr_->SearchDevice(device_id, device)<0)
 		return DDR_FAIL;
 	return DDR_OK;
@@ -420,7 +445,7 @@ int DownDataRestorer::SelectDeviceList(const string& device_id, Device& device)
 
 int DownDataRestorer::InsertDeviceList(const Device& device)
 {
-	assert(started_);
+	CHECK(started_)<<"please start DownDataRestorer first";
 	MutexLockGuard guard(&operations_queue_mutex_);
 	DataRestorerOperation operation(DataRestorerOperation::INSERT, DataRestorerOperation::DEVICE, const_cast<Device*>(&device), -1);
 	operations_queue_.push(operation);
@@ -430,7 +455,7 @@ int DownDataRestorer::InsertDeviceList(const Device& device)
 
 int DownDataRestorer::DeleteDeviceList(const Device& device)
 {
-	assert(started_);
+	CHECK(started_)<<"please start DownDataRestorer first";
 	MutexLockGuard guard(&operations_queue_mutex_);
 	DataRestorerOperation operation(DataRestorerOperation::DELETE, DataRestorerOperation::DEVICE, const_cast<Device*>(&device), -1);
 	operations_queue_.push(operation);
@@ -440,7 +465,7 @@ int DownDataRestorer::DeleteDeviceList(const Device& device)
 
 int DownDataRestorer::ClearDeviceList()
 {
-	assert(started_);
+	CHECK(started_)<<"please start DownDataRestorer first";
 	MutexLockGuard guard(&operations_queue_mutex_);
 	DataRestorerOperation operation(DataRestorerOperation::CLEAR, DataRestorerOperation::DEVICE, NULL, -1);
 	operations_queue_.push(operation);
@@ -450,7 +475,7 @@ int DownDataRestorer::ClearDeviceList()
 
 int DownDataRestorer::UpdateDeviceList(const list<Device>& devices)
 {
-	assert(started_);
+	CHECK(started_)<<"please start DownDataRestorer first";
 	MutexLockGuard guard(&operations_queue_mutex_);
 	list<void*> device_list;
 	for(list<Device>::const_iterator it=devices.begin(); it!=devices.end(); ++it)
@@ -465,14 +490,14 @@ int DownDataRestorer::UpdateDeviceList(const list<Device>& devices)
 
 int DownDataRestorer::LoadChannelList(list<Channel>& channels)
 {
-    assert(started_);
+    CHECK(started_)<<"please start DownDataRestorer first";
     channel_mgr_->LoadChannels(channels);
     return DDR_OK;
 }
 
 int DownDataRestorer::SelectChannelList(const string& channel_id, Channel& channel)
 {
-    assert(started_);
+    CHECK(started_)<<"please start DownDataRestorer first";
     if(channel_mgr_->SearchChannel(channel_id, channel)<0)
         return DDR_FAIL;
     return DDR_OK;
@@ -480,7 +505,7 @@ int DownDataRestorer::SelectChannelList(const string& channel_id, Channel& chann
 
 int DownDataRestorer::InsertChannelList(const Channel& channel)
 {
-    assert(started_);
+    CHECK(started_)<<"please start DownDataRestorer first";
     MutexLockGuard guard(&operations_queue_mutex_);
     DataRestorerOperation operation(DataRestorerOperation::INSERT, DataRestorerOperation::CHANNEL, const_cast<Channel*>(&channel), -1);
     operations_queue_.push(operation);
@@ -490,7 +515,7 @@ int DownDataRestorer::InsertChannelList(const Channel& channel)
 
 int DownDataRestorer::DeleteChannelList(const Channel& channel)
 {
-    assert(started_);
+    CHECK(started_)<<"please start DownDataRestorer first";
     MutexLockGuard guard(&operations_queue_mutex_);
     DataRestorerOperation operation(DataRestorerOperation::DELETE, DataRestorerOperation::CHANNEL, const_cast<Channel*>(&channel), -1);
     operations_queue_.push(operation);
@@ -500,7 +525,7 @@ int DownDataRestorer::DeleteChannelList(const Channel& channel)
 
 int DownDataRestorer::ClearChannelList()
 {
-    assert(started_);
+    CHECK(started_)<<"please start DownDataRestorer first";
     MutexLockGuard guard(&operations_queue_mutex_);
     DataRestorerOperation operation(DataRestorerOperation::CLEAR, DataRestorerOperation::CHANNEL, NULL, -1);
     operations_queue_.push(operation);
@@ -510,7 +535,7 @@ int DownDataRestorer::ClearChannelList()
 
 int DownDataRestorer::UpdateChannelList(const list<Channel>& channels)
 {
-    assert(started_);
+    CHECK(started_)<<"please start DownDataRestorer first";
     MutexLockGuard guard(&operations_queue_mutex_);
     list<void*> channel_list;
     for(list<Channel>::const_iterator it=channels.begin(); it!=channels.end(); ++it)
@@ -525,21 +550,21 @@ int DownDataRestorer::UpdateChannelList(const list<Channel>& channels)
 
 int DownDataRestorer::LoadExecutingInviteCmdList(vector<ExecutingInviteCmdList>& executing_invite_cmd_lists)
 {
-	assert(started_);
+	CHECK(started_)<<"please start DownDataRestorer first";
 	executing_invite_cmd_mgr_->Load(executing_invite_cmd_lists);
 	return DDR_OK;
 }
 
 int DownDataRestorer::LoadExecutingInviteCmdList(int worker_thread_no, ExecutingInviteCmdList& executing_invite_cmd_list)
 {
-	assert(started_);
+	CHECK(started_)<<"please start DownDataRestorer first";
 	executing_invite_cmd_mgr_->Load(worker_thread_no, executing_invite_cmd_list);
 	return DDR_OK;
 }
 
 int DownDataRestorer::SelectExecutingInviteCmdList(int worker_thread_no, const string& cmd_id, ExecutingInviteCmd& cmd)
 {
-	assert(started_);
+	CHECK(started_)<<"please start DownDataRestorer first";
 	if(executing_invite_cmd_mgr_->Search(cmd_id, cmd, worker_thread_no)<0)
 		return DDR_FAIL;
 	return DDR_OK;
@@ -547,7 +572,7 @@ int DownDataRestorer::SelectExecutingInviteCmdList(int worker_thread_no, const s
 
 int DownDataRestorer::InsertExecutingInviteCmdList(int worker_thread_no, const ExecutingInviteCmd& cmd)
 {
-	assert(started_);
+	CHECK(started_)<<"please start DownDataRestorer first";
 	MutexLockGuard guard(&operations_queue_mutex_);
 	DataRestorerOperation operation(DataRestorerOperation::INSERT, DataRestorerOperation::EXECUTING_INVITE_CMD, const_cast<ExecutingInviteCmd*>(&cmd), worker_thread_no);
 	operations_queue_.push(operation);
@@ -557,7 +582,7 @@ int DownDataRestorer::InsertExecutingInviteCmdList(int worker_thread_no, const E
 
 int DownDataRestorer::DeleteExecutingInviteCmdList(int worker_thread_no, const ExecutingInviteCmd& executinginvitecmd)
 {
-	assert(started_);
+	CHECK(started_)<<"please start DownDataRestorer first";
 	MutexLockGuard guard(&operations_queue_mutex_);
 	DataRestorerOperation operation(DataRestorerOperation::DELETE, DataRestorerOperation::EXECUTING_INVITE_CMD, const_cast<ExecutingInviteCmd*>(&executinginvitecmd), worker_thread_no);
 	operations_queue_.push(operation);
@@ -567,7 +592,7 @@ int DownDataRestorer::DeleteExecutingInviteCmdList(int worker_thread_no, const E
 
 int DownDataRestorer::ClearExecutingInviteCmdList()
 {
-	assert(started_);
+	CHECK(started_)<<"please start DownDataRestorer first";
 	MutexLockGuard guard(&operations_queue_mutex_);
 	DataRestorerOperation operation(DataRestorerOperation::CLEAR, DataRestorerOperation::EXECUTING_INVITE_CMD, NULL, -1);
 	operations_queue_.push(operation);
@@ -577,7 +602,7 @@ int DownDataRestorer::ClearExecutingInviteCmdList()
 
 int DownDataRestorer::ClearExecutingInviteCmdList(int worker_thread_no)
 {
-	assert(started_);
+	CHECK(started_)<<"please start DownDataRestorer first";
 	MutexLockGuard guard(&operations_queue_mutex_);
 	DataRestorerOperation operation(DataRestorerOperation::CLEAR, DataRestorerOperation::EXECUTING_INVITE_CMD, NULL, worker_thread_no);
 	operations_queue_.push(operation);
@@ -588,7 +613,7 @@ int DownDataRestorer::ClearExecutingInviteCmdList(int worker_thread_no)
 
 int DownDataRestorer::UpdateExecutingInviteCmdList(int worker_thread_no, const ExecutingInviteCmdList& executing_invite_cmd_list)
 {
-	assert(started_);
+	CHECK(started_)<<"please start DownDataRestorer first";
 	MutexLockGuard guard(&operations_queue_mutex_);
 	list<void*> cmd_list;
 	for(ExecutingInviteCmdList::const_iterator it=executing_invite_cmd_list.begin(); it!=executing_invite_cmd_list.end(); ++it)
@@ -603,8 +628,9 @@ int DownDataRestorer::UpdateExecutingInviteCmdList(int worker_thread_no, const E
 
 int DownDataRestorer::UpdateExecutingInviteCmdList(const vector<ExecutingInviteCmdList>& executing_invite_cmd_lists)
 {
-	assert(started_);
-	assert((int)executing_invite_cmd_lists.size()==GetWorkerThreadNum());
+	CHECK(started_)<<"please start DownDataRestorer first";
+//	assert((int)executing_invite_cmd_lists.size()==GetWorkerThreadNum());
+	CHECK((int)executing_invite_cmd_lists.size()==GetWorkerThreadNum())<<"ExecutingInviteCmdList size must equal to worker_thread_num "<<worker_thread_num_;
 	for(size_t i=0; i<executing_invite_cmd_lists.size(); ++i)
 	{
 		UpdateExecutingInviteCmdList(i, executing_invite_cmd_lists[i]);

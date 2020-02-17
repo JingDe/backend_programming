@@ -165,6 +165,7 @@ public:
 
 	int Init(const string& redis_server_ip, uint16_t redis_server_port, int worker_thread_num);
     int Init(const REDIS_SERVER_LIST& redis_server_list, int worker_thread_num);
+    int Init(const REDIS_SERVER_LIST& redis_server_list, const string& master_name, int worker_thread_num);
     int Uninit();
     int Start();
     int Stop();
@@ -202,6 +203,7 @@ public:
 	bool Inited() { return inited_; }
 
 private:
+	int Init(RedisMode redis_mode, const REDIS_SERVER_LIST& redis_server_list, const string& master_name, int worker_thread_num);
     static void* DataRestorerThreadFuncWrapper(void* arg);
     void DataRestorerThreadFunc();
 	int GetWorkerThreadNum();

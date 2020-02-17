@@ -498,9 +498,9 @@ bool Socket::WatchReadEvent(int& epollfd)
 	ev.data.fd=fd;
 	if(epoll_ctl(epfd, EPOLL_CTL_ADD, fd, &ev)<0)
 	{
-		PLOG(ERROR)<<"epoll_ctl ADD failed";
+		PLOG(ERROR)<<"epoll_ctl ADD failed, fd "<<fd;
 		::close(epfd);
-		return -1;
+		return false;
 	}
 
 	epollfd=epfd;

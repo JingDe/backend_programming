@@ -44,6 +44,7 @@ bool RedisCluster::initConnectPool(const string & clusterIp,uint32_t clusterPort
 	m_clusterPort = clusterPort;
 	m_connectionNum = connectionNum;
 	m_keepaliveTime = keepaliveTime;
+	LOG(INFO)<<"initConnectPool ok, pool size is "<<m_connections.size();
 	return true;
 }
 
