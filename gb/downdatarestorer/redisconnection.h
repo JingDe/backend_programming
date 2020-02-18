@@ -56,6 +56,12 @@ public:
 	bool ListenMessage(int& handler);
 	bool WaitMessage(int handler);
 	bool StopListen(int handler);
+	string GetServerIp() {
+		return m_serverIp;
+	}
+	uint32_t GetServerPort() {
+		return m_serverPort;
+	}
 
 private:
 	bool send(char* request, uint32_t sendLen);

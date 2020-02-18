@@ -38,11 +38,7 @@ bool RedisConnection::connect()
 //		m_logger.warn("connection:[%p] connect to server:[%s:%u] failed.", this, m_serverIp.c_str(), m_serverPort);
 		LOG(ERROR)<<"connection:["<<this<<"] connect to server:["<<m_serverIp<<":"<<m_serverPort<<"] failed.";
 		return false;
-	}
-//	else
-//	{
-//		LOG(INFO)<<"connect to "<<m_serverIp<<":"<<m_serverPort<<" ok, fd is "<<m_socket.fd;
-//	}
+	}	
 	m_socket.setSoTimeout(m_timeout);
 	return true;
 }
@@ -100,7 +96,27 @@ bool RedisConnection::ListenMessage(int& handler)
 
 bool RedisConnection::WaitMessage(int handler)
 {
-	return m_socket.WaitReadEvent(handler);
+	if(m_socket.WaitReadEvent(handler))
+	{
+		return true;
+	}
+	else
+	{
+		if (m_socket.fd == INVALID_SOCKET_HANDLE)
+		{
+			LOG(ERROR)<<"connection:["<<this<<"] socket may be closed by peer.";
+			if(!connect())
+			{
+				LOG(ERROR)<<"connection:["<<this<<"] reconnect to server failed.";
+				return false;
+			}
+			else
+			{
+				LOG(INFO)<<"connect to server ok :["<<m_serverIp<<":"<<m_serverPort<<"]";
+			}
+		}
+		return false;
+	}
 }
 
 bool RedisConnection::StopListen(int handler)

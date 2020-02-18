@@ -86,7 +86,8 @@ typedef struct RedisProxyInfoTag
 	uint32_t connectionNum;
 	uint32_t keepaliveTime;
 	RedisCluster *clusterHandler;
-	bool isAlived;
+	bool isAlived; // true if has created RedisConnection pool
+	bool subscribed; // true if +switch-master channel subscribed
 }RedisProxyInfo;
 
 
@@ -301,6 +302,8 @@ private:
 	bool freeSentinels();
 	bool freeMasterSlaves();
 	bool ParseSubsribeSwitchMasterReply(const RedisReplyInfo& replyInfo);
+
+	static void* SentinelHealthCheckTask(void* arg);
 	
 private:
 	// for all RedisMode
@@ -331,6 +334,10 @@ private:
     string m_masterClusterId;
     RWMutex m_rwMasterMutex;
     SwitchMasterThreadArgType m_threadArg;
+    vector<pthread_t> m_subscribeThreadIdList;
+    bool m_sentinelHealthCheckThreadStarted;
+    pthread_t m_sentinelHealthCheckThreadId;
+    RWMutex m_rwThreadIdMutex; // guard pthread_t above
 };
 
 #endif

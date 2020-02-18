@@ -25,7 +25,12 @@ RedisClient::RedisClient()
 	m_initMasterAddr(),
 	m_dataNodes(),
 	m_masterClusterId(),
-	m_rwMasterMutex()
+	m_rwMasterMutex(),
+	m_threadArg(),
+	m_subscribeThreadIdList(),
+	m_sentinelHealthCheckThreadStarted(false),
+	m_sentinelHealthCheckThreadId()
+	
 {
 	LOG(INFO)<<"construct RedisClient ok";
 }
@@ -328,14 +333,16 @@ bool RedisClient::initSentinels()
 		sentinalHandler.connectPort=it->serverPort;
 		sentinalHandler.proxyId=it->serverIp+":"+toStr(sentinalHandler.connectPort);
 		sentinalHandler.isAlived=false;
-		sentinalHandler.clusterHandler=new RedisCluster;
+		sentinalHandler.subscribed=false;
+		sentinalHandler.clusterHandler=new RedisCluster;		
 		if(sentinalHandler.clusterHandler==NULL)
 		{
-			LOG(ERROR)<<"new RedisCluster failed";			
+			LOG(ERROR)<<"new RedisCluster failed";	
 		}
 		else
 		{
-			// one for control and check, like ckquorum; one for subscribe +switch-master
+			// one for control and check, like ckquorum; 
+			// one for subscribe +switch-master;
 			int connection_num_to_sentinel=2;
 			if (!sentinalHandler.clusterHandler->initConnectPool(sentinalHandler.connectIp, sentinalHandler.connectPort, connection_num_to_sentinel, m_keepaliveTime))
 			{
@@ -346,7 +353,7 @@ bool RedisClient::initSentinels()
 				sentinalHandler.isAlived=true;
 				aliveSentinel++;
 			}
-		}
+		}		
 
 		m_sentinelHandlers[sentinalHandler.proxyId]=sentinalHandler;
 
@@ -360,6 +367,8 @@ bool RedisClient::initSentinels()
 		else
 		{
 			switchMasterSubsribed=true;
+//			sentinalHandler.subscribed=true;
+			m_sentinelHandlers[sentinalHandler.proxyId].subscribed=true;
 		}
 
 		if(!masterNodeGot)
@@ -401,21 +410,88 @@ CLEAR_SENTINELS:
 		}
 	}
 	m_sentinelHandlers.clear();
+	if(m_sentinelHealthCheckThreadStarted)
+		pthread_cancel(m_sentinelHealthCheckThreadId);
+	{
+		WriteGuard guard(m_rwThreadIdMutex);
+		for(size_t i=0; i<m_subscribeThreadIdList.size(); i++)
+		{
+			pthread_cancel(m_subscribeThreadIdList[i]);
+		}
+		m_subscribeThreadIdList.clear();
+	}
 	return false;
 }
 
 bool RedisClient::StartSentinelHealthCheckTask()
 {
-	// ping
-
-	// subsribe +switch-master
-	
-
+	if(m_sentinelHealthCheckThreadStarted)
+		return true;
+	int ret=pthread_create(&m_sentinelHealthCheckThreadId, NULL, SentinelHealthCheckTask, this);
+	if(ret)
+	{
+		LOG(ERROR)<<"start health check thread failed";
+		return false;
+	}
+	m_sentinelHealthCheckThreadStarted=true;;
 	return true;
+}
+
+void* RedisClient::SentinelHealthCheckTask(void* arg)
+{
+	LOG(INFO)<<"sentinel health check task start";
+
+	RedisClient* client=(RedisClient*)arg;
+	while(true)
+	{
+		for(map<string, RedisProxyInfo>::iterator it=client->m_sentinelHandlers.begin(); it!=client->m_sentinelHandlers.end(); ++it)
+		{
+			if(it->second.isAlived==false)
+			{
+				//
+				if(it->second.clusterHandler==NULL)
+					it->second.clusterHandler=new RedisCluster;
+				if(it->second.clusterHandler==NULL)
+				{
+					LOG(ERROR)<<"new RedisCluster failed";	
+				}
+				else
+				{
+					int connection_num_to_sentinel=2;
+					if (!it->second.clusterHandler->initConnectPool(it->second.connectIp, it->second.connectPort, connection_num_to_sentinel, client->m_keepaliveTime))
+					{
+						LOG(ERROR)<<"init sentinel:["<<it->second.proxyId<<"] connect pool failed.";
+					}
+					else
+					{
+						it->second.isAlived=true;
+						LOG(INFO)<<"sentinel now online: "<<it->second.connectIp<<", "<<it->second.connectPort;
+					}
+				}				
+			}
+			
+			if(it->second.isAlived  &&  !it->second.subscribed)
+			{
+				if(!client->SubscribeSwitchMaster(it->second.clusterHandler))
+				{
+					LOG(ERROR)<<"sentinel "<<it->second.proxyId<<" subscribe +switch-master failed";
+				}
+				else
+				{
+					it->second.subscribed=false;
+				}
+			}
+		}
+
+		sleep(60);
+	}
+
+	return 0;
 }
 
 bool RedisClient::SubscribeSwitchMaster(RedisCluster* cluster)
 {
+	// allocate and occupy one RedisConnection from pool
 	RedisConnection* con=cluster->getAvailableConnection();
 	if(con==NULL)
 	{
@@ -456,17 +532,22 @@ bool RedisClient::SubscribeSwitchMaster(RedisCluster* cluster)
 		PLOG(ERROR)<<"create subscribe +switch-master thread failed";
 		return false;
 	}
+	else
+	{
+		WriteGuard guard(m_rwThreadIdMutex);
+		m_subscribeThreadIdList.push_back(thread_id);
+		return true;
+	}
 	
-	return true;
 }
 
 void* RedisClient::SubscribeSwitchMasterThreadFun(void* arg)
 {
-	LOG(INFO)<<"subscribe +switch-master thread start";
 	SwitchMasterThreadArgType* tmp=(SwitchMasterThreadArgType*)arg;
 	
 	RedisClient* client=tmp->client;
 	RedisConnection* con=tmp->con;
+	LOG(INFO)<<"subscribe +switch-master thread start, sentinel addr: "<<con->GetServerIp()<<", "<<con->GetServerPort();
 
 	int handler;
 	if(!con->ListenMessage(handler))
@@ -476,6 +557,7 @@ void* RedisClient::SubscribeSwitchMasterThreadFun(void* arg)
 	}
 	while(true)
 	{
+		LOG(INFO)<<"redisclient: waiting +switch-master channel message now";
 		RedisReplyInfo replyInfo;
 		if(con->WaitMessage(handler))
 		{
@@ -530,7 +612,7 @@ bool RedisClient::ParseSwithMasterMessage(const RedisReplyInfo& replyInfo, Redis
 		if ((*arrayIter).replyType == RedisReplyType::REDIS_REPLY_STRING)
 		{
 			string message = (*arrayIter).arrayValue;
-			LOG(INFO)<<message;
+//			LOG(INFO)<<message;
 			//  "mymaster 192.168.12.59 7100 192.168.12.59 7102"
 			if(i==2)
 			{
@@ -538,11 +620,13 @@ bool RedisClient::ParseSwithMasterMessage(const RedisReplyInfo& replyInfo, Redis
 				if(pos==string::npos)
 					return false;
 				masterAddr.serverPort=atoi(message.substr(pos+1).c_str());
+				
 				string::size_type pos2=pos-1;
 				pos=message.rfind(' ', pos2);
 				if(pos==string::npos)
 					return false;
-				masterAddr.serverIp=message.substr(pos, pos2-pos);
+				masterAddr.serverIp=message.substr(pos+1, pos2-pos);
+				
 				LOG(INFO)<<"get new master addr: "<<masterAddr.serverIp<<", "<<masterAddr.serverPort;
 				return true;
 			}
@@ -645,7 +729,7 @@ bool RedisClient::initMasterSlaves()
 		goto CLEAR_DATANODES;
 	}
 
-	m_masterName=masterNode.proxyId;
+	m_masterClusterId=masterNode.proxyId;
 	masterNode.isAlived=true;
 	m_dataNodes[masterNode.proxyId]=masterNode;
 
@@ -740,6 +824,17 @@ bool RedisClient::freeSentinels()
 		}
 	}
 	m_sentinelHandlers.clear();
+
+	if(m_sentinelHealthCheckThreadStarted)
+		pthread_cancel(m_sentinelHealthCheckThreadId);
+	{
+		WriteGuard guard(m_rwThreadIdMutex);
+		for(size_t i=0; i<m_subscribeThreadIdList.size(); i++)
+		{
+			pthread_cancel(m_subscribeThreadIdList[i]);
+		}
+		m_subscribeThreadIdList.clear();
+	}
 	return true;
 }
 
@@ -1638,16 +1733,16 @@ bool RedisClient::doRedisCommandMaster(const string & key,
 	bool needRedirect;
 	string redirectInfo;
 
-	RedisProxyInfo &masterNode=m_dataNodes[m_masterName];
+	RedisProxyInfo &masterNode=m_dataNodes[m_masterClusterId];
 	if(masterNode.clusterHandler==NULL  ||  masterNode.isAlived==false)
 	{
-		LOG(ERROR)<<"master node "<<m_masterName<<" not alive";
+		LOG(ERROR)<<"master node "<<m_masterClusterId<<" not alive";
         return false;
     }
 	if(!masterNode.clusterHandler->doRedisCommand(commandList, commandLen, replyInfo))
 	{
 		freeReplyInfo(replyInfo);
-		LOG(ERROR)<<"proxy: "<<masterNode.proxyId<<" do redis command failed.";
+		LOG(ERROR)<<"master: "<<masterNode.proxyId<<" do redis command failed.";
 		return false;
 	}
 

@@ -827,7 +827,8 @@ void LoopProcessDevice(DownDataRestorer& ddr)
 
 	Device device4("device_id_4");
 	ddr.InsertDeviceList(device4);
-	
+
+	sleep(3);
 	ShowDevices(ddr);
 
 	LOG(INFO)<<"to delete device1";
@@ -851,6 +852,11 @@ void LoopProcessDevice(DownDataRestorer& ddr)
 	sleep(3);
 	LOG(INFO)<<"after update";
 	ShowDevices(ddr);
+
+	sleep(3);
+	LOG(INFO)<<"to clear";
+	ddr.ClearDeviceList();
+	sleep(3);
 }
 
 void TestDDRInStandaloneMode()
@@ -867,6 +873,32 @@ void TestDDRInStandaloneMode()
 
 		LOG(WARNING)<<"wait to loop";
 		sleep(10);
+	}
+
+	ddr.Stop();
+	ddr.Uninit();
+}
+
+
+void TestDDRWhenSentinelException()
+{
+	DownDataRestorer ddr;	
+	string master_name="mymaster";
+	RedisServerInfo sentinel1("192.168.12.59", 26379);
+	RedisServerInfo sentinel2("192.168.12.59", 26380);
+	RedisServerInfo sentinel3("192.168.12.59", 26381);
+	REDIS_SERVER_LIST sentinels({sentinel1, sentinel2, sentinel3});
+	if(ddr.Init(sentinels, master_name, 3)==false)
+		return;
+	if(ddr.Start()==false)
+		return;
+
+	while(true)
+	{
+		LoopProcessDevice(ddr);
+
+		LOG(WARNING)<<"wait to loop";
+		sleep(15);
 	}
 
 	ddr.Stop();
@@ -918,7 +950,9 @@ int main(int argc, char** argv)
 
 //	TestRedisSentinelVersionDDRCmd();
 
-	TestDDRInStandaloneMode();
+//	TestDDRInStandaloneMode();
+
+	TestDDRWhenSentinelException();
 	
     return 0;
 }

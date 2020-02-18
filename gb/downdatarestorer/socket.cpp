@@ -191,11 +191,14 @@ bool Socket::connectNonBock(const string& host, int port, int tv_sec, int tv_use
 		create(m_stream, address.getAddrType());
 	}
 
+	int ret=false;
 	if(address.getAddrType() == AF_INET){
-		__connectNonBockv4(address,port,tv_sec, tv_usec);
+		ret=__connectNonBockv4(address,port,tv_sec, tv_usec);
 	}else if(address.getAddrType() == AF_INET6){
-		__connectNonBockv6(address,port,tv_sec, tv_usec);
+		ret=__connectNonBockv6(address,port,tv_sec, tv_usec);
 	}
+	if(!ret)
+		return false;
 	this->address = address;
 	this->port = port;
 	return true;
@@ -494,7 +497,7 @@ bool Socket::WatchReadEvent(int& epollfd)
 	}
 
 	struct epoll_event ev;
-	ev.events=EPOLLIN;
+	ev.events=EPOLLIN  |  EPOLLRDHUP;
 	ev.data.fd=fd;
 	if(epoll_ctl(epfd, EPOLL_CTL_ADD, fd, &ev)<0)
 	{
@@ -526,13 +529,21 @@ bool Socket::WaitReadEvent(int epollfd)
 	}
 
 	LOG(INFO)<<"event.events is "<<event.events;
-	// TODO EPOLLERR
-	if(event.events  &  (EPOLLIN | EPOLLPRI | EPOLLRDNORM | POLLRDBAND | EPOLLRDHUP))
+
+	if(event.events & EPOLLRDHUP)
+	{
+		LOG(WARNING)<<"peer disconnect";
+		close();
+		return false;
+	}
+	else if(event.events & (EPOLLIN | EPOLLPRI | EPOLLRDNORM | POLLRDBAND))
 	{
 		return true;
 	}
-	else
-	{		
+	else 
+	{
+		LOG(WARNING)<<"unkonwn socket event occur";
+		close();
 		return false;
 	}
 }
@@ -627,8 +638,7 @@ int Socket::readFull(void * buf, size_t len) {
 
 size_t Socket::writeFull(const void * buf, size_t len) {
 	if (fd == INVALID_SOCKET_HANDLE) {
-//		m_logger.info("can not write to socketFd which is 0");
-		LOG(INFO)<<"can not write to socketFd which is 0";
+		LOG(INFO)<<"can not write to socketFd which is "<<INVALID_SOCKET_HANDLE;
 		return 0;
 	}
 
