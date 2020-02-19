@@ -4,12 +4,14 @@
 #include <string>
 #include <map>
 #include <list>
+#include <queue>
 #include "dbstream.h"
 #include "redisbase.h"
 #include "redisconnection.h"
 #include "rediscluster.h"
 #include "rwmutex.h"
-
+#include "mutexlock.h"
+#include "condvar.h"
 
 #define REDIS_DEFALUT_SERVER_PORT 6379
 #define REDIS_SLOT_NUM 16384
@@ -106,42 +108,107 @@ typedef struct RedisLockInfoTag
 typedef map<string, RedisClusterInfo> REDIS_CLUSTER_MAP;
 
 typedef map<uint16_t, string> REDIS_SLOT_MAP; // key is slot, value is clusterId
+//
+//struct RedisCommandType
+//{
+//	enum{
+//		REDIS_COMMAND_UNKNOWN = 0,
+//		
+//		REDIS_COMMAND_READ_TYPE_START,	// read type cmd
+//		REDIS_COMMAND_GET,
+//		REDIS_COMMAND_EXISTS,
+//		REDIS_COMMAND_DBSIZE,
+//		REDIS_COMMAND_ZCOUNT,
+//		REDIS_COMMAND_ZCARD,
+//		REDIS_COMMAND_ZSCORE,
+//		REDIS_COMMAND_ZRANGEBYSCORE,
+//		REDIS_COMMAND_SCARD,
+//		REDIS_COMMAND_SISMEMBER,
+//		REDIS_COMMAND_SMEMBERS,
+//		REDIS_COMMAND_READ_TYPE_END,	// read type cmd
+//
+//		REDIS_COMMAND_WRITE_TYPE_START, // write type cmd
+//		REDIS_COMMAND_SET,
+//		REDIS_COMMAND_DEL,
+//		REDIS_COMMAND_EXPIRE,
+//		REDIS_COMMAND_ZADD,
+//		REDIS_COMMAND_ZREM,
+//		REDIS_COMMAND_ZINCRBY,
+//		REDIS_COMMAND_ZREMRANGEBYSCORE,
+//		REDIS_COMMAND_SADD,
+//		REDIS_COMMAND_SREM,
+//		REDIS_COMMAND_WRITE_TYPE_END,	// write type cmd
+//		
+//		REDIS_COMMAND_FOR_STAND_ALONE_MODE_START,
+//		REDIS_COMMAND_WATCH,
+//		REDIS_COMMAND_UNWATCH,
+//		REDIS_COMMAND_MULTI,
+//		REDIS_COMMAND_EXEC,
+//		REDIS_COMMAND_DISCARD,		
+//		REDIS_COMMAND_FOR_STAND_ALONE_MODE_END,
+//	        
+//		REDIS_COMMAND_TO_SENTINEL_NODES_START,	// command to sentinel nodes
+//        REDIS_COMMAND_SENTINEL_GET_MASTER_ADDR,
+//        REDIS_COMMAND_INFO_REPLICATION,
+//        REDIS_COMMAND_TO_SENTINEL_NODES_END,	// command to sentinel nodes
+//	};
+//};
 
-struct RedisCommandType
-{
-	enum{
-		REDIS_COMMAND_UNKNOWN = 0,
-		REDIS_COMMAND_GET,
-		REDIS_COMMAND_EXISTS,
-		REDIS_COMMAND_SET,
-		REDIS_COMMAND_DEL,
-		REDIS_COMMAND_EXPIRE,
-		REDIS_COMMAND_WATCH,
-		REDIS_COMMAND_UNWATCH,
-		REDIS_COMMAND_MULTI,
-		REDIS_COMMAND_EXEC,
-		REDIS_COMMAND_DISCARD,
-		REDIS_COMMAND_ZADD,
-		REDIS_COMMAND_ZREM,
-		REDIS_COMMAND_ZINCRBY,
-		REDIS_COMMAND_ZRANGEBYSCORE,
-		REDIS_COMMAND_ZREMRANGEBYSCORE,
-		REDIS_COMMAND_ZCOUNT,
-		REDIS_COMMAND_ZCARD,
-		REDIS_COMMAND_ZSCORE,
 
-		REDIS_COMMAND_SADD,
-		REDIS_COMMAND_SREM,
-		REDIS_COMMAND_SCARD,
-		REDIS_COMMAND_SISMEMBER,
-		REDIS_COMMAND_SMEMBERS,
 
-        REDIS_COMMAND_DBSIZE,
+enum RedisCommandType{
+	REDIS_COMMAND_UNKNOWN = 0,
+	
+	REDIS_COMMAND_READ_TYPE_START,	// read type cmd
+	REDIS_COMMAND_GET,
+	REDIS_COMMAND_EXISTS,
+	REDIS_COMMAND_DBSIZE,
+	REDIS_COMMAND_ZCOUNT,
+	REDIS_COMMAND_ZCARD,
+	REDIS_COMMAND_ZSCORE,
+	REDIS_COMMAND_ZRANGEBYSCORE,
+	REDIS_COMMAND_SCARD,
+	REDIS_COMMAND_SISMEMBER,
+	REDIS_COMMAND_SMEMBERS,
+	REDIS_COMMAND_READ_TYPE_END,	// read type cmd
 
-        REDIS_COMMAND_SENTINEL_GET_MASTER_ADDR,
-        REDIS_COMMAND_INFO_REPLICATION,
-	};
+	REDIS_COMMAND_WRITE_TYPE_START, // write type cmd
+	REDIS_COMMAND_SET,
+	REDIS_COMMAND_DEL,
+	REDIS_COMMAND_EXPIRE,
+	REDIS_COMMAND_ZADD,
+	REDIS_COMMAND_ZREM,
+	REDIS_COMMAND_ZINCRBY,
+	REDIS_COMMAND_ZREMRANGEBYSCORE,
+	REDIS_COMMAND_SADD,
+	REDIS_COMMAND_SREM,
+	REDIS_COMMAND_WRITE_TYPE_END,	// write type cmd
+	
+	REDIS_COMMAND_FOR_STAND_ALONE_MODE_START,
+	REDIS_COMMAND_WATCH,
+	REDIS_COMMAND_UNWATCH,
+	REDIS_COMMAND_MULTI,
+	REDIS_COMMAND_EXEC,
+	REDIS_COMMAND_DISCARD,		
+	REDIS_COMMAND_FOR_STAND_ALONE_MODE_END,
+        
+	REDIS_COMMAND_TO_SENTINEL_NODES_START,	// command to sentinel nodes
+    REDIS_COMMAND_SENTINEL_GET_MASTER_ADDR,
+    REDIS_COMMAND_INFO_REPLICATION,
+    REDIS_COMMAND_TO_SENTINEL_NODES_END,	// command to sentinel nodes
 };
+
+
+
+inline bool IsCommandReadType(RedisCommandType type)
+{
+	return static_cast<int>(type)>static_cast<int>(REDIS_COMMAND_READ_TYPE_START)  &&  static_cast<int>(type)<static_cast<int>(REDIS_COMMAND_READ_TYPE_END);
+}
+
+inline bool IsCommandWriteType(RedisCommandType type)
+{
+	return (int)type>(int)REDIS_COMMAND_WRITE_TYPE_START  &&  (int)type<(int)REDIS_COMMAND_WRITE_TYPE_END;
+}
 
 class RedisClient;
 
@@ -275,14 +342,14 @@ private:
 	void updateClusterCursor(const string& clusterId, int newcursor);
 	bool getClusterIdBySlot(uint16_t slotNum, string& clusterId);
 
- 	bool doRedisCommand(const string & key, int32_t commandLen, list<RedisCmdParaInfo> & commandList, int commandType);
- 	bool doRedisCommand(const string& key, int32_t commandLen, list<RedisCmdParaInfo> &commandList, int commandType, DBSerialize* serial);
- 	bool doRedisCommand(const string& key, int32_t commandLen, list<RedisCmdParaInfo> &commandList, int commandType, int* count);
-	bool doRedisCommand(const string& key, int32_t commandLen, list<RedisCmdParaInfo> &commandList, int commandType, list<string>& members);
-	bool doRedisCommand(const string& key, int32_t commandLen, list<RedisCmdParaInfo> &commandList, int commandType, list<string>& members, DBSerialize* serial, int* count);
-	bool doRedisCommandProxy(const string& key, int32_t commandLen, list<RedisCmdParaInfo> &commandList, int commandType, list<string>& members, DBSerialize* serial, int* count);
-	bool doRedisCommandMaster(const string& key, int32_t commandLen, list<RedisCmdParaInfo> &commandList, int commandType, list<string>& members, DBSerialize* serial, int* count);
-	bool doRedisCommandCluster(const string& key, int32_t commandLen, list<RedisCmdParaInfo> &commandList, int commandType, list<string>& members, DBSerialize* serial, int* count);
+ 	bool doRedisCommand(const string & key, int32_t commandLen, list<RedisCmdParaInfo> & commandList, RedisCommandType commandType);
+ 	bool doRedisCommand(const string& key, int32_t commandLen, list<RedisCmdParaInfo> &commandList, RedisCommandType commandType, DBSerialize* serial);
+ 	bool doRedisCommand(const string& key, int32_t commandLen, list<RedisCmdParaInfo> &commandList, RedisCommandType commandType, int* count);
+	bool doRedisCommand(const string& key, int32_t commandLen, list<RedisCmdParaInfo> &commandList, RedisCommandType commandType, list<string>& members);
+	bool doRedisCommand(const string& key, int32_t commandLen, list<RedisCmdParaInfo> &commandList, RedisCommandType commandType, list<string>& members, DBSerialize* serial, int* count);
+	bool doRedisCommandProxy(const string& key, int32_t commandLen, list<RedisCmdParaInfo> &commandList, RedisCommandType commandType, list<string>& members, DBSerialize* serial, int* count);
+	bool doRedisCommandMaster(const string& key, int32_t commandLen, list<RedisCmdParaInfo> &commandList, RedisCommandType commandType, list<string>& members, DBSerialize* serial, int* count);
+	bool doRedisCommandCluster(const string& key, int32_t commandLen, list<RedisCmdParaInfo> &commandList, RedisCommandType commandType, list<string>& members, DBSerialize* serial, int* count);
 	
 	bool doRedisCommandWithLock(const string& key, int32_t commandLen, list<RedisCmdParaInfo> &commandList, int commandType, RedisLockInfo& lockInfo, bool getSerial = false, DBSerialize* serial = NULL);
 	bool doMultiCommand(int32_t commandLen, list<RedisCmdParaInfo> &commandList, RedisConnection** conn);
@@ -302,8 +369,18 @@ private:
 	bool freeSentinels();
 	bool freeMasterSlaves();
 	bool ParseSubsribeSwitchMasterReply(const RedisReplyInfo& replyInfo);
-
 	static void* SentinelHealthCheckTask(void* arg);
+	bool CheckMasterRole(const RedisServerInfo& masterAddr);
+	bool SentinelReinit();
+	void CheckSentinelGetMasterAddrByName();
+
+	bool StartCheckClusterThread();
+	void SignalToDoClusterNodes();
+	static void* CheckClusterNodesThreadFunc(void* arg);
+	void DoCheckClusterNodes();
+//	bool CreateConnectionPool(map<string, RedisProxyInfo>::iterator& it);
+	bool CreateConnectionPool(RedisProxyInfo& );
+
 	
 private:
 	// for all RedisMode
@@ -323,7 +400,12 @@ private:
     REDIS_CLUSTER_MAP m_clusterMap; // key=clusterId=ip:port
     RWMutex	m_rwClusterMutex;
     map<string, RedisCluster*> m_unusedHandlers;    
-    RedisMonitor* m_redisMonitor;
+//    RedisMonitor* m_redisMonitor;
+    pthread_t m_checkClusterNodesThreadId;
+    bool m_checkClusterNodesThreadStarted;
+    queue<int> m_signalQueue;
+    MutexLock m_lockSignalQueue;
+    CondVar m_condSignalQueue;
     
     // for SENTINEL_MODE
     REDIS_SERVER_LIST m_sentinelList; // redis sentinel nodes addr

@@ -107,9 +107,12 @@ bool RedisCluster::doRedisCommand(list < RedisCmdParaInfo > & paraList,int32_t p
 	{
 //		m_logger.warn("doRedisCommand, cluster:[%s:%d] not find available connection, use once connection.",m_clusterIp.c_str(), m_clusterPort);
 		connection = new RedisConnection(m_clusterIp, m_clusterPort, 30);
+		if(connection==NULL)
+			return false;
 		if(!connection->connect())
 		{
 //			m_logger.warn("connect to clusterIp:%s clusterPort:%d failed.", m_clusterIp.c_str(), m_clusterPort);
+			delete connection;
 			return false;
 		}
 		success = connection->doRedisCommand(paraList, paraLen, replyInfo, parserType);
