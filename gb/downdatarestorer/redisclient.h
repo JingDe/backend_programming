@@ -158,6 +158,8 @@ typedef map<uint16_t, string> REDIS_SLOT_MAP; // key is slot, value is clusterId
 
 enum RedisCommandType{
 	REDIS_COMMAND_UNKNOWN = 0,
+
+	REDIS_COMMAND_AUTH,
 	
 	REDIS_COMMAND_READ_TYPE_START,	// read type cmd
 	REDIS_COMMAND_GET,
@@ -235,10 +237,10 @@ public:
 
 	RedisClient();
 	~RedisClient();
-	bool init(const string& serverIp, uint32_t serverPort, uint32_t connectionNum);
-	bool init(const REDIS_SERVER_LIST& clusterList, uint32_t connectionNum);
-	bool init(const REDIS_SERVER_LIST& sentinelList, const string& masterName, uint32_t connectionNum);
-	bool init(RedisMode redis_mode, const REDIS_SERVER_LIST& serverList, const string& masterName, uint32_t connectionNum, uint32_t keepaliveTime=-1);
+	bool init(const string& serverIp, uint32_t serverPort, uint32_t connectionNum, const string& passwd="");
+	bool init(const REDIS_SERVER_LIST& clusterList, uint32_t connectionNum, const string& passwd="");
+	bool init(const REDIS_SERVER_LIST& sentinelList, const string& masterName, uint32_t connectionNum, const string& passwd="");
+	bool init(RedisMode redis_mode, const REDIS_SERVER_LIST& serverList, const string& masterName, uint32_t connectionNum, const string& passwd="", uint32_t keepaliveTime=-1);
     bool freeRedisClient();
 	bool getSerial(const string& key, DBSerialize &serial);
 	bool getSerialWithLock(const string& key, DBSerialize &serial, RedisLockInfo& lockInfo);
@@ -347,8 +349,15 @@ private:
  	bool doRedisCommand(const string& key, int32_t commandLen, list<RedisCmdParaInfo> &commandList, RedisCommandType commandType, int* count);
 	bool doRedisCommand(const string& key, int32_t commandLen, list<RedisCmdParaInfo> &commandList, RedisCommandType commandType, list<string>& members);
 	bool doRedisCommand(const string& key, int32_t commandLen, list<RedisCmdParaInfo> &commandList, RedisCommandType commandType, list<string>& members, DBSerialize* serial, int* count);
-	bool doRedisCommandProxy(const string& key, int32_t commandLen, list<RedisCmdParaInfo> &commandList, RedisCommandType commandType, list<string>& members, DBSerialize* serial, int* count);
+	bool doRedisCommandStandAlone(const string& key, int32_t commandLen, list<RedisCmdParaInfo> &commandList, RedisCommandType commandType, list<string>& members, DBSerialize* serial, int* count);
 	bool doRedisCommandMaster(const string& key, int32_t commandLen, list<RedisCmdParaInfo> &commandList, RedisCommandType commandType, list<string>& members, DBSerialize* serial, int* count);
+	bool ParseRedisReplyForStandAloneAndMasterMode(				RedisReplyInfo& replyInfo,
+				bool& needRedirect,
+				string& redirectInfo,
+				const string& key,
+				RedisCommandType commandType,
+				list<string>& members,
+				DBSerialize* serial, int* count);
 	bool doRedisCommandCluster(const string& key, int32_t commandLen, list<RedisCmdParaInfo> &commandList, RedisCommandType commandType, list<string>& members, DBSerialize* serial, int* count);
 	
 	bool doRedisCommandWithLock(const string& key, int32_t commandLen, list<RedisCmdParaInfo> &commandList, int commandType, RedisLockInfo& lockInfo, bool getSerial = false, DBSerialize* serial = NULL);
@@ -381,12 +390,15 @@ private:
 //	bool CreateConnectionPool(map<string, RedisProxyInfo>::iterator& it);
 	bool CreateConnectionPool(RedisProxyInfo& );
 
+	bool AuthPasswd(const string& passwd, RedisCluster* cluster);
+	bool ParseAuthReply(const RedisReplyInfo& replyInfo);
 	
 private:
 	// for all RedisMode
 	RedisMode m_redisMode;
 	uint32_t m_connectionNum;
 	uint32_t m_keepaliveTime;
+	string m_passwd;
 	bool m_connected;
 		
 	// for STAND_ALONE_OR_PROXY_MODE

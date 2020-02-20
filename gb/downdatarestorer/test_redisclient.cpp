@@ -579,23 +579,23 @@ public:
 	}
 };
 
-//void TestSentinelSlaves()
-//{
-//	// "sentienl slaves"
-//	RedisClient client;
-//
-//	RedisServerInfo sentinel1("192.168.12.59", 26379);
-//	RedisServerInfo sentinel2("192.168.12.59", 26380);
-//	RedisServerInfo sentinel3("192.168.12.59", 26381);
-//	REDIS_SERVER_LIST serverList({sentinel1, sentinel2, sentinel3});
-//	string master_name="mymaster";
-//	if(!client.init(serverList, master_name, 2))
-//		return;
-//
-////	client.DoTestOfSentinelSlavesCommand();
-//
-//	return ;
-//}
+void TestSentinelSlaves()
+{
+	// "sentienl slaves"
+	RedisClient client;
+
+	RedisServerInfo sentinel1("192.168.12.59", 26379);
+	RedisServerInfo sentinel2("192.168.12.59", 26380);
+	RedisServerInfo sentinel3("192.168.12.59", 26381);
+	REDIS_SERVER_LIST serverList({sentinel1, sentinel2, sentinel3});
+	string master_name="mymaster";
+	if(!client.init(serverList, master_name, 2))
+		return;
+
+	client.DoTestOfSentinelSlavesCommand();
+
+	return ;
+}
 
 void TestRedisSentinelInit()
 {
@@ -905,6 +905,15 @@ void TestDDRWhenSentinelException()
 	ddr.Uninit();
 }
 
+
+void TestRedisClientAuth()
+{
+	RedisClient client;
+	client.init(redis_ip, 6379, 5, "wrong");
+	
+}
+
+
 int main(int argc, char** argv)
 {
 	Glogger glog;
@@ -938,7 +947,7 @@ int main(int argc, char** argv)
 //	TestDelTransactionInCluster();
 
 
-//    TestSentinelSlaves();
+    TestSentinelSlaves();
 
 //    TestRedisSentinelInit();
 
@@ -952,7 +961,9 @@ int main(int argc, char** argv)
 
 //	TestDDRInStandaloneMode();
 
-	TestDDRWhenSentinelException();
+//	TestDDRWhenSentinelException();
+
+//	TestRedisClientAuth();
 	
     return 0;
 }

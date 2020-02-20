@@ -25,6 +25,9 @@ struct RedisReplyType
 		REDIS_REPLY_INTEGER,
 		REDIS_REPLY_STRING,
 		REDIS_REPLY_ARRAY,
+
+		// TODO for parseEnance
+		REDIS_REPLY_MULTI_ARRRY,
 	};
 };
 

@@ -12,6 +12,53 @@
 #define REDIS_READ_BUFF_SIZE 4096
 using namespace std;
 
+
+
+/* for parseEnhanch, 更通用、全面的解析resp协议reply */
+
+// 沿用 ReplyArrayInfo
+//struct ArrayElem{
+//	int elem_type;
+//	string elem_value;
+//};
+//typedef vector<ArrayElem> Array;
+typedef vector<ReplyArrayInfo> Array;
+
+//struct ReplyInfo{
+//	// 返回一条成功或者失败消息
+//	// 返回一个整数的命令
+//	// 返回一个对象，一个string对象。get
+//	// 返回一个数组。 smembers, sentinel master,
+//	// 返回一个整数，和一个数组。  scan
+//	// 返回多个数组。 sentinel salves,
+//	
+//	int code; // 成功或者失败
+//	string msg; // 失败msg
+//	int num; // 
+//	string entity; // string表示的对象
+//	vector<Array> arrays;
+//
+//	// 记录parse过程中的中间状态
+//	int arrays_size; // 获取arrays的大小
+//	int cur_array_pos; // 当前解析的第几个Array
+//	int cur_arry_size; // 获取当前解析的Array的大小
+//};
+
+struct ReplyInfo{
+	int replyType;
+	string resultString;
+	int intValue;
+	
+//	list<ReplyArrayInfo> arrayList; // 返回一个string对象时，存储在第一个元素
+	vector<Array> arrays; // 返回一个string对象时，存储在第一个Array的第一个元素
+	
+	// 记录parse过程中的中间状态
+	int arrays_size; // 获取arrays的大小
+	int cur_array_pos; // 当前解析的第几个Array
+	int cur_arry_size; // 获取当前解析的Array的大小
+};
+
+
 class RedisConnection
 {
 public:
@@ -30,6 +77,10 @@ public:
 		REDIS_PARSE_KEYSLEN,
 		REDIS_PARSE_KEYLEN,
 		REDIS_PARSE_KEY,
+
+		// TODO for parseEnance
+		REDIS_PARSE_CHECK_ARRAYS_SIZE, // 等待确定第二行是否*开头
+		
 	};
 	enum ReplyParserType{
 		COMMON_PARSER,
@@ -68,6 +119,8 @@ private:
 	void checkConnectionStatus();
 	bool parse(char* parseBuf, int32_t parseLen, RedisReplyInfo& replyInfo);
 	bool parseScanReply(char *parseBuf, int32_t parseLen, RedisReplyInfo & replyInfo);
+
+	bool parseEnance(char *parseBuf, int32_t parseLen, ReplyInfo & replyInfo);
 	
 public:
 	bool m_available;
