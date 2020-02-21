@@ -49,7 +49,7 @@ DownDataRestorer::~DownDataRestorer()
 }
 
 // for STAND_ALONE
-int DownDataRestorer::Init(const string& redis_server_ip, uint16_t redis_server_port, int worker_thread_num)
+int DownDataRestorer::Init(const string& redis_server_ip, uint16_t redis_server_port, int worker_thread_num, uint32_t connect_timeout_ms, uint32_t read_timeout_ms, const string& passwd)
 {
 	if(inited_)
 	{
@@ -61,11 +61,11 @@ int DownDataRestorer::Init(const string& redis_server_ip, uint16_t redis_server_
 	RedisServerInfo redis_server(redis_server_ip, redis_server_port);
 	REDIS_SERVER_LIST redis_server_list({redis_server});
 
-	return Init(STAND_ALONE_OR_PROXY_MODE, redis_server_list, "", worker_thread_num);
+	return Init(STAND_ALONE_OR_PROXY_MODE, redis_server_list, "", worker_thread_num, connect_timeout_ms, read_timeout_ms, passwd);
 }
 
 // for CLUSTER
-int DownDataRestorer::Init(const REDIS_SERVER_LIST& redis_server_list, int worker_thread_num)
+int DownDataRestorer::Init(const REDIS_SERVER_LIST& redis_server_list, int worker_thread_num, uint32_t connect_timeout_ms, uint32_t read_timeout_ms, const string& passwd)
 {
 	if(inited_)
 	{
@@ -73,11 +73,11 @@ int DownDataRestorer::Init(const REDIS_SERVER_LIST& redis_server_list, int worke
 		return DDR_FAIL;
 	}
 
-	return Init(CLUSTER_MODE, redis_server_list, "", worker_thread_num);
+	return Init(CLUSTER_MODE, redis_server_list, "", worker_thread_num, connect_timeout_ms, read_timeout_ms, passwd);
 }
 
 // for SENTINEL
-int DownDataRestorer::Init(const REDIS_SERVER_LIST& redis_server_list, const string& master_name, int worker_thread_num)
+int DownDataRestorer::Init(const REDIS_SERVER_LIST& redis_server_list, const string& master_name, int worker_thread_num, uint32_t connect_timeout_ms, uint32_t read_timeout_ms, const string& passwd)
 {
 	if(inited_)
 	{
@@ -85,10 +85,10 @@ int DownDataRestorer::Init(const REDIS_SERVER_LIST& redis_server_list, const str
 		return DDR_FAIL;
 	}
 
-	return Init(SENTINEL_MODE, redis_server_list, master_name, worker_thread_num);
+	return Init(SENTINEL_MODE, redis_server_list, master_name, worker_thread_num, connect_timeout_ms, read_timeout_ms, passwd);
 }
 
-int DownDataRestorer::Init(RedisMode redis_mode, const REDIS_SERVER_LIST& redis_server_list, const string& master_name, int worker_thread_num)
+int DownDataRestorer::Init(RedisMode redis_mode, const REDIS_SERVER_LIST& redis_server_list, const string& master_name, int worker_thread_num, uint32_t connect_timeout_ms, uint32_t read_timeout_ms, const string& passwd)
 {
 	if(inited_)
 	{
@@ -118,7 +118,7 @@ int DownDataRestorer::Init(RedisMode redis_mode, const REDIS_SERVER_LIST& redis_
 	LOG(INFO)<<"worker_thead num is "<<worker_thread_num_;
 	LOG(INFO)<<"redis_connection num is "<<connection_num;
 //	uint32_t keepalive_time_secs=86400;
-	if(redis_client_->init(redis_mode_, redis_server_list, master_name, connection_num/*, keepalive_time_secs*/)==false)
+	if(redis_client_->init(redis_mode_, redis_server_list, master_name, connection_num, connect_timeout_ms, read_timeout_ms, passwd)==false)
 	{
 		LOG(ERROR)<<"init RedisClient failed";
 		delete redis_client_;

@@ -7,11 +7,13 @@
 
 typedef bool (*ParseFunction)(void *parseBuf, int32_t parseLen, RedisReplyInfo & replyInfo);
 
-RedisConnection::RedisConnection(const string serverIp,uint32_t serverPort,uint32_t timeout)//:m_logger("clib.redisconnection")
+RedisConnection::RedisConnection(const string serverIp,uint32_t serverPort, uint32_t connectTimeout, uint32_t readTimeout)//:m_logger("clib.redisconnection")
 {
 	m_serverIp = serverIp;
 	m_serverPort = serverPort;
-	m_timeout = timeout;
+	m_connectTime=connectTimeout;
+	m_readTimeout=readTimeout; 
+//	m_timeout = timeout;
 	m_unparseBuf = NULL;
 	m_unparseLen = 0;
 	m_parseState = REDIS_PARSE_UNKNOWN_STATE;
@@ -34,13 +36,12 @@ void RedisConnection::SetCanRelease(bool canRelease)
 
 bool RedisConnection::connect()
 {
-	if (!m_socket.connect(m_serverIp, m_serverPort))
+	if (!m_socket.connect(m_serverIp, m_serverPort, m_connectTimeout))
 	{
 //		m_logger.warn("connection:[%p] connect to server:[%s:%u] failed.", this, m_serverIp.c_str(), m_serverPort);
 		LOG(ERROR)<<"connection:["<<this<<"] connect to server:["<<m_serverIp<<":"<<m_serverPort<<"] failed.";
 		return false;
-	}	
-	m_socket.setSoTimeout(m_timeout);
+	}
 	return true;
 }
 
@@ -84,6 +85,128 @@ bool RedisConnection::doRedisCommand(list < RedisCmdParaInfo > & paraList,int32_
 	commandBuf = NULL;
 	return recv(replyInfo, parserType);
 }
+
+bool RedisConnection::testDoCommandWithParseEnhance(list < RedisCmdParaInfo > & paraList,int32_t paraLen, CommonReplyInfo &replyInfo)
+{
+	checkConnectionStatus();
+	if (m_socket.fd == INVALID_SOCKET_HANDLE)
+	{
+		LOG(ERROR)<<"connection:["<<this<<"] socket may be closed by peer.";
+		if(!connect())
+		{
+			LOG(ERROR)<<"connection:["<<this<<"] reconnect to server failed.";
+			return false;
+		}
+	}
+	char* commandBuf = NULL;
+	commandBuf = (char*)malloc(paraLen);
+	memset(commandBuf, 0, paraLen);
+	int32_t cmdLen = 0;
+	createRedisCommand(paraList, &commandBuf, cmdLen);
+	if(!send(commandBuf, cmdLen))
+	{
+		LOG(ERROR)<<"connection:["<<this<<"] send command:["<<commandBuf<<"] to redis:"<<m_serverIp<<":"<<m_serverPort<<" failed.";
+		free(commandBuf);
+		commandBuf = NULL;
+		return false;
+	}
+	free(commandBuf);
+	commandBuf = NULL;
+	return recvSentinelSlavesReply(replyInfo);
+}
+
+
+bool RedisConnection::recvSentinelSlavesReply(CommonReplyInfo & replyInfo)
+{
+	//init parse data
+	m_unparseBuf = NULL;
+	m_unparseLen = 0;
+	m_parseState = REDIS_PARSE_UNKNOWN_STATE;
+	m_valid = false;
+	m_arrayNum = 0;
+	m_doneNum = 0;
+	m_arrayLen = 0;
+	//recv data.
+	char recvBuf[REDIS_READ_BUFF_SIZE];
+	char *toParseBuf = NULL;
+	int32_t mallocLen = 0;
+	int32_t toParseLen = 0;
+	toParseBuf = (char*)malloc(REDIS_READ_BUFF_SIZE);
+	memset(toParseBuf, 0, REDIS_READ_BUFF_SIZE);
+	toParseLen += REDIS_READ_BUFF_SIZE;
+	mallocLen = toParseLen;
+	while(!m_valid)
+	{
+		memset(recvBuf, 0, REDIS_READ_BUFF_SIZE);
+		int32_t recvLen = m_socket.read(recvBuf, REDIS_READ_BUFF_SIZE-1, m_readTimeout);
+		if (recvLen < 0)
+		{
+//			m_logger.warn("connection:[%p] failed to read socket", this);
+			LOG(ERROR)<<"connection:["<<this<<"] failed to read socket";
+			if (m_unparseBuf != NULL)
+			{
+				free(m_unparseBuf);
+				m_unparseBuf = NULL;
+			}
+			if (toParseBuf != NULL)
+			{
+				free(toParseBuf);
+				toParseBuf = NULL;
+			}
+			return false;
+		}
+		toParseLen = m_unparseLen + recvLen;
+		if (m_unparseLen != 0)
+		{
+			if (m_unparseLen + recvLen >= mallocLen)
+			{
+				char *newBuf = (char*)malloc(mallocLen*2);
+				memset(newBuf, 0, mallocLen*2);
+				mallocLen *= 2;
+				memcpy(newBuf, m_unparseBuf, m_unparseLen);
+				memcpy(newBuf + m_unparseLen, recvBuf, recvLen);
+				free(toParseBuf);
+				toParseBuf = NULL;
+				free(m_unparseBuf);
+				m_unparseBuf = NULL;
+				m_unparseLen = 0;
+//				toParseBuf = (char*)malloc(mallocLen);
+//				memset(toParseBuf, 0, mallocLen);
+//				memcpy(toParseBuf, newBuf, toParseLen);
+//				free(newBuf);
+                toParseBuf=newBuf;				
+				newBuf = NULL;
+			}
+			else
+			{
+				memset(toParseBuf, 0, mallocLen);
+				memcpy(toParseBuf, m_unparseBuf, m_unparseLen);
+				memcpy(toParseBuf + m_unparseLen, recvBuf, recvLen);
+				free(m_unparseBuf);
+				m_unparseBuf = NULL;
+				m_unparseLen = 0;
+			}
+		}
+		else
+		{
+			memset(toParseBuf, 0, mallocLen);
+			memcpy(toParseBuf, recvBuf, recvLen);
+		}
+		parseEnhance(toParseBuf, toParseLen, replyInfo);
+	}
+	if (m_unparseBuf != NULL)
+	{
+		free(m_unparseBuf);
+		m_unparseBuf = NULL;
+	}
+	if (toParseBuf != NULL)
+	{
+		free(toParseBuf);
+		toParseBuf = NULL;
+	}
+	return m_valid;
+}
+
 
 bool RedisConnection::send(char * request,uint32_t sendLen)
 {
@@ -147,7 +270,7 @@ bool RedisConnection::recv(RedisReplyInfo & replyInfo, ReplyParserType parserTyp
 	while(!m_valid)
 	{
 		memset(recvBuf, 0, REDIS_READ_BUFF_SIZE);
-		int32_t recvLen = m_socket.read(recvBuf, REDIS_READ_BUFF_SIZE-1, 3);
+		int32_t recvLen = m_socket.read(recvBuf, REDIS_READ_BUFF_SIZE-1, m_readTimeout);
 		if (recvLen < 0)
 		{
 //			m_logger.warn("connection:[%p] failed to read socket", this);
@@ -219,17 +342,20 @@ bool RedisConnection::recv(RedisReplyInfo & replyInfo, ReplyParserType parserTyp
 	return m_valid;
 }
 
-// TODO test this with "sentinel slaves" in RedisClient::DoTestOfSentinelSlavesCommand
-bool RedisConnection::parseEnance(char *parseBuf, int32_t parseLen, ReplyInfo & replyInfo)
+// test this with "sentinel slaves" in RedisClient::DoTestOfSentinelSlavesCommand
+bool RedisConnection::parseEnhance(char *parseBuf, int32_t parseLen, CommonReplyInfo & replyInfo)
 {
 	LOG(INFO)<<"parseEnance, connection:["<<this<<"] start to parse redis response:["<<parseBuf<<"], parseLen: "<<parseLen;
 	const char * const end = parseBuf + parseLen;
 	bool haveArray = false;
 	char *p=NULL;
-	char buf[256]; // enough to contain key
+	char buf[4096];
 	if (m_parseState == REDIS_PARSE_UNKNOWN_STATE && parseBuf != NULL)
 	{
 		m_parseState = REDIS_PARSE_TYPE;
+		replyInfo.arrays_size=0;
+		replyInfo.cur_array_pos=replyInfo.arrays_size;
+		replyInfo.cur_array_size=0;
 	}
 	while(parseBuf < end)
 	{
@@ -238,13 +364,13 @@ bool RedisConnection::parseEnance(char *parseBuf, int32_t parseLen, ReplyInfo & 
 			switch(*parseBuf)
 			{
 			case '-':
-				m_parseState = REDIS_PARSE_RESULT;
+				m_parseState = REDIS_PARSE_RESULT_ERR;
 				replyInfo.replyType = RedisReplyType::REDIS_REPLY_ERROR;
 				LOG(WARNING)<<"reply ERR";
 				parseBuf++;
 				break;
 			case '+':
-				m_parseState = REDIS_PARSE_RESULT;
+				m_parseState = REDIS_PARSE_RESULT_OK;
 				replyInfo.replyType = RedisReplyType::REDIS_REPLY_STATUS;
 				break;
 			case ':':
@@ -255,8 +381,10 @@ bool RedisConnection::parseEnance(char *parseBuf, int32_t parseLen, ReplyInfo & 
 				m_parseState = REDIS_PARSE_LENGTH;
 				replyInfo.replyType = RedisReplyType::REDIS_REPLY_STRING;
 				m_arrayNum = 1;
-				replyInfo.cur_arry_size=1;
+				replyInfo.cur_array_size=1; // 当reply只有一个string时，存储在第一个Array中？
 				replyInfo.cur_array_pos=0;
+				replyInfo.arrays_size=1; // TODO 
+				replyInfo.arrays.resize(replyInfo.arrays_size);
 				break;
 			case '*':
 				{
@@ -290,6 +418,7 @@ bool RedisConnection::parseEnance(char *parseBuf, int32_t parseLen, ReplyInfo & 
 					LOG(INFO)<<"arrays size is "<<replyInfo.arrays_size;
 
 					// 下面解析第一个Array数组
+					replyInfo.arrays.resize(replyInfo.arrays_size);
 					replyInfo.cur_array_pos=0;
 					parseBuf=tmp+3;
 					m_parseState=REDIS_PARSE_ARRAYLENGTH;
@@ -300,12 +429,13 @@ bool RedisConnection::parseEnance(char *parseBuf, int32_t parseLen, ReplyInfo & 
 					replyInfo.replyType = RedisReplyType::REDIS_REPLY_ARRAY;
 					replyInfo.arrays_size=1;
 
-					replyInfo.cur_arry_size=atoi(string(parseBuf, tmp-parseBuf).c_str());
+					replyInfo.cur_array_size=atoi(string(parseBuf, tmp-parseBuf).c_str());
 					// 获得唯一的Array数组的长度
-					LOG(INFO)<<"the array size is "<<replyInfo.cur_arry_size;
-					m_arrayNum=replyInfo.cur_arry_size;
+					LOG(INFO)<<"the array size is "<<replyInfo.cur_array_size;
+					m_arrayNum=replyInfo.cur_array_size;
 
 					// 下面解析唯一的Array数组
+					replyInfo.arrays.resize(replyInfo.arrays_size);
 					replyInfo.cur_array_pos=0;
 					parseBuf=tmp+3;
 					m_parseState=REDIS_PARSE_LENGTH;
@@ -320,19 +450,97 @@ bool RedisConnection::parseEnance(char *parseBuf, int32_t parseLen, ReplyInfo & 
 				return false;
 			}
 		}
+		else if(m_parseState==REDIS_PARSE_INTEGER)
+		{
+			p = strstr(parseBuf, "\r\n");
+			if (p != NULL)
+			{
+				memset(buf, 0, sizeof(buf)/sizeof(buf[0]));
+				memcpy(buf, parseBuf, p-parseBuf);
+				replyInfo.intValue = atoi(buf);
+//				m_valid = true;
+				if(replyInfo.cur_array_pos>=replyInfo.arrays_size)
+				{
+					LOG(INFO)<<"get integer ok: "<<replyInfo.intValue<<", and no more Array";
+					m_valid=true;
+				}
+				else
+				{
+					m_parseState=REDIS_PARSE_ARRAYLENGTH;
+				}
+
+				parseBuf = p;
+				//parse '\r'
+				++parseBuf; 
+				++parseBuf;
+			}
+			else
+			{
+				goto check_buf;
+			}
+		}
 		else if(m_parseState==REDIS_PARSE_CHECK_ARRAYS_SIZE) // 等待第二行的首字符
 		{
-			// TODO 同上
+			// 同上
+			// 尝试找当前*之后的\r\n，紧接着的符号，是否*
+			char* tmp=parseBuf;
+			while(tmp+3<=end)
+			{
+				if(*tmp=='\r'  &&  *(tmp+1)=='\n')
+					break;
+				tmp++;
+			}
+
+			if(tmp+3>end)
+			{
+				LOG(INFO)<<"wait more data";
+				m_parseState=REDIS_PARSE_CHECK_ARRAYS_SIZE;
+				m_valid=false;
+				goto check_buf;
+			}
+			assert(*tmp=='\r'  &&  *(tmp+1)=='\n');
+			char second_line_start_charactor=*(tmp+2);
+			if(second_line_start_charactor=='*')
+			{
+				LOG(INFO)<<"reply has multi array";
+				replyInfo.replyType = RedisReplyType::REDIS_REPLY_MULTI_ARRRY;
+				replyInfo.arrays_size=atoi(string(parseBuf, tmp-parseBuf).c_str());
+				LOG(INFO)<<"arrays size is "<<replyInfo.arrays_size;
+
+				// 下面解析第一个Array数组
+				replyInfo.arrays.resize(replyInfo.arrays_size);
+				replyInfo.cur_array_pos=0;
+				parseBuf=tmp+3;
+				m_parseState=REDIS_PARSE_ARRAYLENGTH;
+			}
+			else
+			{
+				LOG(INFO)<<"reply has one array";
+				replyInfo.replyType = RedisReplyType::REDIS_REPLY_ARRAY;
+				replyInfo.arrays_size=1;
+
+				replyInfo.cur_array_size=atoi(string(parseBuf, tmp-parseBuf).c_str());
+				// 获得唯一的Array数组的长度
+				LOG(INFO)<<"the array size is "<<replyInfo.cur_array_size;
+				m_arrayNum=replyInfo.cur_array_size;
+
+				// 下面解析唯一的Array数组
+				replyInfo.arrays.resize(replyInfo.arrays_size);
+				replyInfo.cur_array_pos=0;
+				parseBuf=tmp+3;
+				m_parseState=REDIS_PARSE_LENGTH;
+			}
 		}
-		else if(m_parseState==REDIS_PARSE_RESULT) // ERR OK
+		else if(m_parseState==REDIS_PARSE_RESULT_OK  
+			||  m_parseState==REDIS_PARSE_RESULT_ERR) // ERR OK
 		{			
 			p = strstr(parseBuf, "\r\n");
 			if (p != NULL) // get full error msg
 			{
-				memset(buf, 0, sizeof(buf));
+				memset(buf, 0, sizeof(buf)/sizeof(buf[0]));
 				memcpy(buf, parseBuf, p-parseBuf);
 				replyInfo.resultString = buf; // get error msg
-				LOG(INFO)<<"parse get ERR: "<<buf;
+				LOG(INFO)<<"parse get result: "<<buf;
 				m_valid = true;
 				return true;
 			}
@@ -349,14 +557,14 @@ bool RedisConnection::parseEnance(char *parseBuf, int32_t parseLen, ReplyInfo & 
 			p = strstr(parseBuf, "\r\n");
 			if (p != NULL)
 			{
-				memset(buf, 0, 4096);
+				memset(buf, 0, sizeof(buf)/sizeof(buf[0]));
 				memcpy(buf, parseBuf, p-parseBuf);
 				m_arrayNum = atoi(buf);
-				replyInfo.cur_arry_size=m_arrayNum;
-				LOG(INFO)<<"get another Array size "<<replyInfo.cur_arry_size;
+				replyInfo.cur_array_size=m_arrayNum;
+				LOG(INFO)<<"get one Array size "<<replyInfo.cur_array_size<<", pos is "<<replyInfo.cur_array_pos<<", total is "<<replyInfo.arrays_size;
 				parseBuf = p;
 				//parse '\r'
-				++parseBuf;
+				++parseBuf;	++parseBuf;
 				if (m_arrayNum == 0)
 				{
 					m_valid = true;
@@ -400,24 +608,37 @@ bool RedisConnection::parseEnance(char *parseBuf, int32_t parseLen, ReplyInfo & 
 					//for string last char
 					memset(arrayInfo.arrayValue, 0, arrayInfo.arrayLen+1);
 					memcpy(arrayInfo.arrayValue, parseBuf, arrayInfo.arrayLen);
-//					replyInfo.arrayList.push_back(arrayInfo);
-					replyInfo.arrays[replyInfo.cur_array_pos].push_back(arrayInfo);
-					m_doneNum++;
+
+//					if(arrayInfo.arrayLen)
+					{
+						replyInfo.arrays[replyInfo.cur_array_pos].push_back(arrayInfo);
+						LOG(INFO)<<"get Array "<<replyInfo.cur_array_pos<<" elem: ["<<arrayInfo.arrayValue<<"]";
+						m_doneNum++;
+					}
+//					else
+//					{
+//						LOG(WARNING)<<"why string empty";
+//					}					
+					
 					if (m_doneNum < m_arrayNum)
 					{
 						m_parseState = REDIS_PARSE_LENGTH;
 					}
 					else
 					{
+						LOG(INFO)<<"ok get one Array of size "<<replyInfo.arrays[replyInfo.cur_array_pos].size();
 						if(replyInfo.cur_array_pos+1<replyInfo.arrays_size)
-						{
-							LOG(INFO)<<"parse get "<<replyInfo.cur_array_pos+1<<"Array, total "<<replyInfo.arrays_size;
+						{							
+							LOG(INFO)<<"now get "<<replyInfo.cur_array_pos+1<<" Array, total "<<replyInfo.arrays_size<<" Array";
 							m_parseState=REDIS_PARSE_ARRAYLENGTH; // 解析下一个数组的长度
+							replyInfo.cur_array_pos++;
 							m_doneNum=0;
+							m_arrayNum=0;
 						}
 						else
 						{
 							m_valid = true;
+							LOG(INFO)<<"get all "<<replyInfo.arrays_size<<" Array ok";
 						}
 					}
 					parseBuf = p;
@@ -438,12 +659,12 @@ bool RedisConnection::parseEnance(char *parseBuf, int32_t parseLen, ReplyInfo & 
 			p = strstr(parseBuf, "\r\n");
 			if (p != NULL)
 			{
-				memset(buf, 0, 4096);
+				memset(buf, 0, sizeof(buf)/sizeof(buf[0]));
 				memcpy(buf, parseBuf, p-parseBuf);
 				m_arrayLen = atoi(buf);
 				parseBuf = p;
 				//parse '\r'
-				++parseBuf;
+				++parseBuf;	++parseBuf;
 				if (m_arrayLen != -1)
 				{
 					m_parseState = REDIS_PARSE_STRING;
@@ -453,7 +674,8 @@ bool RedisConnection::parseEnance(char *parseBuf, int32_t parseLen, ReplyInfo & 
 					ReplyArrayInfo arrayInfo;
 					arrayInfo.arrayLen = -1;
 					arrayInfo.replyType = RedisReplyType::REDIS_REPLY_NIL;
-
+					replyInfo.arrays[replyInfo.cur_array_pos].push_back(arrayInfo);
+					LOG(WARNING)<<"get Array "<<replyInfo.cur_array_pos<<" elem: [nil]";
 					
 					m_doneNum++;
 					if (m_doneNum < m_arrayNum)
@@ -462,16 +684,19 @@ bool RedisConnection::parseEnance(char *parseBuf, int32_t parseLen, ReplyInfo & 
 					}
 					else
 					{
-//						m_valid = true;
+						LOG(INFO)<<"ok get one Array of size "<<replyInfo.arrays[replyInfo.cur_array_pos].size();
 						if(replyInfo.cur_array_pos+1<replyInfo.arrays_size)
-						{
-							LOG(INFO)<<"parse get "<<replyInfo.cur_array_pos+1<<"Array, total "<<replyInfo.arrays_size;
+						{							
+							LOG(INFO)<<"now get "<<replyInfo.cur_array_pos+1<<" Array, total "<<replyInfo.arrays_size<<" Array";
 							m_parseState=REDIS_PARSE_ARRAYLENGTH; // 解析下一个数组的长度
+							replyInfo.cur_array_pos++;
 							m_doneNum=0;
+							m_arrayNum=0;
 						}
 						else
 						{
 							m_valid = true;
+							LOG(INFO)<<"get all "<<replyInfo.arrays_size<<" Array ok";
 						}
 					}
 				}
@@ -480,90 +705,7 @@ bool RedisConnection::parseEnance(char *parseBuf, int32_t parseLen, ReplyInfo & 
 			{
 				goto check_buf;
 			}
-
 		}
-//		else if(m_parseState==REDIS_PARSE_KEYSLEN) // TODO 对应某一个Array的长度 REDIS_PARSE_ARRAYLENGTH
-//		{
-//			if(*parseBuf != '*')
-//			{
-////				m_logger.error("parse keyslen error, %c, parseBuf %s", *parseBuf, parseBuf);
-//				LOG(ERROR)<<"parse keyslen error, "<<*parseBuf<<", parseBuf %s"<<parseBuf;
-//				m_valid=true;
-//				return false;
-//			}
-//			parseBuf ++;
-//			p = strstr(parseBuf, "\r\n");
-//			if (p != NULL)
-//			{
-//				memset(buf, 0, sizeof(buf));
-//				memcpy(buf, parseBuf, p-parseBuf);
-//				m_arrayNum = atoi(buf);				
-//				if(m_arrayNum < 0)
-//				{
-////					m_logger.error("reply error, array num is %d, buf %s, parseBuf %s", m_arrayNum, buf, parseBuf);
-//					LOG(ERROR)<<"reply error, array num is "<<m_arrayNum<<", buf "<<buf<<", parseBuf "<<parseBuf;
-//					m_valid=true;
-//					return false;
-//				}
-//				else if (m_arrayNum == 0)
-//				{
-//					m_valid = true;
-////					m_logger.debug("empty result, ok");
-//					LOG(INFO)<<"empty result, ok";
-//					return true;
-//				}
-//				else
-//				{
-//					m_parseState = REDIS_PARSE_KEYLEN;
-////					m_logger.debug("prepare to parse %d keys", m_arrayNum);
-//					LOG(INFO)<<"prepare to parse "<<m_arrayNum<<" keys";
-//					parseBuf = p+2;
-//				}
-//			}
-//			else
-//			{
-//				goto check_buf;
-//			}
-//		}
-//		else if(m_parseState==REDIS_PARSE_KEYLEN) // TODO 对应Array中某一个元素的长度 REDIS_PARSE_LENGTH
-//		{
-//			if (*parseBuf == '$')
-//			{
-//				++parseBuf;
-//			}
-//			else
-//			{
-////				m_logger.error("parse keylen error, %c, parseBuf %s", *parseBuf, parseBuf);
-//				LOG(ERROR)<<"parse keyslen error, "<<*parseBuf<<", parseBuf %s"<<parseBuf;
-//				m_valid=true;
-//				return false;
-//			}
-//			p = strstr(parseBuf, "\r\n");
-//			if (p != NULL)
-//			{
-//				memset(buf, 0, sizeof(buf));
-//				memcpy(buf, parseBuf, p-parseBuf);
-//				int keylen = atoi(buf); // TODO save keylen in m_arrayLen				
-//				if (keylen <0 )
-//				{
-////					m_logger.error("reply error, keylen is %d, buf %s, parseBuf %s", keylen, buf, parseBuf);
-//					LOG(ERROR)<<"reply error, keylen is "<<keylen<<", buf "<<buf<<", parseBuf "<<parseBuf;
-//					m_valid=true;
-//					return false;
-//				}
-//				else
-//				{
-////					m_logger.debug("get keylen %d", keylen);
-//					LOG(ERROR)<<"get keylen "<<keylen;
-//					m_parseState = REDIS_PARSE_KEY;
-//					parseBuf = p+2;
-//				}
-//			}
-//			else
-//			{
-//				goto check_buf;
-//			}
-//		}
 		else if(m_parseState==REDIS_PARSE_STRING)
 		{
 			//can not use strstr,for maybe binary data.
@@ -577,28 +719,41 @@ bool RedisConnection::parseEnance(char *parseBuf, int32_t parseLen, ReplyInfo & 
 				memset(arrayInfo.arrayValue, 0, arrayInfo.arrayLen+1);
 				memcpy(arrayInfo.arrayValue, parseBuf, arrayInfo.arrayLen);
 				arrayInfo.replyType = RedisReplyType::REDIS_REPLY_STRING;
-//				replyInfo.arrayList.push_back(arrayInfo);
-				replyInfo.arrays[replyInfo.cur_array_pos].push_back(arrayInfo);
-				m_doneNum++;
+
+//				if(arrayInfo.arrayLen>0)
+				{
+					replyInfo.arrays[replyInfo.cur_array_pos].push_back(arrayInfo);
+					LOG(INFO)<<"get Array "<<replyInfo.cur_array_pos<<" elem: ["<<arrayInfo.arrayValue<<"]";
+					m_doneNum++;
+				}
+//				else
+//				{
+//					LOG(WARNING)<<"why string empty";
+//				}				
+				
 				parseBuf += m_arrayLen;
 				//parse '\r'
-				++parseBuf;
+				++parseBuf;	++parseBuf;
 				if (m_doneNum < m_arrayNum)
 				{
 					m_parseState = REDIS_PARSE_LENGTH;
 				}
 				else
 				{
-//					m_valid = true;
+					LOG(INFO)<<"ok get one Array of size "<<replyInfo.arrays[replyInfo.cur_array_pos].size();
 					if(replyInfo.cur_array_pos+1<replyInfo.arrays_size)
-					{
-						LOG(INFO)<<"parse get "<<replyInfo.cur_array_pos+1<<"Array, total "<<replyInfo.arrays_size;
+					{						
+						LOG(INFO)<<"now get "<<replyInfo.cur_array_pos+1<<" Array, total "<<replyInfo.arrays_size;
 						m_parseState=REDIS_PARSE_ARRAYLENGTH; // 解析下一个数组的长度
+						parseBuf++;
+						replyInfo.cur_array_pos++;
 						m_doneNum=0;
+						m_arrayNum=0;
 					}
 					else
 					{
 						m_valid = true;
+						LOG(INFO)<<"get all "<<replyInfo.arrays_size<<" Array ok";
 					}
 				}
 			}
@@ -607,43 +762,6 @@ bool RedisConnection::parseEnance(char *parseBuf, int32_t parseLen, ReplyInfo & 
 				goto check_buf;
 			}
 		}
-//		else if(m_parseState==REDIS_PARSE_KEY) // Array中某一个元素
-//		{
-//			p = strstr(parseBuf, "\r\n");
-//			if (p != NULL)
-//			{
-//				memset(buf, 0, sizeof(buf));
-//				memcpy(buf, parseBuf, p-parseBuf);
-//				int keylen=p-parseBuf; // TODO check keylen
-//				ReplyArrayInfo arrayInfo;
-//				arrayInfo.arrayLen = keylen;
-//				arrayInfo.arrayValue = (char*)malloc(arrayInfo.arrayLen+1);
-//				memset(arrayInfo.arrayValue, 0, arrayInfo.arrayLen+1);
-//				memcpy(arrayInfo.arrayValue, parseBuf, arrayInfo.arrayLen);
-//				arrayInfo.replyType = RedisReplyType::REDIS_REPLY_STRING;
-//				replyInfo.arrayList.push_back(arrayInfo);
-//				m_doneNum++; // TODO rep;yInfo.arrayList.size()
-//				
-//				if (m_doneNum < m_arrayNum)
-//				{
-//					m_parseState = REDIS_PARSE_KEYLEN;
-//					parseBuf += keylen+2; // parseBuf = p+2;
-////					m_logger.debug("done %d, sum %d", m_doneNum, m_arrayNum);
-//					LOG(ERROR)<<"done "<<m_doneNum<<", sum "<<m_arrayNum;
-//				}
-//				else
-//				{
-////					m_logger.debug("get all %d keys ok", m_arrayNum);
-//					LOG(INFO)<<"get all "<<m_arrayNum<<" keys ok";
-//					m_valid=true;
-//					return true;
-//				}
-//			}
-//			else
-//			{
-//				goto check_buf;
-//			}
-//		}
 		else
 		{
 			LOG(ERROR)<<"unknown parse state "<<m_parseState;
@@ -914,7 +1032,7 @@ bool RedisConnection::parseScanReply(char *parseBuf, int32_t parseLen, RedisRepl
 				memcpy(arrayInfo.arrayValue, parseBuf, arrayInfo.arrayLen);
 				arrayInfo.replyType = RedisReplyType::REDIS_REPLY_STRING;
 				replyInfo.arrayList.push_back(arrayInfo);
-				m_doneNum++; // TODO rep;yInfo.arrayList.size()
+				m_doneNum++; // TODO replyInfo.arrayList.size()
 				
 				if (m_doneNum < m_arrayNum)
 				{

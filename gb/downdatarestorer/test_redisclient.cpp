@@ -597,6 +597,108 @@ void TestSentinelSlaves()
 	return ;
 }
 
+void TestParseEnhanceWithSmembers()
+{
+	// "sentienl slaves"
+	RedisClient client;
+
+	RedisServerInfo sentinel1("192.168.12.59", 26379);
+	RedisServerInfo sentinel2("192.168.12.59", 26380);
+	RedisServerInfo sentinel3("192.168.12.59", 26381);
+	REDIS_SERVER_LIST serverList({sentinel1, sentinel2, sentinel3});
+	string master_name="mymaster";
+	if(!client.init(serverList, master_name, 2))
+		return;
+
+	string setkey="testparseset";
+	list<string> members;
+	client.DoSmembersWithParseEnhance(setkey, members);
+
+	return ;
+}
+
+void TestParseEnhanceWithSadd()
+{
+	// "sentienl slaves"
+	RedisClient client;
+
+	RedisServerInfo sentinel1("192.168.12.59", 26379);
+	RedisServerInfo sentinel2("192.168.12.59", 26380);
+	RedisServerInfo sentinel3("192.168.12.59", 26381);
+	REDIS_SERVER_LIST serverList({sentinel1, sentinel2, sentinel3});
+	string master_name="mymaster";
+	if(!client.init(serverList, master_name, 2))
+		return;
+
+	string setkey="testparseset";
+	string setMember="testmember";
+	client.DoSaddWithParseEnhance(setkey, setMember);
+
+	return ;
+}
+
+void TestParseEnhanceWithGet()
+{
+	// "sentienl slaves"
+	RedisClient client;
+
+	RedisServerInfo sentinel1("192.168.12.59", 26379);
+	RedisServerInfo sentinel2("192.168.12.59", 26380);
+	RedisServerInfo sentinel3("192.168.12.59", 26381);
+	REDIS_SERVER_LIST serverList({sentinel1, sentinel2, sentinel3});
+	string master_name="mymaster";
+	if(!client.init(serverList, master_name, 2))
+		return;
+
+	string strKey="norah";
+	string value;
+	client.DoGetWithParseEnhance(strKey, value);
+	LOG(INFO)<<"get value "<<value;
+
+	return ;
+}
+
+
+void TestParseEnhanceWithSet()
+{
+	// "sentienl slaves"
+	RedisClient client;
+
+	RedisServerInfo sentinel1("192.168.12.59", 26379);
+	RedisServerInfo sentinel2("192.168.12.59", 26380);
+	RedisServerInfo sentinel3("192.168.12.59", 26381);
+	REDIS_SERVER_LIST serverList({sentinel1, sentinel2, sentinel3});
+	string master_name="mymaster";
+	if(!client.init(serverList, master_name, 2))
+		return;
+
+	string strKey="name";
+	string value="wangjing";
+	client.DoSetWithParseEnhance(strKey, value);
+
+	return ;
+}
+
+void TestParseEnhanceWithWrongCmd()
+{
+	// "sentienl slaves"
+	RedisClient client;
+
+	RedisServerInfo sentinel1("192.168.12.59", 26379);
+	RedisServerInfo sentinel2("192.168.12.59", 26380);
+	RedisServerInfo sentinel3("192.168.12.59", 26381);
+	REDIS_SERVER_LIST serverList({sentinel1, sentinel2, sentinel3});
+	string master_name="mymaster";
+	if(!client.init(serverList, master_name, 2))
+		return;
+
+	
+	client.DoWrongCmdWithParseEnhance("foobar");
+
+	return ;
+}
+
+
 void TestRedisSentinelInit()
 {
 	RedisClient client;
@@ -909,7 +1011,7 @@ void TestDDRWhenSentinelException()
 void TestRedisClientAuth()
 {
 	RedisClient client;
-	client.init(redis_ip, 6379, 5, "wrong");
+	client.init(redis_ip, 6379, 5, 900, 3000, "wrong");
 	
 }
 
@@ -947,7 +1049,7 @@ int main(int argc, char** argv)
 //	TestDelTransactionInCluster();
 
 
-    TestSentinelSlaves();
+//    TestSentinelSlaves();
 
 //    TestRedisSentinelInit();
 
@@ -964,6 +1066,16 @@ int main(int argc, char** argv)
 //	TestDDRWhenSentinelException();
 
 //	TestRedisClientAuth();
+
+//	TestParseEnhanceWithSmembers();
+
+//	TestParseEnhanceWithSadd();
+
+//	TestParseEnhanceWithGet();
+
+//	TestParseEnhanceWithSet();
+
+	TestParseEnhanceWithWrongCmd();
 	
     return 0;
 }

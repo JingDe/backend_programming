@@ -47,7 +47,8 @@ typedef struct RedisClusterInfoTag
 		connectIp.clear();
 		connectPort = 0;
 		connectionNum = 0;
-		keepaliveTime = 0;
+		connectTimeout = 0;
+		readTimeout=0;
 		isMaster = false;
 		isAlived = false;
 		masterClusterId.clear();
@@ -60,7 +61,8 @@ typedef struct RedisClusterInfoTag
 	string connectIp;
 	uint32_t connectPort;
 	uint32_t connectionNum;
-	uint32_t keepaliveTime;
+	uint32_t connectTimeout;
+	uint32_t readTimeout;
 	bool isMaster;
 	bool isAlived;
 	string masterClusterId;
@@ -78,7 +80,8 @@ typedef struct RedisProxyInfoTag
 		connectIp.clear();
 		connectPort = 0;
 		connectionNum = 0;
-		keepaliveTime = 0;
+		connectTimeout = 0;
+		readTimeout=0;
 		clusterHandler = NULL;
 		isAlived=false;
 	}
@@ -86,7 +89,8 @@ typedef struct RedisProxyInfoTag
 	string connectIp;
 	uint32_t connectPort;
 	uint32_t connectionNum;
-	uint32_t keepaliveTime;
+	uint32_t connectTimeout;
+	uint32_t readTimeout;
 	RedisCluster *clusterHandler;
 	bool isAlived; // true if has created RedisConnection pool
 	bool subscribed; // true if +switch-master channel subscribed
@@ -237,10 +241,10 @@ public:
 
 	RedisClient();
 	~RedisClient();
-	bool init(const string& serverIp, uint32_t serverPort, uint32_t connectionNum, const string& passwd="");
-	bool init(const REDIS_SERVER_LIST& clusterList, uint32_t connectionNum, const string& passwd="");
-	bool init(const REDIS_SERVER_LIST& sentinelList, const string& masterName, uint32_t connectionNum, const string& passwd="");
-	bool init(RedisMode redis_mode, const REDIS_SERVER_LIST& serverList, const string& masterName, uint32_t connectionNum, const string& passwd="", uint32_t keepaliveTime=-1);
+	bool init(const string& serverIp, uint32_t serverPort, uint32_t connectionNum, uint32_t connectTimeout=900, uint32_t read_timeout_ms=3000, const string& passwd="");
+	bool init(const REDIS_SERVER_LIST& clusterList, uint32_t connectionNum, uint32_t connectTimeout=900, uint32_t read_timeout_ms=3000, const string& passwd="");
+	bool init(const REDIS_SERVER_LIST& sentinelList, const string& masterName, uint32_t connectionNum, uint32_t connectTimeout=900, uint32_t read_timeout_ms=3000, const string& passwd="");
+	bool init(RedisMode redis_mode, const REDIS_SERVER_LIST& serverList, const string& masterName, uint32_t connectionNum, uint32_t connectTimeout, uint32_t readTimeout, const string& passwd);
     bool freeRedisClient();
 	bool getSerial(const string& key, DBSerialize &serial);
 	bool getSerialWithLock(const string& key, DBSerialize &serial, RedisLockInfo& lockInfo);
@@ -307,9 +311,16 @@ public:
 	bool ParseSwithMasterMessage(const RedisReplyInfo& replyInfo, RedisServerInfo& masterAddr);
 	bool DoSwitchMaster(const RedisServerInfo& masterAddr);
 
+	// debug test
 	void DoTestOfSentinelSlavesCommand();
 	bool SentinelGetSlavesInfo(RedisCluster* cluster, vector<RedisServerInfo>& slavesAddr);
-	bool ParseSentinelSlavesReply(const RedisReplyInfo& replyInfo, vector<RedisServerInfo>& slavesInfo);
+	bool ParseSentinelSlavesReply(const CommonReplyInfo& replyInfo, vector<RedisServerInfo>& slavesInfo);
+	bool DoSmembersWithParseEnhance(const string& setKey, list<string>& members);
+	bool ParseSmembersFromParseEnhance(const CommonReplyInfo& replyInfo);
+	bool DoSaddWithParseEnhance(const string& setKey, const string& setMember);
+	bool DoGetWithParseEnhance(const string& key, string& value);
+	bool DoSetWithParseEnhance(const string& key, const string& value);
+	bool DoWrongCmdWithParseEnhance(const string& wrongCmd);
 	
 private:
     bool getClusterIdFromRedirectReply(const string& redirectInfo, string& clusterId);
@@ -334,6 +345,7 @@ private:
 	bool parseGetKeysReply(RedisReplyInfo& replyInfo, list<string>& keys);
 	
 	void freeReplyInfo(RedisReplyInfo& replyInfo);
+	void freeReplyInfo(CommonReplyInfo& replyInfo);
 	void freeCommandList(list<RedisCmdParaInfo> &paraList);
 	
 	void fillCommandPara(const char* paraValue, int32_t paraLen, list<RedisCmdParaInfo> &paraList);
@@ -397,7 +409,8 @@ private:
 	// for all RedisMode
 	RedisMode m_redisMode;
 	uint32_t m_connectionNum;
-	uint32_t m_keepaliveTime;
+	uint32_t m_connectTimeout;
+	uint32_t m_readTimeout;
 	string m_passwd;
 	bool m_connected;
 		

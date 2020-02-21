@@ -10,7 +10,8 @@
 RedisClient::RedisClient()
 	:m_redisMode(STAND_ALONE_OR_PROXY_MODE),
 	m_connectionNum(0),
-	m_keepaliveTime(-1),
+	m_connectTimeout(-1),
+	m_readTimeout(-1),
 	m_passwd(),
 	m_connected(false),
 	m_redisProxy(),
@@ -83,24 +84,24 @@ bool RedisClient::freeRedisClient()
     return true;
 }
 
-bool RedisClient::init(const string& serverIp, uint32_t serverPort, uint32_t connectionNum, const string& passwd)
+bool RedisClient::init(const string& serverIp, uint32_t serverPort, uint32_t connectionNum, uint32_t connectTimeout, uint32_t readTimeout, const string& passwd)
 {	
 	RedisServerInfo server(serverIp, serverPort);
 	REDIS_SERVER_LIST serverList({server});
-	return init(STAND_ALONE_OR_PROXY_MODE, serverList, "", connectionNum, passwd);
+	return init(STAND_ALONE_OR_PROXY_MODE, serverList, "", connectionNum, connectTimeout, readTimeout, passwd);
 }
 
-bool RedisClient::init(const REDIS_SERVER_LIST& clusterList, uint32_t connectionNum, const string& passwd)
+bool RedisClient::init(const REDIS_SERVER_LIST& clusterList, uint32_t connectionNum, uint32_t connectTimeout, uint32_t readTimeout, const string& passwd)
 {
-	return init(CLUSTER_MODE, clusterList, "", connectionNum, passwd);
+	return init(CLUSTER_MODE, clusterList, "", connectionNum, connectTimeout, readTimeout, passwd);
 }
 
-bool RedisClient::init(const REDIS_SERVER_LIST& sentinelList, const string& masterName, uint32_t connectionNum, const string& passwd)
+bool RedisClient::init(const REDIS_SERVER_LIST& sentinelList, const string& masterName, uint32_t connectionNum, uint32_t connectTimeout, uint32_t readTimeout, const string& passwd)
 {
-	return init(SENTINEL_MODE, sentinelList, masterName, connectionNum, passwd);
+	return init(SENTINEL_MODE, sentinelList, masterName, connectionNum, connectTimeout, readTimeout, passwd);
 }
 
-bool RedisClient::init(RedisMode redis_mode, const REDIS_SERVER_LIST& serverList, const string& masterName, uint32_t connectionNum, const string& passwd, uint32_t keepaliveTime)
+bool RedisClient::init(RedisMode redis_mode, const REDIS_SERVER_LIST& serverList, const string& masterName, uint32_t connectionNum, uint32_t connectTimeout, uint32_t readTimeout, const string& passwd)
 {
     if(m_connected==true)
     {
@@ -115,9 +116,10 @@ bool RedisClient::init(RedisMode redis_mode, const REDIS_SERVER_LIST& serverList
 	else
 		m_serverList = serverList;
 	m_connectionNum = connectionNum;
+	m_connectTimeout=connectTimeout;
+	m_readTimeout=readTimeout;
 	m_passwd=passwd;
-	m_keepaliveTime = keepaliveTime;
-
+	
 	if(m_redisMode==STAND_ALONE_OR_PROXY_MODE)
 	{
 		if (!initRedisProxy())
@@ -189,7 +191,8 @@ bool RedisClient::initRedisProxy()
 	m_redisProxy.connectPort=m_serverList.front().serverPort;
 	m_redisProxy.proxyId=m_redisProxy.connectIp+":"+toStr(m_redisProxy.connectPort);
 	m_redisProxy.connectionNum=m_connectionNum;
-	m_redisProxy.keepaliveTime=m_keepaliveTime;
+	m_redisProxy.connectTimeout=m_connectTimeout;
+	m_redisProxy.readTimeout=m_readTimeout;
 
     if(m_redisProxy.clusterHandler != NULL)
     {
@@ -202,7 +205,7 @@ bool RedisClient::initRedisProxy()
     {
         return false;
     }
-	if (!m_redisProxy.clusterHandler->initConnectPool(m_redisProxy.connectIp, m_redisProxy.connectPort, m_redisProxy.connectionNum, m_redisProxy.keepaliveTime))
+	if (!m_redisProxy.clusterHandler->initConnectPool(m_redisProxy.connectIp, m_redisProxy.connectPort, m_redisProxy.connectionNum, m_redisProxy.connectTimeout, m_redisProxy.readTimeout))
 	{
 //		m_logger.warn("init proxy:[%s] connect pool failed.", m_redisProxy.proxyId.c_str());
 		LOG(ERROR)<<"init redis-server:["<<m_redisProxy.proxyId<<"] connect pool failed.";
@@ -235,7 +238,7 @@ bool RedisClient::getRedisClusterNodes()
 	{
 		RedisServerInfo serverInfo = (*iter);
 		
-		RedisConnection *connection = new RedisConnection(serverInfo.serverIp, serverInfo.serverPort, m_keepaliveTime);
+		RedisConnection *connection = new RedisConnection(serverInfo.serverIp, serverInfo.serverPort, m_connectTimeout, m_readTimeout);
 		if (!connection->connect())
 		{
 //			m_logger.warn("connect to serverIp:[%s] serverPort:[%d] failed.", serverInfo.serverIp.c_str(), serverInfo.serverPort);
@@ -318,7 +321,7 @@ bool RedisClient::initRedisCluster()
 	for (clusterIter = m_clusterMap.begin(); clusterIter != m_clusterMap.end(); clusterIter++)
 	{
 		((*clusterIter).second).clusterHandler = new RedisCluster();
-		if (!((*clusterIter).second).clusterHandler->initConnectPool(((*clusterIter).second).connectIp, ((*clusterIter).second).connectPort, ((*clusterIter).second).connectionNum, ((*clusterIter).second).keepaliveTime))
+		if (!((*clusterIter).second).clusterHandler->initConnectPool(((*clusterIter).second).connectIp, ((*clusterIter).second).connectPort, ((*clusterIter).second).connectionNum, ((*clusterIter).second).connectTimeout, ((*clusterIter).second).readTimeout))
 		{
 //			m_logger.warn("init cluster:[%s] connect pool failed.", (*clusterIter).first.c_str());
 			LOG(ERROR)<<"init cluster:["<<(*clusterIter).first<<"] connect pool failed.";
@@ -372,7 +375,7 @@ bool RedisClient::initSentinels()
 			// one for control and check, like ckquorum; 
 			// one for subscribe +switch-master;
 			int connection_num_to_sentinel=2;
-			if (!sentinalHandler.clusterHandler->initConnectPool(sentinalHandler.connectIp, sentinalHandler.connectPort, connection_num_to_sentinel, m_keepaliveTime))
+			if (!sentinalHandler.clusterHandler->initConnectPool(sentinalHandler.connectIp, sentinalHandler.connectPort, connection_num_to_sentinel, m_connectTimeout, m_readTimeout))
 			{
 				LOG(ERROR)<<"init sentinel:["<<sentinalHandler.proxyId<<"] connect pool failed.";
 			}
@@ -489,7 +492,7 @@ bool RedisClient::SentinelReinit()
 			else
 			{
 				int connection_num_to_sentinel=2;
-				if (!it->second.clusterHandler->initConnectPool(it->second.connectIp, it->second.connectPort, connection_num_to_sentinel, m_keepaliveTime))
+				if (!it->second.clusterHandler->initConnectPool(it->second.connectIp, it->second.connectPort, connection_num_to_sentinel, m_connectTimeout, m_readTimeout))
 				{
 					LOG(ERROR)<<"init sentinel:["<<it->second.proxyId<<"] connect pool failed.";
 					sentinel_reinit_work_all_done=false;
@@ -545,7 +548,7 @@ void* RedisClient::SentinelHealthCheckTask(void* arg)
 //				else
 //				{
 //					int connection_num_to_sentinel=2;
-//					if (!it->second.clusterHandler->initConnectPool(it->second.connectIp, it->second.connectPort, connection_num_to_sentinel, client->m_keepaliveTime))
+//					if (!it->second.clusterHandler->initConnectPool(it->second.connectIp, it->second.connectPort, connection_num_to_sentinel, client->m_connectTimeout, client->m_readTimeout))
 //					{
 //						LOG(ERROR)<<"init sentinel:["<<it->second.proxyId<<"] connect pool failed.";
 //						sentinel_reinit_work_all_done=false;
@@ -817,7 +820,7 @@ bool RedisClient::DoSwitchMaster(const RedisServerInfo& masterAddr)
 			return false;
 	}
 
-	if(!masterNode.clusterHandler->initConnectPool(masterNode.connectIp, masterNode.connectPort, m_connectionNum, m_keepaliveTime))
+	if(!masterNode.clusterHandler->initConnectPool(masterNode.connectIp, masterNode.connectPort, m_connectionNum, m_connectTimeout, m_readTimeout))
 	{
 		LOG(ERROR)<<"init master connection pool failed";
 		return false;
@@ -844,7 +847,7 @@ bool RedisClient::initMasterSlaves()
 	{
 		return false;
 	}
-	if(!masterNode.clusterHandler->initConnectPool(masterNode.connectIp, masterNode.connectPort, m_connectionNum, m_keepaliveTime))
+	if(!masterNode.clusterHandler->initConnectPool(masterNode.connectIp, masterNode.connectPort, m_connectionNum, m_connectTimeout, m_readTimeout))
 	{
 		LOG(ERROR)<<"init master node connection pool failed";
 		goto CLEAR_DATANODES;
@@ -878,7 +881,7 @@ bool RedisClient::initMasterSlaves()
 		{
 			LOG(ERROR)<<"new slave RedisCluster failed";
 		}
-		else if(!slave_node.clusterHandler->initConnectPool(slave_node.connectIp, slave_node.connectPort, m_connectionNum, m_keepaliveTime))
+		else if(!slave_node.clusterHandler->initConnectPool(slave_node.connectIp, slave_node.connectPort, m_connectionNum, m_connectTimeout, m_readTimeout))
 		{
 			LOG(WARNING)<<"init slave connection pool failed";
 		}
@@ -1076,6 +1079,188 @@ void RedisClient::DoTestOfSentinelSlavesCommand()
 	}
 }
 
+bool RedisClient::DoSaddWithParseEnhance(const string& setKey, const string& setMember)
+{
+	list<RedisCmdParaInfo> paraList;
+    int32_t paraLen = 0;
+    string str="sadd";
+    fillCommandPara(str.c_str(), str.size(), paraList);
+    paraLen += str.size()+11;
+    fillCommandPara(setKey.c_str(), setKey.length(), paraList);
+    paraLen += setKey.length() + 11;
+    fillCommandPara(setMember.c_str(), setMember.length(), paraList);
+    paraLen += setMember.length() + 11;
+
+	RedisCluster* cluster;
+	if(m_redisMode==STAND_ALONE_OR_PROXY_MODE)
+		cluster=m_redisProxy.clusterHandler;
+	else if(m_redisMode==SENTINEL_MODE)
+		cluster=m_dataNodes[m_masterClusterId].clusterHandler;
+	else
+		return false;
+
+	if(cluster==NULL)
+		return false;
+
+    CommonReplyInfo replyInfo;
+	bool success=cluster->testDoCommandWithParseEnhance(paraList, paraLen, replyInfo);
+	freeCommandList(paraList);
+	if(!success)
+	{
+		LOG(ERROR)<<"sadd "<<setKey<<" "<<setMember<<" failed";
+		return false;
+	}
+
+	freeReplyInfo(replyInfo);
+	return true;
+}
+
+bool RedisClient::DoGetWithParseEnhance(const string& key, string& value)
+{
+	list<RedisCmdParaInfo> paraList;
+    int32_t paraLen = 0;
+    string str="get";
+    fillCommandPara(str.c_str(), str.size(), paraList);
+    paraLen += str.size()+11;
+    fillCommandPara(key.c_str(), key.length(), paraList);
+    paraLen += key.length() + 11;
+
+	RedisCluster* cluster;
+	if(m_redisMode==STAND_ALONE_OR_PROXY_MODE)
+		cluster=m_redisProxy.clusterHandler;
+	else if(m_redisMode==SENTINEL_MODE)
+		cluster=m_dataNodes[m_masterClusterId].clusterHandler;
+	else
+		return false;
+
+	if(cluster==NULL)
+		return false;
+
+    CommonReplyInfo replyInfo;
+	bool success=cluster->testDoCommandWithParseEnhance(paraList, paraLen, replyInfo);
+	freeCommandList(paraList);
+	if(!success)
+	{
+		LOG(ERROR)<<"get "<<key<<" failed";
+		return false;
+	}
+
+	freeReplyInfo(replyInfo);
+	return true;
+}
+
+
+bool RedisClient::DoSetWithParseEnhance(const string& key, const string& value)
+{
+	list<RedisCmdParaInfo> paraList;
+    int32_t paraLen = 0;
+    string str="set";
+    fillCommandPara(str.c_str(), str.size(), paraList);
+    paraLen += str.size()+11;
+    fillCommandPara(key.c_str(), key.length(), paraList);
+    paraLen += key.length() + 11;
+    fillCommandPara(value.c_str(), value.length(), paraList);
+    paraLen += value.length() + 11;
+
+	RedisCluster* cluster;
+	if(m_redisMode==STAND_ALONE_OR_PROXY_MODE)
+		cluster=m_redisProxy.clusterHandler;
+	else if(m_redisMode==SENTINEL_MODE)
+		cluster=m_dataNodes[m_masterClusterId].clusterHandler;
+	else
+		return false;
+
+	if(cluster==NULL)
+		return false;
+
+    CommonReplyInfo replyInfo;
+	bool success=cluster->testDoCommandWithParseEnhance(paraList, paraLen, replyInfo);
+	freeCommandList(paraList);
+	if(!success)
+	{
+		LOG(ERROR)<<"set "<<key<<" "<<value<<" failed";
+		return false;
+	}
+
+	freeReplyInfo(replyInfo);
+	return true;
+}
+
+bool RedisClient::DoWrongCmdWithParseEnhance(const string& wrongCmd)
+{
+	list<RedisCmdParaInfo> paraList;
+    int32_t paraLen = 0;
+    string str="set";
+    fillCommandPara(str.c_str(), str.size(), paraList);
+    paraLen += str.size()+11;
+    fillCommandPara(wrongCmd.c_str(), wrongCmd.length(), paraList);
+    paraLen += wrongCmd.length() + 11;
+
+	RedisCluster* cluster;
+	if(m_redisMode==STAND_ALONE_OR_PROXY_MODE)
+		cluster=m_redisProxy.clusterHandler;
+	else if(m_redisMode==SENTINEL_MODE)
+		cluster=m_dataNodes[m_masterClusterId].clusterHandler;
+	else
+		return false;
+
+	if(cluster==NULL)
+		return false;
+
+    CommonReplyInfo replyInfo;
+	bool success=cluster->testDoCommandWithParseEnhance(paraList, paraLen, replyInfo);
+	freeCommandList(paraList);
+	if(!success)
+	{
+		LOG(ERROR)<<"do cmd "<<wrongCmd<<" failed";
+		return false;
+	}
+
+	freeReplyInfo(replyInfo);
+	return true;
+}
+
+
+bool RedisClient::DoSmembersWithParseEnhance(const string& setKey, list<string>& members)
+{
+	list<RedisCmdParaInfo> paraList;
+    int32_t paraLen = 0;
+    string str="smembers";
+    fillCommandPara(str.c_str(), str.size(), paraList);
+    paraLen += str.size()+11;
+    fillCommandPara(setKey.c_str(), setKey.length(), paraList);
+    paraLen += setKey.length() + 11;
+
+	RedisCluster* cluster;
+	if(m_redisMode==STAND_ALONE_OR_PROXY_MODE)
+		cluster=m_redisProxy.clusterHandler;
+	else if(m_redisMode==SENTINEL_MODE)
+		cluster=m_dataNodes[m_masterClusterId].clusterHandler;
+	else
+		return false;
+
+	if(cluster==NULL)
+		return false;
+
+    CommonReplyInfo replyInfo;
+	bool success=cluster->testDoCommandWithParseEnhance(paraList, paraLen, replyInfo);
+	freeCommandList(paraList);
+	if(!success)
+	{
+		LOG(ERROR)<<"sadd "<<setKey<<" failed";
+		return false;
+	}
+
+	ParseSmembersFromParseEnhance(replyInfo);
+	freeReplyInfo(replyInfo);
+	return true;
+}
+
+bool RedisClient::ParseSmembersFromParseEnhance(const CommonReplyInfo& replyInfo)
+{
+	return true;	
+}
+
 bool RedisClient::SentinelGetSlavesInfo(RedisCluster* cluster, vector<RedisServerInfo>& slavesAddr)
 {
 	list<RedisCmdParaInfo> paraList;
@@ -1089,8 +1274,8 @@ bool RedisClient::SentinelGetSlavesInfo(RedisCluster* cluster, vector<RedisServe
 	fillCommandPara(m_masterName.c_str(), m_masterName.length(), paraList);
 	paraLen += m_masterName.length() + 20;
 		
-	RedisReplyInfo replyInfo;
-	bool success=cluster->doRedisCommand(paraList, paraLen, replyInfo);
+	CommonReplyInfo replyInfo;
+	bool success=cluster->testDoCommandWithParseEnhance(paraList, paraLen, replyInfo);
 	freeCommandList(paraList);
 	if(!success)
 	{
@@ -1110,7 +1295,7 @@ bool RedisClient::SentinelGetSlavesInfo(RedisCluster* cluster, vector<RedisServe
 	}
 }
 
-bool RedisClient::ParseSentinelSlavesReply(const RedisReplyInfo& replyInfo, vector<RedisServerInfo>& slavesInfo)
+bool RedisClient::ParseSentinelSlavesReply(const CommonReplyInfo& replyInfo, vector<RedisServerInfo>& slavesInfo)
 {
 	LOG(INFO)<<"sentinel slalves command has replyType "<<replyInfo.replyType<<", resultString "<<replyInfo.resultString<<", intValue "<<replyInfo.intValue;
 
@@ -1120,21 +1305,39 @@ bool RedisClient::ParseSentinelSlavesReply(const RedisReplyInfo& replyInfo, vect
 		return false;
 	}
 
-	if (replyInfo.replyType != RedisReplyType::REDIS_REPLY_ARRAY)
+	if (replyInfo.replyType != RedisReplyType::REDIS_REPLY_MULTI_ARRRY)
 	{
 		LOG(ERROR)<<"recv redis wrong reply type:["<<replyInfo.replyType<<"].";
 		return false;
 	}
 
-	list<ReplyArrayInfo>::const_iterator arrayIter;
-	for (arrayIter = replyInfo.arrayList.begin(); arrayIter != replyInfo.arrayList.end(); arrayIter++)
+	string ip="ip";
+	string port="port";
+	for(size_t i=0; i<replyInfo.arrays.size(); i++)
 	{
-		LOG(INFO)<<"sentinel slalves arrayList has replyType "<<(*arrayIter).replyType<<", arrayValue "<<arrayIter->arrayValue<<", arrayLen "<<arrayIter->arrayLen;
-		
-		if ((*arrayIter).replyType == RedisReplyType::REDIS_REPLY_STRING)
+		LOG(INFO)<<"get the "<<i<<" Array, size is "<<replyInfo.arrays[i].size();
+		for(size_t j=0; j<replyInfo.arrays[i].size(); j++)
 		{
-			string message = (*arrayIter).arrayValue;
-			LOG(INFO)<<message;
+//			LOG(INFO)<<"replyType "<<replyInfo.arrays[i][j].replyType<<", arrayValue "<<replyInfo.arrays[i][j].arrayValue<<", arrayLen "<<replyInfo.arrays[i][j].arrayLen;
+			
+			if (replyInfo.arrays[i][j].replyType == RedisReplyType::REDIS_REPLY_STRING)
+			{
+				string message = replyInfo.arrays[i][j].arrayValue;
+//				LOG(INFO)<<"["<<message<<"]";
+
+				if(strcmp(message.c_str(), ip.c_str())==0  && j+3<replyInfo.arrays[i].size())
+				{
+					string message2 = replyInfo.arrays[i][j+2].arrayValue;
+					if(strcmp(message2.c_str(), port.c_str())!=0)
+						break;
+					RedisServerInfo addr;
+					addr.serverIp=replyInfo.arrays[i][j+1].arrayValue;
+					addr.serverPort=atoi(replyInfo.arrays[i][j+3].arrayValue);
+					LOG(INFO)<<"get slave addr: "<<addr.serverIp<<", "<<addr.serverPort;
+					slavesInfo.push_back(addr);
+					break;
+				}
+			}
 		}
 	}
 	
@@ -1915,7 +2118,7 @@ bool RedisClient::ParseRedisReplyForStandAloneAndMasterMode(
 //			return false;
 //	}
 //
-//	if(!it->second.clusterHandler->initConnectPool(it->second.connectIp, it->second.connectPort, m_connectionNum, m_keepaliveTime))
+//	if(!it->second.clusterHandler->initConnectPool(it->second.connectIp, it->second.connectPort, m_connectionNum, m_connectTimeout, m_readTimeout))
 //	{
 //		LOG(ERROR)<<"init connection pool failed for "<<it->second.proxyId;
 //		return false;
@@ -1933,7 +2136,7 @@ bool RedisClient::CreateConnectionPool(RedisProxyInfo& node)
 			return false;
 	}
 
-	if(!node.clusterHandler->initConnectPool(node.connectIp, node.connectPort, m_connectionNum, m_keepaliveTime))
+	if(!node.clusterHandler->initConnectPool(node.connectIp, node.connectPort, m_connectionNum, m_connectTimeout, m_readTimeout))
 	{
 		LOG(ERROR)<<"init connection pool failed for "<<node.proxyId;
 		return false;
@@ -3154,7 +3357,8 @@ bool RedisClient::checkAndSaveRedisClusters(REDIS_CLUSTER_MAP & clusterMap)
 				RedisClusterInfo oldClusterInfo = m_clusterMap[clusterId];
 				clusterInfo.clusterHandler = oldClusterInfo.clusterHandler;
 				clusterInfo.connectionNum = oldClusterInfo.connectionNum;
-				clusterInfo.keepaliveTime = oldClusterInfo.keepaliveTime;
+				clusterInfo.connectTimeout = oldClusterInfo.connectTimeout;
+				clusterInfo.readTimeout=oldClusterInfo.readTimeout;
 				m_clusterMap[clusterId] = clusterInfo;
 				if (clusterInfo.isMaster)
 				{
@@ -3175,8 +3379,8 @@ bool RedisClient::checkAndSaveRedisClusters(REDIS_CLUSTER_MAP & clusterMap)
 				//need create new connect pool.
 				clusterInfo.clusterHandler = new RedisCluster();
 				clusterInfo.connectionNum = m_connectionNum;
-				clusterInfo.keepaliveTime = m_keepaliveTime;
-				if (!clusterInfo.clusterHandler->initConnectPool(clusterInfo.connectIp, clusterInfo.connectPort, clusterInfo.connectionNum, clusterInfo.keepaliveTime))
+				clusterInfo.connectTimeout = m_connectTimeout;
+				if (!clusterInfo.clusterHandler->initConnectPool(clusterInfo.connectIp, clusterInfo.connectPort, clusterInfo.connectionNum, clusterInfo.connectTimeout, clusterInfo.readTimeout))
 				{
 //					m_logger.warn("init cluster:[%s] connect pool failed.", clusterId.c_str());
 					LOG(ERROR)<<"init cluster:["<<clusterId<<"] connect pool failed.";
@@ -3312,7 +3516,8 @@ bool RedisClient::parseClusterInfo(RedisReplyInfo & replyInfo,REDIS_CLUSTER_MAP 
 			bakMap[clusterId] = clusterInfo.masterClusterId;
 		}
 		clusterInfo.connectionNum = m_connectionNum;
-		clusterInfo.keepaliveTime = m_keepaliveTime;
+		clusterInfo.connectTimeout = m_connectTimeout;
+		clusterInfo.readTimeout=m_readTimeout;
 		clusterMap[clusterId] = clusterInfo;
 		startPos = findPos + 1;
 		findPos = str.find("\n", startPos);
@@ -3692,6 +3897,36 @@ void RedisClient::freeReplyInfo(RedisReplyInfo & replyInfo)
 		replyInfo.arrayList.clear();
 	}
 }
+
+void RedisClient::freeReplyInfo(CommonReplyInfo & replyInfo)
+{
+	for(size_t i=0; i<replyInfo.arrays.size(); i++)
+	{
+		for(size_t j=0; j<replyInfo.arrays[i].size(); j++)
+		{
+			if (replyInfo.arrays[i][j].arrayValue != NULL)
+			{
+				free(replyInfo.arrays[i][j].arrayValue);
+				replyInfo.arrays[i][j].arrayValue = NULL;
+			}
+		}
+	}
+	replyInfo.arrays.clear();
+//	if (replyInfo.arrayList.size() > 0)
+//	{
+//		list<ReplyArrayInfo>::iterator iter;
+//		for (iter = replyInfo.arrayList.begin(); iter != replyInfo.arrayList.end(); iter++)
+//		{
+//			if ((*iter).arrayValue != NULL)
+//			{
+//				free((*iter).arrayValue);
+//				(*iter).arrayValue = NULL;
+//			}
+//		}
+//		replyInfo.arrayList.clear();
+//	}
+}
+
 
 void RedisClient::fillCommandPara(const char * paraValue,int32_t paraLen,list < RedisCmdParaInfo > & paraList)
 {

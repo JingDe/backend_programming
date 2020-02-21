@@ -9,32 +9,30 @@ RedisCluster::RedisCluster()//:m_logger("cdn.common.rediscluster")
 	m_clusterIp.clear();
 	m_clusterPort = 0;
 	m_connectionNum = 0;
-	m_keepaliveTime = 0;
+	m_connectTimeout = 0;
+	m_readTimeout = 0;
 	m_connections.clear();
 	m_tmpConnections.clear();
 }
 
 RedisCluster::~RedisCluster()
 {
-	m_clusterIp.clear();
-	m_clusterPort = 0;
-	m_connectionNum = 0;
-	m_keepaliveTime = 0;
 	m_tmpConnections.clear();
 }
 
-bool RedisCluster::initConnectPool(const string & clusterIp,uint32_t clusterPort,uint32_t connectionNum,uint32_t keepaliveTime)
-{
+bool RedisCluster::initConnectPool(const string & clusterIp,uint32_t clusterPort,uint32_t connectionNum, uint32_t connectTimeout, uint32_t readTimeout)
+{	
 	//create redis connection.
 	WriteGuard guard(m_lockAvailableConnection);
 	for (unsigned int i = 0; i < connectionNum; i++)
 	{
-		RedisConnection *connection = new RedisConnection(clusterIp, clusterPort, keepaliveTime);
+		RedisConnection *connection = new RedisConnection(clusterIp, clusterPort, connectTimeout, readTimeout);
 		if(!connection->connect())
 		{
 			LOG(ERROR)<<"connect to clusterIp:"<<clusterIp<<" clusterPort:"<<clusterPort<<" failed.";
 			delete connection;
-			return false;
+//			return false;
+			goto CLEAR;
 		}
 		connection->m_available = true;
 		connection->m_connectTime = 0;
@@ -43,9 +41,17 @@ bool RedisCluster::initConnectPool(const string & clusterIp,uint32_t clusterPort
 	m_clusterIp = clusterIp;
 	m_clusterPort = clusterPort;
 	m_connectionNum = connectionNum;
-	m_keepaliveTime = keepaliveTime;
+	m_connectTimeout=connectTimeout;
+	m_readTimeout=readTimeout;
 	LOG(INFO)<<"initConnectPool ok, pool size is "<<m_connections.size();
 	return true;
+
+CLEAR:
+	for(size_t i=0; i<m_connections.size(); i++)
+	{
+		delete m_connections[i];
+	}
+	return false;
 }
 
 bool RedisCluster::freeConnectPool()
@@ -94,6 +100,35 @@ bool RedisCluster::checkIfCanFree()
 	return findFree;
 }
 
+
+bool RedisCluster::testDoCommandWithParseEnhance(list < RedisCmdParaInfo > & paraList,int32_t paraLen, CommonReplyInfo & replyInfo)
+{
+	bool success = false;
+	RedisConnection* connection = getAvailableConnection();
+	if (connection != NULL)
+	{
+		success = connection->testDoCommandWithParseEnhance(paraList, paraLen, replyInfo);
+		releaseConnection(connection);
+	}
+	else
+	{
+		connection = new RedisConnection(m_clusterIp, m_clusterPort, m_connectTimeout, m_readTimeout);
+		if(connection==NULL)
+			return false;
+		if(!connection->connect())
+		{
+			delete connection;
+			return false;
+		}
+		success = connection->testDoCommandWithParseEnhance(paraList, paraLen, replyInfo);
+		connection->close();
+		delete connection;
+		connection = NULL;
+	}
+	return success;
+}
+
+
 bool RedisCluster::doRedisCommand(list < RedisCmdParaInfo > & paraList,int32_t paraLen,RedisReplyInfo & replyInfo, RedisConnection::ReplyParserType parserType)
 {
 	bool success = false;
@@ -106,7 +141,7 @@ bool RedisCluster::doRedisCommand(list < RedisCmdParaInfo > & paraList,int32_t p
 	else
 	{
 //		m_logger.warn("doRedisCommand, cluster:[%s:%d] not find available connection, use once connection.",m_clusterIp.c_str(), m_clusterPort);
-		connection = new RedisConnection(m_clusterIp, m_clusterPort, 30);
+		connection = new RedisConnection(m_clusterIp, m_clusterPort, m_connectTimeout, m_readTimeout);
 		if(connection==NULL)
 			return false;
 		if(!connection->connect())
@@ -136,7 +171,7 @@ bool RedisCluster::doRedisCommandOneConnection(list < RedisCmdParaInfo > & paraL
 	}
 	else
 	{
-		*conn = new RedisConnection(m_clusterIp, m_clusterPort, 30);
+		*conn = new RedisConnection(m_clusterIp, m_clusterPort, m_connectTimeout, m_readTimeout);
 		if(!(*conn)->connect())
 		{
 			return false;
@@ -223,7 +258,7 @@ RedisConnection* RedisCluster::getAvailableConnection()
 			delete conn;
 			conn = NULL;
 			//recreate redis connection.
-			conn = new RedisConnection(m_clusterIp, m_clusterPort, m_keepaliveTime);
+			conn = new RedisConnection(m_clusterIp, m_clusterPort, m_connectTimeout, m_readTimeout);
 			if(!conn->connect())
 			{
 				LOG(ERROR)<<"connect to clusterIp:"<<m_clusterIp<<" clusterPort:"<<m_clusterPort<<" failed.";
@@ -289,7 +324,7 @@ void RedisCluster::freeConnection(RedisConnection * conn)
 			delete conn;
 			conn = NULL;
 			//recreate redis connection.
-			conn = new RedisConnection(m_clusterIp, m_clusterPort, m_keepaliveTime);
+			conn = new RedisConnection(m_clusterIp, m_clusterPort, m_connectTimeout, m_readTimeout);
 			if(!conn->connect())
 			{
 //				m_logger.warn("connect to clusterIp:%s clusterPort:%d failed.", m_clusterIp.c_str(), m_clusterPort);

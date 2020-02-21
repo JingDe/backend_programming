@@ -166,17 +166,168 @@ int Socket::close() {
     return 0;
 }
 
-bool Socket::connect(const string& host, int port)
+bool Socket::connect(const string& host, int port, uint32_t connectTimeout)
 {
-	return connectNonBock(host, port, 0, 900000);
+//	return connectNonBock(host, port, 0, 900000);
+	m_connectTimeout=connectTimeout;
+	return connectNonBock(host, port, m_connectTimeout);
 }
 
-bool Socket::connectNonBock(const string& host, int port, int timeOut)
-{
-	return connectNonBock(host, port, timeOut, 0);
-}
+//bool Socket::connectNonBock(const string& host, int port, int timeOut)
+//{
+//	return connectNonBock(host, port, timeOut, 0);
+//}
 
-bool Socket::connectNonBock(const string& host, int port, int tv_sec, int tv_usec)
+//bool Socket::connectNonBock(const string& host, int port, int tv_sec, int tv_usec)
+//{
+//	m_connectToHost = host;
+//	m_connectToPort = port;
+//	InetAddr address=InetAddr::getByName(host);
+//	if (fd == INVALID_SOCKET_HANDLE) {
+//		create(m_stream, address.getAddrType());
+//	}
+//	if (fd == 0)
+//	{
+////		m_logger.warn("meet fd = 0, need create socket again.");
+//		LOG(ERROR)<<"meet fd = 0, need create socket again.";
+//		create(m_stream, address.getAddrType());
+//	}
+//
+//	int ret=false;
+//	if(address.getAddrType() == AF_INET){
+//		ret=__connectNonBockv4(address,port,tv_sec, tv_usec);
+//	}else if(address.getAddrType() == AF_INET6){
+//		ret=__connectNonBockv6(address,port,tv_sec, tv_usec);
+//	}
+//	if(!ret)
+//		return false;
+//	this->address = address;
+//	this->port = port;
+//	return true;
+//}
+//
+//bool Socket::__connectNonBockv4(InetAddr address, int port, int tv_sec, int tv_usec){
+// 	sockaddr_in client_addr;
+//	int client_len = sizeof(client_addr);
+//	client_addr.sin_family = AF_INET;
+//	client_addr.sin_addr = address.address.sin_addr;
+//	client_addr.sin_port = htons(port);
+//
+//	int flags,n,error;
+//	struct timeval ;
+//	flags = fcntl(fd, F_GETFL, 0);
+//	fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+//	error=0;
+//
+//	if( ( n = ::connect(fd,(struct sockaddr *)&client_addr, client_len ))<0){
+//		if( errno != EINPROGRESS ){
+////			m_logger.error("connect to %s:%d failed: %m",address.getHostAddress().c_str(), port);
+//			PLOG(ERROR)<<"connect to "<<address.getHostAddress()<<":"<<port<<" failed";
+//			return false;
+//		}
+//	}
+//
+//	if( n != 0){
+//		int retval;
+//		struct pollfd pfd;
+//		pfd.fd = fd;
+//		pfd.events = POLLWRNORM | POLLRDNORM;
+//		pfd.revents = 0;
+//
+//		retval = ::poll( &pfd, 1, tv_sec*1000+tv_usec/1000 );  //milliseconds
+//		if( retval < 0 ) {
+////			m_logger.error( "poll error at connect, fd %d, errno %d", fd, errno );
+//			PLOG(ERROR)<<"poll error at connect, fd "<<fd<<", errno "<<errno;
+//			close(); //avoid close_wait, see http://www.chinaitpower.com/A200507/2005-07-27/174296.html
+//			return false;
+//		}
+//		if (retval == 0) {
+////			m_logger.error("poll on fd(%d) at connect return timeout(%d ms)", fd, tv_sec*1000+tv_usec/1000);
+//			LOG(ERROR)<<"poll on fd("<<fd<<") at connect return timeout("<<tv_sec*1000+tv_usec/1000<<" ms)";
+//			close(); //avoid to recv peer response when the socket is used to next command
+//			return false;
+//		}
+//		socklen_t len=sizeof(error);
+//		if(getsockopt(fd,SOL_SOCKET,SO_ERROR,&error,&len)<0){
+////			m_logger.error("connect to %s:%d failed: getsockopt error:",address.getHostAddress().c_str(), port);
+//			PLOG(ERROR)<<"connect to "<<address.getHostAddress()<<":"<<port<<" failed: getsockopt error";
+//			return false;
+//		}
+//		if(error){
+////			m_logger.error("connect to %s:%d failed: getsockopt.error[%d]:",address.getHostAddress().c_str(), port,error);
+//			LOG(ERROR)<<"connect to "<<address.getHostAddress()<<":"<<port<<" failed: getsockopt.error["<<error<<"]";
+//			close();
+//			return false;
+//		}
+//	}
+//	fcntl(fd, F_SETFL, flags);
+////	m_logger.debug("connected to %s:%d, socketFd=%d", address.getHostAddress().c_str(), port, fd);
+//	LOG(INFO)<<"connected to "<<address.getHostAddress()<<":"<<port<<", socketFd="<<fd;
+//	return true;
+//}
+//
+//bool Socket::__connectNonBockv6(InetAddr address, int port, int tv_sec, int tv_usec){
+//		sockaddr_in6 client_addr;
+//		int client_len = sizeof(sockaddr_in6);
+//		bzero(&client_addr, client_len);
+//		client_addr.sin6_family = AF_INET6;
+//		client_addr.sin6_addr = address.address.sin6_addr;
+//		client_addr.sin6_port = htons(port);
+//
+//		int flags,n,error;
+//		flags = fcntl(fd, F_GETFL, 0);
+//		fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+//		error=0;
+//
+//		if( ( n = ::connect(fd,(struct sockaddr *)&client_addr, client_len ))<0){
+//			if( errno != EINPROGRESS ){
+////				m_logger.error("connect to %s:%d failed: %s",address.getHostAddress().c_str(), port, strerror(errno));
+//				PLOG(ERROR)<<"connect to "<<address.getHostAddress()<<":"<<port<<" failed";
+//				return false;
+//			}
+//		}
+//
+//		if( n != 0){
+//			int retval;
+//			struct pollfd pfd;
+//			pfd.fd = fd;
+//			pfd.events = POLLWRNORM | POLLRDNORM;
+//			pfd.revents = 0;
+//
+//			retval = ::poll( &pfd, 1, tv_sec*1000+tv_usec/1000 );  //milliseconds
+//			if( retval < 0 ) {
+////				m_logger.error( "poll error at connect, fd %d, error %s", fd, strerror(errno));
+//				PLOG(ERROR)<<"poll error at connect, fd "<<fd;
+//				close(); //avoid close_wait, see http://www.chinaitpower.com/A200507/2005-07-27/174296.html
+//				return false;
+//			}
+//			if (retval == 0) {
+////				m_logger.error("poll on fd(%d) at connect return timeout(%d ms)", fd, tv_sec*1000+tv_usec/1000);
+//				LOG(ERROR)<<"poll on fd("<<fd<<") at connect return timeout("<<tv_sec*1000+tv_usec/1000<<" ms)";
+//				close(); //avoid to recv peer response when the socket is used to next command
+//				return false;
+//			}
+//			socklen_t len=sizeof(error);
+//			if(getsockopt(fd,SOL_SOCKET,SO_ERROR,&error,&len)<0){
+////				m_logger.error("connect to %s:%d failed: getsockopt error:%s",address.getHostAddress().c_str(), port, strerror(errno));
+//				PLOG(ERROR)<<"connect to "<<address.getHostAddress()<<":"<<port<<" failed: getsockopt error";
+//				return false;
+//			}
+//			if(error){
+////				m_logger.error("connect to %s:%d failed: getsockopt.error[%s]:",address.getHostAddress().c_str(), port,strerror(errno));
+//				PLOG(ERROR)<<"connect to "<<address.getHostAddress()<<":"<<port<<" failed: getsockopt.error";
+//				close();
+//				return false;
+//			}
+//		}
+//
+//		fcntl(fd, F_SETFL, flags);
+////		m_logger.debug("connected to %s:%d, socketFd=%d", address.getHostAddress().c_str(), port, fd);
+//		LOG(INFO)<<"connected to "<<address.getHostAddress()<<":"<<port<<", socketFd="<<fd;
+//		return true;
+//}
+
+bool Socket::connectNonBock(const string& host, int port, uint32_t milliseconds)
 {
 	m_connectToHost = host;
 	m_connectToPort = port;
@@ -193,9 +344,9 @@ bool Socket::connectNonBock(const string& host, int port, int tv_sec, int tv_use
 
 	int ret=false;
 	if(address.getAddrType() == AF_INET){
-		ret=__connectNonBockv4(address,port,tv_sec, tv_usec);
+		ret=__connectNonBockv4(address,port,milliseconds);
 	}else if(address.getAddrType() == AF_INET6){
-		ret=__connectNonBockv6(address,port,tv_sec, tv_usec);
+		ret=__connectNonBockv6(address,port,milliseconds);
 	}
 	if(!ret)
 		return false;
@@ -204,7 +355,7 @@ bool Socket::connectNonBock(const string& host, int port, int tv_sec, int tv_use
 	return true;
 }
 
-bool Socket::__connectNonBockv4(InetAddr address, int port, int tv_sec, int tv_usec){
+bool Socket::__connectNonBockv4(InetAddr address, int port, int milliseconds){
  	sockaddr_in client_addr;
 	int client_len = sizeof(client_addr);
 	client_addr.sin_family = AF_INET;
@@ -232,7 +383,7 @@ bool Socket::__connectNonBockv4(InetAddr address, int port, int tv_sec, int tv_u
 		pfd.events = POLLWRNORM | POLLRDNORM;
 		pfd.revents = 0;
 
-		retval = ::poll( &pfd, 1, tv_sec*1000+tv_usec/1000 );  //milliseconds
+		retval = ::poll( &pfd, 1, milliseconds);  //milliseconds
 		if( retval < 0 ) {
 //			m_logger.error( "poll error at connect, fd %d, errno %d", fd, errno );
 			PLOG(ERROR)<<"poll error at connect, fd "<<fd<<", errno "<<errno;
@@ -241,7 +392,7 @@ bool Socket::__connectNonBockv4(InetAddr address, int port, int tv_sec, int tv_u
 		}
 		if (retval == 0) {
 //			m_logger.error("poll on fd(%d) at connect return timeout(%d ms)", fd, tv_sec*1000+tv_usec/1000);
-			LOG(ERROR)<<"poll on fd("<<fd<<") at connect return timeout("<<tv_sec*1000+tv_usec/1000<<" ms)";
+			LOG(ERROR)<<"poll on fd("<<fd<<") at connect return timeout("<<milliseconds<<" ms)";
 			close(); //avoid to recv peer response when the socket is used to next command
 			return false;
 		}
@@ -264,7 +415,7 @@ bool Socket::__connectNonBockv4(InetAddr address, int port, int tv_sec, int tv_u
 	return true;
 }
 
-bool Socket::__connectNonBockv6(InetAddr address, int port, int tv_sec, int tv_usec){
+bool Socket::__connectNonBockv6(InetAddr address, int port, int milliseconds){
 		sockaddr_in6 client_addr;
 		int client_len = sizeof(sockaddr_in6);
 		bzero(&client_addr, client_len);
@@ -292,7 +443,7 @@ bool Socket::__connectNonBockv6(InetAddr address, int port, int tv_sec, int tv_u
 			pfd.events = POLLWRNORM | POLLRDNORM;
 			pfd.revents = 0;
 
-			retval = ::poll( &pfd, 1, tv_sec*1000+tv_usec/1000 );  //milliseconds
+			retval = ::poll( &pfd, 1, milliseconds);  //milliseconds
 			if( retval < 0 ) {
 //				m_logger.error( "poll error at connect, fd %d, error %s", fd, strerror(errno));
 				PLOG(ERROR)<<"poll error at connect, fd "<<fd;
@@ -301,7 +452,7 @@ bool Socket::__connectNonBockv6(InetAddr address, int port, int tv_sec, int tv_u
 			}
 			if (retval == 0) {
 //				m_logger.error("poll on fd(%d) at connect return timeout(%d ms)", fd, tv_sec*1000+tv_usec/1000);
-				LOG(ERROR)<<"poll on fd("<<fd<<") at connect return timeout("<<tv_sec*1000+tv_usec/1000<<" ms)";
+				LOG(ERROR)<<"poll on fd("<<fd<<") at connect return timeout("<<milliseconds<<" ms)";
 				close(); //avoid to recv peer response when the socket is used to next command
 				return false;
 			}
@@ -324,7 +475,6 @@ bool Socket::__connectNonBockv6(InetAddr address, int port, int tv_sec, int tv_u
 		LOG(INFO)<<"connected to "<<address.getHostAddress()<<":"<<port<<", socketFd="<<fd;
 		return true;
 }
-
 
 
 /**  Connects this socket to the specified port number
@@ -439,16 +589,16 @@ string Socket::toString() const {
 	return ret;
 }
 
-int Socket::read2(void * buf, size_t maxlen, int timeout)
+int Socket::read2(void * buf, size_t maxlen, int secTimeout)
 {
 	int len_read = 0;
 	unsigned char * p = (unsigned char *)buf;
 
-	if (timeout > 0) {
+	if (secTimeout > 0) {
 		struct timeval tv;	
 		fd_set readFds;
 		int ret;
-		tv.tv_sec = timeout;
+		tv.tv_sec = secTimeout;
 		tv.tv_usec = 0;
 		FD_ZERO(&readFds);
 		FD_SET(fd, &readFds);
@@ -554,19 +704,19 @@ bool Socket::UnWatchEvent(int handler)
 	return true;
 }
 
-int Socket::read(void * buf, size_t maxlen, int timeout) {
+int Socket::read(void * buf, size_t maxlen, int milliTimeout) {
 	int len_read = 0;
 	unsigned char * p = (unsigned char *)buf;
 
 	// use poll to implement timeout
-	if (timeout > 0) {
+	if (milliTimeout > 0) {
 		int retval;
 		struct pollfd pfd;
 		pfd.fd = fd;
 		pfd.events = POLLIN;
 		pfd.revents = 0;
 
-		retval = ::poll( &pfd, 1, timeout*1000 );  //milliseconds
+		retval = ::poll( &pfd, 1, milliTimeout );  //milliseconds
 		if( retval < 0 ) {
 //			if( errno == EINTR ){
 //				continue;
@@ -584,7 +734,7 @@ int Socket::read(void * buf, size_t maxlen, int timeout) {
 		}
 		if (retval == 0) {
 //			m_logger.error("poll on fd(%d) at read return timeout(%d s)", fd, timeout);
-			LOG(ERROR)<<"poll on fd("<<fd<<") at read return timeout("<<timeout<<" s)";
+			LOG(ERROR)<<"poll on fd("<<fd<<") at read return timeout("<<milliTimeout<<" ms)";
 			close(); //avoid to recv peer response when the socket is used to next command
 			return -1;
 		}

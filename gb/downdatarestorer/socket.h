@@ -33,9 +33,10 @@ public:
     bool connectOriginally(const string& host, int port);
 
     /** Connects this socket to the specified port on the named host. */
-    bool connectNonBock(const string& host, int port, int timeOut=10);
-    bool connectNonBock(const string& host, int port, int tv_sec, int tv_usec);
-    bool connect(const string& host, int port);
+//    bool connectNonBock(const string& host, int port, int timeOut=10);
+//    bool connectNonBock(const string& host, int port, int tv_sec, int tv_usec);
+    bool connectNonBock(const string& host, int port, uint32_t milliseconds);
+    bool connect(const string& host, int port, uint32_t connectTimeout);
 
     /** Creates either a stream or a datagram socket. */
     void create(bool stream = true);  //true: tcp  false:udp
@@ -62,8 +63,8 @@ public:
     */
     string toString() const;
 
-    int read(void * buf, size_t maxlen, int timeout = -1);
-    int read2(void * buf, size_t maxlen, int timeout = -1);
+    int read(void * buf, size_t maxlen, int milliTimeout = -1);
+    int read2(void * buf, size_t maxlen, int secTimeout = -1);
     int readFull(void * buf, size_t len);
 
     size_t writeFull(const void * buf, size_t len);
@@ -80,8 +81,10 @@ private:
     int __bindv6(InetAddr host, int port);
     bool __connectv4(InetAddr host, int port);
     bool __connectv6(InetAddr host, int port);
-    bool __connectNonBockv4(InetAddr host, int port, int tv_sec, int tv_usec);
-    bool __connectNonBockv6(InetAddr host, int port, int tv_sec, int tv_usec);
+//    bool __connectNonBockv4(InetAddr host, int port, int tv_sec, int tv_usec);
+//    bool __connectNonBockv6(InetAddr host, int port, int tv_sec, int tv_usec);
+	bool __connectNonBockv4(InetAddr host, int port, int milliseconds);
+    bool __connectNonBockv6(InetAddr host, int port, int milliseconds);
 
 public:
 	int    fd; /** The file descriptor object for this socket. */
@@ -107,6 +110,8 @@ protected:
 
     bool m_stream;	
 //    OWLog m_logger;
+
+	int m_connectTimeout; // MilliSeconds
 };
 
 #endif /*SOCKET_H_*/

@@ -163,9 +163,9 @@ public:
     DownDataRestorer();
 	~DownDataRestorer();
 
-	int Init(const string& redis_server_ip, uint16_t redis_server_port, int worker_thread_num);
-    int Init(const REDIS_SERVER_LIST& redis_server_list, int worker_thread_num);
-    int Init(const REDIS_SERVER_LIST& redis_server_list, const string& master_name, int worker_thread_num);
+	int Init(const string& redis_server_ip, uint16_t redis_server_port, int worker_thread_num, uint32_t connect_timeout_ms=900, uint32_t read_timeout_ms=3000, const string& passwd="");
+    int Init(const REDIS_SERVER_LIST& redis_server_list, int worker_thread_num, uint32_t connect_timeout_ms=900, uint32_t read_timeout_ms=3000, const string& passwd="");
+    int Init(const REDIS_SERVER_LIST& redis_server_list, const string& master_name, int worker_thread_num, uint32_t connect_timeout_ms=900, uint32_t read_timeout_ms=3000, const string& passwd="");
     int Uninit();
     int Start();
     int Stop();
@@ -203,7 +203,7 @@ public:
 	bool Inited() { return inited_; }
 
 private:
-	int Init(RedisMode redis_mode, const REDIS_SERVER_LIST& redis_server_list, const string& master_name, int worker_thread_num);
+	int Init(RedisMode redis_mode, const REDIS_SERVER_LIST& redis_server_list, const string& master_name, int worker_thread_num, uint32_t connect_timeout_ms, uint32_t read_timeout_ms, const string& passwd);
     static void* DataRestorerThreadFuncWrapper(void* arg);
     void DataRestorerThreadFunc();
 	int GetWorkerThreadNum();
