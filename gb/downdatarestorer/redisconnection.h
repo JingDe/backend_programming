@@ -74,7 +74,7 @@ public:
 	}
 
 	bool testDoCommandWithParseEnhance(list < RedisCmdParaInfo > & paraList,int32_t paraLen, CommonReplyInfo &replyInfo);
-	bool recvSentinelSlavesReply(CommonReplyInfo & replyInfo);
+	bool recvWithParseEnhance(CommonReplyInfo & replyInfo);
 
 private:
 	bool send(char* request, uint32_t sendLen);
@@ -83,6 +83,7 @@ private:
 	bool parseScanReply(char *parseBuf, int32_t parseLen, RedisReplyInfo & replyInfo);
 
 	bool parseEnhance(char *parseBuf, int32_t parseLen, CommonReplyInfo & replyInfo);
+//	bool parseEnhance2(char *parseBuf, int32_t parseLen, CommonReplyInfo2 & replyInfo);
 	
 public:
 	bool m_available;

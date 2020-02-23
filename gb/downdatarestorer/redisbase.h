@@ -117,6 +117,21 @@ struct CommonReplyInfo{
 	int cur_array_size; // 获取当前解析的Array的大小
 };
 
+struct CommonReplyInfo2{
+	int replyType;
+	string resultString;
+	int intValue;
+
+	vector<void*> arrays;
+	// arrays存储的元素类型可以不同，可以是int*, string*, vector<ReplyArrayInfo>*
+	
+	// 记录parse过程中的中间状态
+	int arrays_size; // 获取arrays的大小
+	int cur_array_pos; // 当前解析的第几个Array
+	int cur_array_size; // 获取当前解析的Array的大小
+};
+
+
 
 enum RedisMode{
 	STAND_ALONE_OR_PROXY_MODE,

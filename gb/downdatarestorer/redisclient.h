@@ -321,6 +321,7 @@ public:
 	bool DoGetWithParseEnhance(const string& key, string& value);
 	bool DoSetWithParseEnhance(const string& key, const string& value);
 	bool DoWrongCmdWithParseEnhance(const string& wrongCmd);
+	bool DoScanWithParseEnhance();
 	
 private:
     bool getClusterIdFromRedirectReply(const string& redirectInfo, string& clusterId);

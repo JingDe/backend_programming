@@ -1190,9 +1190,6 @@ bool RedisClient::DoWrongCmdWithParseEnhance(const string& wrongCmd)
 {
 	list<RedisCmdParaInfo> paraList;
     int32_t paraLen = 0;
-    string str="set";
-    fillCommandPara(str.c_str(), str.size(), paraList);
-    paraLen += str.size()+11;
     fillCommandPara(wrongCmd.c_str(), wrongCmd.length(), paraList);
     paraLen += wrongCmd.length() + 11;
 
@@ -1213,6 +1210,42 @@ bool RedisClient::DoWrongCmdWithParseEnhance(const string& wrongCmd)
 	if(!success)
 	{
 		LOG(ERROR)<<"do cmd "<<wrongCmd<<" failed";
+		return false;
+	}
+
+	freeReplyInfo(replyInfo);
+	return true;
+}
+
+bool RedisClient::DoScanWithParseEnhance()
+{
+	list<RedisCmdParaInfo> paraList;
+    int32_t paraLen = 0;
+    // scan 0
+    string scan="scan";
+    fillCommandPara(scan.c_str(), scan.length(), paraList);
+    paraLen += scan.length() + 11;
+    string arg="0";
+    fillCommandPara(arg.c_str(), arg.length(), paraList);
+    paraLen += arg.length() + 11;
+
+	RedisCluster* cluster;
+	if(m_redisMode==STAND_ALONE_OR_PROXY_MODE)
+		cluster=m_redisProxy.clusterHandler;
+	else if(m_redisMode==SENTINEL_MODE)
+		cluster=m_dataNodes[m_masterClusterId].clusterHandler;
+	else
+		return false;
+
+	if(cluster==NULL)
+		return false;
+
+    CommonReplyInfo replyInfo;
+	bool success=cluster->testDoCommandWithParseEnhance(paraList, paraLen, replyInfo);
+	freeCommandList(paraList);
+	if(!success)
+	{
+		LOG(ERROR)<<"do scan 0 failed";
 		return false;
 	}
 
