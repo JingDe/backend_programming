@@ -1,5 +1,5 @@
-#ifndef UTIL_H_
-#define UTIL_H_
+#ifndef REDIS_CLIENT_UTIL_H_
+#define REDIS_CLIENT_UTIL_H_
 
 #include<string>
 #include<sstream>

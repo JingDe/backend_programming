@@ -765,7 +765,7 @@ void TestRedisSentinelSetApi()
 
 }
 
-void TestRedisSentinelVersionDDR()
+void TestRedisSentinelVersionDDRDevice()
 {
 	DownDataRestorer ddr;	
 	string master_name="mymaster";
@@ -988,12 +988,12 @@ void TestDDRInStandaloneMode()
 	if(ddr.Start()==DDR_FAIL)
 		return;
 
-	while(true)
+//	while(true)
 	{
 		LoopProcessDevice(ddr);
 
-		LOG(WARNING)<<"wait to loop";
-		sleep(10);
+//		LOG(WARNING)<<"wait to loop";
+//		sleep(10);
 	}
 
 	ddr.Stop();
@@ -1076,11 +1076,11 @@ int main(int argc, char** argv)
 
 //	TestRedisSentinelSetApi();
 
-//	TestRedisSentinelVersionDDRDevice();
+	TestRedisSentinelVersionDDRDevice();
 
 //	TestRedisSentinelVersionDDRCmd();
 
-//	TestDDRInStandaloneMode();
+	TestDDRInStandaloneMode();
 
 //	TestDDRWhenSentinelException();
 
@@ -1096,7 +1096,7 @@ int main(int argc, char** argv)
 
 //	TestParseEnhanceWithWrongCmd();
 
-	TestParseEnhanceWithScan();
+//	TestParseEnhanceWithScan();
 	
     return 0;
 }

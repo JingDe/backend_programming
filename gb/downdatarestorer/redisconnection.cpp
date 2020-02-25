@@ -13,7 +13,6 @@ RedisConnection::RedisConnection(const string serverIp,uint32_t serverPort, uint
 	m_serverPort = serverPort;
 	m_connectTime=connectTimeout;
 	m_readTimeout=readTimeout; 
-//	m_timeout = timeout;
 	m_unparseBuf = NULL;
 	m_unparseLen = 0;
 	m_parseState = REDIS_PARSE_UNKNOWN_STATE;
@@ -857,6 +856,9 @@ check_buf:
 //				}
 //				assert(*tmp=='\r'  &&  *(tmp+1)=='\n');
 //				replyInfo.arrays_size=atoi(string(parseBuf, tmp-parseBuf).c_str());
+//				replyInfo.cur_array_pos=0;
+//				LOG(INFO)<<"reply arrays_size is "<<replyInfo.arrays_size;
+//				m_parseState=REDIS_PARSE_ARRAYLENGTH; // to get replyInfo.cur_array_size
 //				
 //				}
 //				break;
@@ -922,6 +924,20 @@ check_buf:
 //		}		
 //		else if(m_parseState==REDIS_PARSE_ARRAYLENGTH) // 用于获得二级/子数组的长度
 //		{
+//			if(*parseBuf!='*')
+//			{
+//				assert(*parseBuf=='$');
+//				parseBuf++;
+//				m_parseState=REDIS_PARSE_LENGTH;
+//				replyInfo.cur_array_size=1;
+//				m_arrayNum=1;
+//				m_doneNum=0;
+//				LOG(INFO)<<"current char is "<<*parseBuf<<", is type of arrays["<<replyInfo.cur_array_pos<<"]";
+//				continue;
+//			}
+//
+//			LOG(INFO)<<"reply arrays["<<replyInfo.cur_array_pos<<"] is really array type";
+//			
 //			m_doneNum=0; // 当前已经解析到的数组元素的个数，与 m_arrayNum 比较
 //			// 或者通过 replyInfo.arrays[replyInfo.cur_array_pos].size(); 比较 replyInfo.cur_array_size
 //			
@@ -982,7 +998,8 @@ check_buf:
 //
 ////					if(arrayInfo.arrayLen)
 //					{
-//						replyInfo.arrays[replyInfo.cur_array_pos].push_back(arrayInfo);
+////						replyInfo.arrays[replyInfo.cur_array_pos].push_back(arrayInfo);
+//						replyInfo.arrays[replyInfo.cur_array_pos]
 //						LOG(INFO)<<"get Array "<<replyInfo.cur_array_pos<<" elem: ["<<arrayInfo.arrayValue<<"]";
 //						m_doneNum++;
 //					}

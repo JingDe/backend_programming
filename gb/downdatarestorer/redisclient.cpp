@@ -1,7 +1,7 @@
 #include "redisclient.h"
 #include"redisconnection.h"
 #include"glog/logging.h"
-#include"util.h"
+#include"redis_client_util.h"
 #include"mutexlockguard.h"
 //#include"redismonitor.h"
 #include<algorithm>
@@ -524,6 +524,8 @@ bool RedisClient::SentinelReinit()
 
 void* RedisClient::SentinelHealthCheckTask(void* arg)
 {
+    pthread_detach(pthread_self());
+
 	LOG(INFO)<<"sentinel health check task start";
 
 	RedisClient* client=(RedisClient*)arg;
@@ -662,6 +664,8 @@ bool RedisClient::SubscribeSwitchMaster(RedisCluster* cluster)
 
 void* RedisClient::SubscribeSwitchMasterThreadFun(void* arg)
 {
+    pthread_detach(pthread_self());
+
 	SwitchMasterThreadArgType* tmp=(SwitchMasterThreadArgType*)arg;
 	
 	RedisClient* client=tmp->client;
@@ -2697,6 +2701,8 @@ void RedisClient::SignalToDoClusterNodes()
 
 void* RedisClient::CheckClusterNodesThreadFunc(void* arg)
 {
+    pthread_detach(pthread_self());
+
 	LOG(INFO)<<"check cluster nodes thread start";
 
 	RedisClient* client=(RedisClient*)arg;

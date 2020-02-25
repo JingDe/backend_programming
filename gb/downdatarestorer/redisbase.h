@@ -120,10 +120,37 @@ struct CommonReplyInfo{
 struct CommonReplyInfo2{
 	int replyType;
 	string resultString;
-	int intValue;
+	int intValue; 
 
-	vector<void*> arrays;
-	// arrays存储的元素类型可以不同，可以是int*, string*, vector<ReplyArrayInfo>*
+	// 方法一：
+//	 vector<void*> arrays;
+//	 arrays存储的元素类型可以不同，可以是int*, string*, vector<ReplyArrayInfo>*
+//	 不可行，原因：存储到array之后不知道原始类型是什么指针.
+//	struct ElemType{
+//		int pointerType;
+//		void* value;
+//	};
+//	vector<ElemType*> arrays;
+
+
+	// 方法二：
+	// vector<vector<void*> > arrays; 
+	// int*,string*存储在vector<void*> arrays[x]中
+	// vector<void*> arrays[x], 也可以作为vector<ReplyArrayInfo*>类型
+	// 问题：不能确定void*真正类型。
+	struct ElemType1{
+		int pointerType;
+		vector<void*> vec;
+	};
+	vector<ElemType1> arrays;
+
+	// 或者
+//	struct ElemType2{
+//		int pointerType;
+//		void* value;
+//	}; 
+//	vector<vector<ElemType2> > arrays;
+		
 	
 	// 记录parse过程中的中间状态
 	int arrays_size; // 获取arrays的大小

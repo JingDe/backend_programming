@@ -5,16 +5,11 @@
 #include <queue>
 
 #include "socket.h"
-//#include "owlog.h"
 #include "redisbase.h"
-#include"util.h"
+#include"redis_client_util.h"
 
 #define REDIS_READ_BUFF_SIZE 4096
 using namespace std;
-
-
-
-
 
 class RedisConnection
 {
@@ -92,7 +87,6 @@ public:
 private:
 	string m_serverIp;
 	uint32_t m_serverPort;
-	uint32_t m_timeout;
 	Socket m_socket;
 	char*  m_unparseBuf;
 	int32_t  m_unparseLen;
