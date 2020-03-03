@@ -307,3 +307,5 @@ test_redisclient
 
 *.txt
 downdatarestorerlogdir/
+
+*.zip
