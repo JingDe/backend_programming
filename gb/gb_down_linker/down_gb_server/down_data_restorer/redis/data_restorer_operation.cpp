@@ -10,7 +10,6 @@ Device* DeviceCopy(Device* d)
 {
 	if(d==nullptr)
 	{
-		LOG_WRITE_ERROR("nullptr");
 		return nullptr;
 	}
 
@@ -85,7 +84,6 @@ Device* DeviceCopy(Device* d)
 	device->keepaliveTimerId = 0;
 	device->channelList=nullptr;
 
-	LOG_WRITE_INFO("DeviceCopy ok");
 	return device;
 }
 
@@ -135,15 +133,15 @@ void PushEntity(DataRestorerOperation operation, Device* device)
 	if (device == NULL)
 		return;
 	Device* copy = DeviceCopy(device);
-	operation.entities_.push_back(copy);
+	operation.entities.push_back(copy);
 }
 
 void PushEntity(DataRestorerOperation operation, Channel* channel)
 {
 	if (channel == NULL)
 		return;
-	Channel* channel = ChannelCopy(channel);
-	operation.entities_.push_back(copy);
+	Channel* copy = ChannelCopy(channel);
+	operation.entities.push_back(copy);
 }
 
 void PushEntity(DataRestorerOperation operation, ExecutingInviteCmd* executing_invite_cmd)
@@ -151,7 +149,7 @@ void PushEntity(DataRestorerOperation operation, ExecutingInviteCmd* executing_i
 	if (executing_invite_cmd == NULL)
 		return;
 	ExecutingInviteCmd* copy = ExecutingInviteCmdCopy(executing_invite_cmd);
-	operation.entities_.push_back(copy);
+	operation.entities.push_back(copy);
 }
 
 } // namespace GBGateway

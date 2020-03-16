@@ -31,7 +31,7 @@ public:
 	int DeleteChannel(const std::string& gbdownlinker_device_id, const std::string& channel_id);
 	int ClearChannel(const std::string& gbdownlinker_device_id);
 
-	int GetChannelCount(const std::string& gbdownlinker_device_id);
+	size_t GetChannelCount(const std::string& gbdownlinker_device_id);
 
 private:
 	int InsertChannelInTransaction(const Channel& channel);

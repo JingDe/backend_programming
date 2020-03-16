@@ -6,19 +6,19 @@
 
 #include"down_data_restorer_def.h"
 
+namespace GBGateway {
+
 class Device;
 class Channel;
 class ExecutingInviteCmd;
 
-namespace GBGateway {
-
 class CDownDataRestorer {
 public:
-	virtual int Init(RestorerParamPtr restorer_param/*, ErrorReportCallback error_callback*/)=0;
+	virtual int Init(const RestorerParamPtr& restorer_param/*, ErrorReportCallback error_callback*/)=0;
 	virtual int Uninit()=0;
     virtual int Start()=0;
     virtual int Stop()=0;
-    virtual int GetStat()=0;
+    virtual int GetStat(const std::string& gbdownlinker_device_id, int worker_thread_idx)=0;
 
 	virtual int PrepareLoadData(const std::string& gbdownlinker_device_id, int worker_thread_number)=0;
 
@@ -38,7 +38,7 @@ public:
 	virtual int LoadExecutingInviteCmdList(const std::string& gbdownlinker_device_id, int worker_thread_idx, std::list<ExecutingInviteCmdPtr>* executing_invite_cmd_lists)=0;
 	virtual int InsertExecutingInviteCmdList(const std::string& gbdownlinker_device_id, int worker_thread_idx, ExecutingInviteCmd* executinginvitecmd)=0;
 	virtual int UpdateExecutingInviteCmdList(const std::string& gbdownlinker_device_id, int worker_thread_idx, ExecutingInviteCmd* executinginvitecmd)=0;
-	virtual int DeleteExecutingInviteCmdList(const std::string& gbdownlinker_device_id, int worker_thread_idx, const std::string& cmd_sender_id, const std::string& device_id, const std::string& cmd_seq)=0;
+	virtual int DeleteExecutingInviteCmdList(const std::string& gbdownlinker_device_id, int worker_thread_idx, const std::string& cmd_sender_id, const std::string& device_id, const int64_t& cmd_seq)=0;
 	virtual int DeleteExecutingInviteCmdList(const std::string& gbdownlinker_device_id, int worker_thread_idx)=0;
 	
 };

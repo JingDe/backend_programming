@@ -15,7 +15,7 @@ DeviceMgr::DeviceMgr(RedisClient* redis_client)
 	LOG_WRITE_INFO("DeviceMgr constructed");
 }
 
-int DeviceMgr::GetDeviceKeyList(std::string gbdownlinker_device_id, std::list<std::string>& device_key_list)
+int DeviceMgr::GetDeviceKeyList(const std::string& gbdownlinker_device_id, std::list<std::string>& device_key_list)
 {
 	device_key_list.clear();
 	std::string key_prefix = std::string("{downlinker.device}:") + gbdownlinker_device_id;
@@ -25,26 +25,26 @@ int DeviceMgr::GetDeviceKeyList(std::string gbdownlinker_device_id, std::list<st
 
 int DeviceMgr::LoadDevice(const std::list<std::string>& device_key_list, std::list<DevicePtr>* devices)
 {
-	devices.clear();
+	devices->clear();
 	for (std::list<std::string>::const_iterator cit = device_key_list.cbegin(); cit != device_key_list.cend(); cit++)
 	{
 		Device* device=new Device();
-		if (!redis_client_->getSerial(*it, *device))
+		if (!redis_client_->getSerial(*cit, *device))
 			continue;
 		device->registerLastTime = base::CTime::GetCurrentTime();
 		device->keepaliveLastTime = base::CTime::GetCurrentTime();
 
 		DevicePtr device_ptr(device);
-		devices.push_back(device_ptr);
+		devices->push_back(std::move(device_ptr));
 	}
 	return 0;
 }
 
-int DeviceMgr::LoadDevice(std::string gbdownlinker_device_id, std::list<DevicePtr>* devices)
+int DeviceMgr::LoadDevice(const std::string& gbdownlinker_device_id, std::list<DevicePtr>* devices)
 {
 	std::list<std::string> device_key_list;
 	GetDeviceKeyList(gbdownlinker_device_id, device_key_list);
-	LoadDevices(device_key_list, devices);
+	LoadDevice(device_key_list, devices);
 	return 0;
 }
 
@@ -61,7 +61,7 @@ int DeviceMgr::InsertDevice(const std::string& gbdownlinker_device_id, const Dev
 	return 0;
 }
 
-int DeviceMgr::InsertDevice(const std::string& gbdownlinker_device_id, const Device& device)
+int DeviceMgr::UpdateDevice(const std::string& gbdownlinker_device_id, const Device& device)
 {
 	return InsertDevice(gbdownlinker_device_id, device);
 }
@@ -91,7 +91,7 @@ int DeviceMgr::ClearDevice(const std::string& gbdownlinker_device_id)
 	return 0;
 }
 
-int DeviceMgr::GetDeviceCount(const std::string& gbdownlinker_device_id)
+size_t DeviceMgr::GetDeviceCount(const std::string& gbdownlinker_device_id)
 {
 	ReadGuard guard(rwmutex_);
 	std::list<std::string> device_key_list;

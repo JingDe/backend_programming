@@ -7,12 +7,13 @@ namespace GBGateway {
 
 CDownDataRestorer* CDownDataRestorerManager::AllocateDownDataRestorer(RestorerParam::Type type)
 {
+	//type_=type;
 	switch(type)
 	{
 		case RestorerParam::Type::Redis:
 			return new CDownDataRestorerRedis();
 		case RestorerParam::Type::MySQL:
-			return new CDownDataRestorerMysql();
+			return new CDownDataRestorerMySql();
 		case RestorerParam::Type::SQLite:
 			return new CDownDataRestorerSqlite();
 		default:
@@ -24,6 +25,19 @@ void CDownDataRestorerManager::FreeDownDataRestorer(CDownDataRestorer* down_data
 {
 	if(down_data_restorer)
 		delete down_data_restorer;
+//	if(down_data_restorer==NULL)
+//		return;
+//	switch(type_)
+//	{
+//		case RestorerParam::Type::Redis:
+//			delete static_cast<CDownDataRestorerRedis*>(down_data_restorer);
+//		case RestorerParam::Type::MySQL:
+//			delete static_cast<CDownDataRestorerMySql*>(down_data_restorer);
+//		case RestorerParam::Type::SQLite:
+//			delete static_cast<CDownDataRestorerSqlite*>(down_data_restorer);
+//		default:
+//			return;
+//	}	
 }
 
 } // namespace GBGateway

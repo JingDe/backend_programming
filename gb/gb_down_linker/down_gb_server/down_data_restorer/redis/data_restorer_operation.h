@@ -12,6 +12,12 @@
 
 
 namespace GBGateway {
+
+struct DataRestorerOperation;
+
+void PushEntity(DataRestorerOperation operation, Device* device);
+void PushEntity(DataRestorerOperation operation, Channel* channel);
+void PushEntity(DataRestorerOperation operation, ExecutingInviteCmd* invite);
 	
 Device* CopyDevice(Device* d);
 Channel* CopyChannel(Channel* c);
@@ -20,7 +26,7 @@ ExecutingInviteCmd* CopyExecutingInviteCmd(ExecutingInviteCmd* eic);
 
 struct DataRestorerOperation{
 	enum OperationType{
-		UNKNOWN=0,
+		UNKNOWN_OPERATION=0,
 		INSERT,
 		UPDATE,
 		DELETE,
@@ -28,7 +34,7 @@ struct DataRestorerOperation{
 	} operation_type;
 
 	enum EntityType{
-		UNKNOWN=0,
+		UNKNOWN_ENTITY=0,
 		DEVICE,
 		CHANNEL,
 		EXECUTING_INVITE_CMD,
@@ -55,14 +61,14 @@ struct DataRestorerOperation{
 
     DataRestorerOperation()
     {
-		operation_type = UNKNOWN;
-		entity_type = UNKNOWN;
-		gbdown_linker_device_id = "";
+		operation_type = OperationType::UNKNOWN_OPERATION;
+		entity_type = EntityType::UNKNOWN_ENTITY;
+		gbdownlinker_device_id = "";
 		worker_thread_idx = -1;
 		entity_id = "";
 		invite_cmd_sender_id = "";
 		invite_device_id = "";
-		invite_cmd_seq = "";
+		invite_cmd_seq = 0;
 		entities.clear();
 	}
     
@@ -195,11 +201,11 @@ struct DataRestorerOperation{
 		invite_device_id = op.invite_device_id;
 		invite_cmd_seq = op.invite_cmd_seq;
 		
-		entities.swap(op.entities);
-        //for(list<void*>::const_iterator it=op.entities.begin(); it!=op.entities.end(); ++it)
-        //{
-        //    entities.push_back(*it);
-        //}
+		//entities.swap(op.entities);
+        for(std::list<void*>::const_iterator it=op.entities.begin(); it!=op.entities.end(); ++it)
+        {
+            entities.push_back(*it);
+        }
         return *this;
 	}
 };

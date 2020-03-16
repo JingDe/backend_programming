@@ -15,7 +15,7 @@ ChannelMgr::ChannelMgr(RedisClient* redis_client)
 	LOG_WRITE_INFO("ChannelMgr constructed");
 }
 
-int ChannelMgr::GetChannelKeyList(std::string gbdownlinker_device_id, std::list<std::string>& channel_key_list)
+int ChannelMgr::GetChannelKeyList(const std::string& gbdownlinker_device_id, std::list<std::string>& channel_key_list)
 {
 	channel_key_list.clear();
 	std::string key_prefix = std::string("{downlinker.channel}:") + gbdownlinker_device_id;
@@ -25,26 +25,26 @@ int ChannelMgr::GetChannelKeyList(std::string gbdownlinker_device_id, std::list<
 
 int ChannelMgr::LoadChannel(const std::list<std::string>& channel_key_list, std::list<ChannelPtr>* channels)
 {
-	channels.clear();
+	channels->clear();
 	for (std::list<std::string>::const_iterator cit = channel_key_list.cbegin(); cit != channel_key_list.cend(); cit++)
 	{
 		Channel* channel=new Channel();
-		if (!redis_client_->getSerial(*it, *channel))
+		if (!redis_client_->getSerial(*cit, *channel))
 			continue;
-		channel->registerLastTime = base::CTime::GetCurrentTime();
-		channel->keepaliveLastTime = base::CTime::GetCurrentTime();
+		//channel->registerLastTime = base::CTime::GetCurrentTime();
+		//channel->keepaliveLastTime = base::CTime::GetCurrentTime();
 
 		ChannelPtr channel_ptr(channel);
-		channels.push_back(channel_ptr);
+		channels->push_back(std::move(channel_ptr));
 	}
 	return 0;
 }
 
-int ChannelMgr::LoadChannel(std::string gbdownlinker_device_id, std::list<ChannelPtr>* channels)
+int ChannelMgr::LoadChannel(const std::string& gbdownlinker_device_id, std::list<ChannelPtr>* channels)
 {
 	std::list<std::string> channel_key_list;
 	GetChannelKeyList(gbdownlinker_device_id, channel_key_list);
-	LoadChannels(channel_key_list, channels);
+	LoadChannel(channel_key_list, channels);
 	return 0;
 }
 
@@ -53,7 +53,7 @@ int ChannelMgr::InsertChannel(const std::string& gbdownlinker_device_id, const C
 {
 	WriteGuard guard(rwmutex_);
 
-	std::string channel_key = std::string("{downlinker.channel}:") + gbdownlinker_device_id + ":" + channel.channelId;
+	std::string channel_key = std::string("{downlinker.channel}:") + gbdownlinker_device_id + ":" + channel.deviceId+":"+channel.channelDeviceId;
 	if(redis_client_->setSerial(channel_key, channel)==false)
 	{
 		return -1;
@@ -61,7 +61,7 @@ int ChannelMgr::InsertChannel(const std::string& gbdownlinker_device_id, const C
 	return 0;
 }
 
-int ChannelMgr::InsertChannel(const std::string& gbdownlinker_device_id, const Channel& channel)
+int ChannelMgr::UpdateChannel(const std::string& gbdownlinker_device_id, const Channel& channel)
 {
 	return InsertChannel(gbdownlinker_device_id, channel);
 }
@@ -101,7 +101,7 @@ int ChannelMgr::ClearChannel(const std::string& gbdownlinker_device_id)
 	return 0;
 }
 
-int ChannelMgr::GetChannelCount(const std::string& gbdownlinker_device_id)
+size_t ChannelMgr::GetChannelCount(const std::string& gbdownlinker_device_id)
 {
 	ReadGuard guard(rwmutex_);
 	std::list<std::string> channel_key_list;

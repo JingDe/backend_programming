@@ -12,6 +12,8 @@ public:
 	static CDownDataRestorer* AllocateDownDataRestorer(RestorerParam::Type type);
 	static void FreeDownDataRestorer(CDownDataRestorer* down_data_restorer);
 
+//private:
+//	RestorerParam::Type type_;
 };
 
 } // namespace GBGateway

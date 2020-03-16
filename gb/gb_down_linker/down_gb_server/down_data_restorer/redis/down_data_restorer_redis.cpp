@@ -11,7 +11,7 @@
 
 #include<sstream>
 #include<cassert>
-
+#include<functional>
 
 namespace GBGateway {
 
@@ -25,6 +25,41 @@ namespace GBGateway {
 			}\
 		}while(0);
 
+static bool ParseChannelKey(const std::string& channel_key, std::string& device_id, std::string& channel_device_id)
+{
+	std::string::size_type pos=channel_key.rfind(':');
+	if(pos==std::string::npos)
+		return false;
+	channel_device_id=channel_key.substr(pos+1);
+
+	std::string::size_type pos2=channel_key.rfind(pos-1);
+	if(pos2==std::string::npos)
+		return false;
+	device_id=channel_key.substr(pos2+1, pos-(pos2+1));
+
+	return true;
+}
+
+static bool ParseInviteKey(const std::string& invite_key, int& worker_thread_idx, std::string& device_id)
+{
+	std::string::size_type pos1=invite_key.rfind(':');	
+	if(pos1==std::string::npos  ||  pos1<1)
+		return false;
+	std::string::size_type pos2=invite_key.rfind(pos1-1);
+	if(pos2==std::string::npos)
+		return false;
+	device_id=invite_key.substr(pos2+1, pos1-(pos2+1));	
+
+	std::string::size_type pos3=invite_key.rfind(pos2-1);
+	if(pos3==std::string::npos)
+		return false;
+	std::string::size_type pos4=invite_key.rfind(pos3-1);
+	if(pos4==std::string::npos)
+		return false;
+
+	worker_thread_idx=atoi(invite_key.substr(pos4+1, pos3-(pos4+1)).c_str());
+	return true;
+}
 
 CDownDataRestorerRedis::CDownDataRestorerRedis()
 	:redis_mode_(STAND_ALONE_OR_PROXY_MODE),
@@ -55,7 +90,7 @@ CDownDataRestorerRedis::~CDownDataRestorerRedis()
 		Uninit();		
 }
 
-int CDownDataRestorerRedis::Init(RestorerParamPtr restorer_param/*, ErrorReportCallback error_callback*/)
+int CDownDataRestorerRedis::Init(const RestorerParamPtr& restorer_param/*, ErrorReportCallback error_callback*/)
 {
 	if(inited_)
 	{
@@ -98,7 +133,8 @@ int CDownDataRestorerRedis::Init(RestorerParamPtr restorer_param/*, ErrorReportC
 	std::string passwd="";
 
 	REDIS_SERVER_LIST redis_server_list;
-	for (std::list<UrlPtr>::iterator it = restorer_param.urlList.begin(); it != restorer_param.urlList.end(); it++)
+	const RestorerParam::RedisConfig& redis_config=std::get<RestorerParam::RedisConfig>(restorer_param->config);
+	for (std::list<RestorerParam::RedisConfig::UrlPtr>::const_iterator it = redis_config.urlList.cbegin(); it != redis_config.urlList.cend(); it++)
 	{
 		RedisServerInfo server((*it)->ip, (*it)->port);
 		redis_server_list.push_back(server);
@@ -406,14 +442,14 @@ int CDownDataRestorerRedis::GetChannelCount(const std::string& gbdownlinker_devi
 	return channel_mgr_->GetChannelCount(gbdownlinker_device_id);
 }
 
-int CDownDataRestorerRedis::GetExecutingInviteCmdCount(const std::string& gbdownlinker_device_id, int worker_thread_no)
+int CDownDataRestorerRedis::GetExecutingInviteCmdCount(const std::string& gbdownlinker_device_id, int worker_thread_idx)
 {
 	CHECK_CONDITION(started_, "please start CDownDataRestorerRedis first");
-	return executing_invite_cmd_mgr_->GetExecutingInviteCmdListSize(gbdownlinker_device_id, worker_thread_no);
+	return executing_invite_cmd_mgr_->GetInviteCount(gbdownlinker_device_id, worker_thread_idx);
 }
 
 // compare channel.device_id to device.id
-static bool CompareChannelDeviceId(const std::string& device_key, const std::string& channel_key_device_id)
+static bool CompareChannelDeviceId(std::string device_key, const std::string& channel_key_device_id)
 {
 	std::string device_id;
 	std::string::size_type pos = device_key.rfind(':');
@@ -425,6 +461,24 @@ static bool CompareChannelDeviceId(const std::string& device_key, const std::str
 	LOG_WRITE_INFO(log_msg.str());
 	return device_id == channel_key_device_id;
 }
+
+class ChannelDeviceIdComparator : public std::binary_function<std::string, std::string, bool>
+{
+public:
+	bool operator()(const std::string& device_key, const std::string& channel_key_device_id) const 
+	{
+		std::string device_id;
+		std::string::size_type pos = device_key.rfind(':');
+		if (pos == string::npos)
+			return false;
+		device_id = device_key.substr(pos+1);
+		std::stringstream log_msg;
+		log_msg << "device_key "<< device_key<<" has device_id " << device_id;
+		LOG_WRITE_INFO(log_msg.str());
+		return device_id == channel_key_device_id;
+	}
+	
+};
 
 // compare invite.device_id to channel.channel_device_id
 //static bool CompareInviteDeviceId(const std::string& channel_device_id, const std::string& invite_device_id)
@@ -443,10 +497,10 @@ int CDownDataRestorerRedis::PrepareLoadData(const std::string& gbdownlinker_devi
 	device_mgr_->GetDeviceKeyList(gbdownlinker_device_id, device_key_list_); // full device key
 
 	// {downlinker.channel}:gbdownlinker_device_id:device_id:channel_device_id
-	channel_mgr_->GetChannelKeyList(gbdownlinker_device_id, channel_id_list_); // full channel key
+	channel_mgr_->GetChannelKeyList(gbdownlinker_device_id, channel_key_list_); // full channel key
 
 	std::list<std::string> channel_device_id_list;
-	for (std::list<std::string>::iterator it = channel_id_list_.begin(); it != channel_id_list_.end(); )
+	for (std::list<std::string>::iterator it = channel_key_list_.begin(); it != channel_key_list_.end(); )
 	{
 		std::string device_id_part;
 		std::string channel_device_id;
@@ -455,11 +509,12 @@ int CDownDataRestorerRedis::PrepareLoadData(const std::string& gbdownlinker_devi
 		log_msg << "parse channel key " << *it << ", get device_id " << device_id_part << " and channel_device_id " << channel_device_id;
 		LOG_WRITE_INFO(log_msg.str());
 
-		if (std::find(device_key_list_.cbegin(), device_key_list_.cend(), std::bind2nd(std::ptr_fun(CompareChannelDeviceId), device_id_part)) == device_key_list_.end£¨£©)
+		if (std::find_if(device_key_list_.cbegin(), device_key_list_.cend(), std::bind2nd(std::ptr_fun(CompareChannelDeviceId), device_id_part)) == device_key_list_.end())
+		//if (std::find_if(device_key_list_.cbegin(), device_key_list_.cend(), std::bind2nd(ChannelDeviceIdComparator(), device_id_part)) == device_key_list_.end())
 		{
 			channel_mgr_->DeleteChannel(*it);
 
-			channel_id_list_.erase(it++);
+			channel_key_list_.erase(it++);
 		}
 		else
 		{
@@ -480,7 +535,7 @@ int CDownDataRestorerRedis::PrepareLoadData(const std::string& gbdownlinker_devi
 		log_msg << "parse invite key " << *it << ", get worker_thread_idx " << worker_thread_idx << " and device_id " << device_id_part;
 		LOG_WRITE_INFO(log_msg.str());
 
-		if (worker_thread_idx => worker_thread_number)
+		if (worker_thread_idx >= worker_thread_number)
 		{
 			log_msg.str("");
 			log_msg << "invite key " << *it << ", worker_thread_idx "<<worker_thread_idx<<" is invalid "<<worker_thread_number;
@@ -506,9 +561,9 @@ int CDownDataRestorerRedis::PrepareLoadData(const std::string& gbdownlinker_devi
 
 		log_msg.str("");
 		log_msg << "invite key " << *it << "is valid";
-		LOG_WRITE_INFO(log.str());
+		LOG_WRITE_INFO(log_msg.str());
 
-		invite_key_lists_[worker_thread_idx].insert(*it);
+		invite_key_lists_[worker_thread_idx].push_back(*it);
 		it++;
 	}
 
@@ -559,7 +614,7 @@ int CDownDataRestorerRedis::DeleteDeviceList(const std::string& gbdownlinker_dev
 	operation.operation_type = DataRestorerOperation::DELETE;
 	operation.entity_type = DataRestorerOperation::DEVICE;
 	operation.gbdownlinker_device_id = gbdownlinker_device_id;
-	operation.entity_id_ = device_id;
+	operation.entity_id = device_id;
 
 	operations_queue_.push(operation);
 	operations_queue_not_empty_condvar.SignalAll();
@@ -581,7 +636,7 @@ int CDownDataRestorerRedis::DeleteDeviceList(const std::string& gbdownlinker_dev
 	return RESTORER_OK;
 }
 
-int CDownDataRestorerRedis::LoadExecutingInviteCmdList(const std::string& gbdownlinker_device_id, int worker_thread_idx, std::list<ExecutingInviteCmdPtr>* executing_invite_cmd_lists);
+int CDownDataRestorerRedis::LoadExecutingInviteCmdList(const std::string& gbdownlinker_device_id, int worker_thread_idx, std::list<ExecutingInviteCmdPtr>* executing_invite_cmd_lists)
 {
 	CHECK_CONDITION(started_, "please start CDownDataRestorerRedis first");
 	if (gbdownlinker_device_id_ == gbdownlinker_device_id  &&  !invite_key_lists_[worker_thread_idx].empty())
@@ -619,7 +674,7 @@ int CDownDataRestorerRedis::UpdateExecutingInviteCmdList(const std::string& gbdo
 	return InsertExecutingInviteCmdList(gbdownlinker_device_id, worker_thread_idx, executing_invite_cmd);
 }
 
-int CDownDataRestorerRedis::DeleteExecutingInviteCmdList(const std::string& gbdownlinker_device_id, int worker_thread_idx, const std::string& cmd_sender_id, const std::string& device_id, const int64_t& cmd_seq)
+int CDownDataRestorerRedis::DeleteExecutingInviteCmdList(const std::string& gbdownlinker_device_id, int worker_thread_idx, const std::string& invite_cmd_sender_id, const std::string& device_id, const int64_t& cmd_seq)
 {
 	CHECK_CONDITION(started_, "please start CDownDataRestorerRedis first");
 	MutexLockGuard guard(&operations_queue_mutex_);
@@ -629,9 +684,9 @@ int CDownDataRestorerRedis::DeleteExecutingInviteCmdList(const std::string& gbdo
 	operation.entity_type = DataRestorerOperation::EXECUTING_INVITE_CMD;
 	operation.gbdownlinker_device_id = gbdownlinker_device_id;
 	operation.worker_thread_idx = worker_thread_idx;
-	operation.cmd_sender_id = cmd_sender_id;
-	operation.device_id = device_id;
-	operation.cmd_seq = cmd_seq;
+	operation.invite_cmd_sender_id = invite_cmd_sender_id;
+	operation.invite_device_id = device_id;
+	operation.invite_cmd_seq = cmd_seq;
 
 	operations_queue_.push(operation);
 	operations_queue_not_empty_condvar.SignalAll();

@@ -27,7 +27,7 @@ public:
 	int DeleteDevice(const std::string& gbdownlinker_device_id, const std::string& device_id);
 	int ClearDevice(const std::string& gbdownlinker_device_id);
 
-	int GetDeviceCount(const std::string& gbdownlinker_device_id);
+	size_t GetDeviceCount(const std::string& gbdownlinker_device_id);
 
 private:
 	int InsertDeviceInTransaction(const Device& device);

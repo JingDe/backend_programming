@@ -37,7 +37,7 @@ public:
     CDownDataRestorerRedis();
 	~CDownDataRestorerRedis();
 
-	int Init(RestorerParamPtr restorer_param);
+	int Init(const RestorerParamPtr& restorer_param);
     int Uninit();
     int Start();
     int Stop();
@@ -64,12 +64,11 @@ public:
 	int DeleteExecutingInviteCmdList(const std::string& gbdownlinker_device_id, int worker_thread_idx, const std::string& cmd_sender_id, const std::string& device_id, const int64_t& cmd_seq);
 	int DeleteExecutingInviteCmdList(const std::string& gbdownlinker_device_id, int worker_thread_idx);
 	
-
-private:	
 	int GetDeviceCount(const std::string& gbdownlinker_device_id);
 	int GetChannelCount(const std::string& gbdownlinker_device_id);
 	int GetExecutingInviteCmdCount(const std::string& gbdownlinker_device_id, int worker_thread_idx);
 
+private:
 	bool Inited() { return inited_; }
 	int Init(RedisMode redis_mode, const REDIS_SERVER_LIST& redis_server_list, const std::string& master_name, int worker_thread_num, uint32_t connect_timeout_ms, uint32_t read_timeout_ms, const std::string& passwd);
 
@@ -98,9 +97,9 @@ private:
 	std::queue<DataRestorerOperation> operations_queue_;
     
 	std::string gbdownlinker_device_id_;
-	std::list<std::string>& device_key_list_;
-	std::list<std::string>& channel_key_list_;
-	std::list<std::string>& invite_key_list_;
+	std::list<std::string> device_key_list_;
+	std::list<std::string> channel_key_list_;
+	std::list<std::string> invite_key_list_;
 	std::vector<std::list<std::string> > invite_key_lists_;
 };
 

@@ -23,7 +23,7 @@ ExecutingInviteCmdMgr::~ExecutingInviteCmdMgr()
 {
 }
 
-int ExecutingInviteCmdMgr::GetInviteKeyList(std::string gbdownlinker_device_id, std::list<std::string>& invite_key_list)
+int ExecutingInviteCmdMgr::GetInviteKeyList(const std::string& gbdownlinker_device_id, std::list<std::string>& invite_key_list)
 {
 	invite_key_list.clear();
 	std::string key_prefix = std::string("{downlinker.invite}:") + gbdownlinker_device_id;
@@ -31,7 +31,7 @@ int ExecutingInviteCmdMgr::GetInviteKeyList(std::string gbdownlinker_device_id, 
 	return 0;
 }
 
-int ExecutingInviteCmdMgr::GetInviteKeyList(std::string gbdownlinker_device_id, int worker_thread_idx, std::list<std::string>& invite_key_list)
+int ExecutingInviteCmdMgr::GetInviteKeyList(const std::string& gbdownlinker_device_id, int worker_thread_idx, std::list<std::string>& invite_key_list)
 {
 	invite_key_list.clear();
 	std::string key_prefix = std::string("{downlinker.invite}:") + gbdownlinker_device_id + std::to_string(worker_thread_idx);
@@ -39,27 +39,27 @@ int ExecutingInviteCmdMgr::GetInviteKeyList(std::string gbdownlinker_device_id, 
 	return 0;
 }
 
-int ExecutingInviteCmdMgr::Load(const std::list<std::string>& invite_key_list, std::list<ExecutingInviteCmdPtr>* invites)
+int ExecutingInviteCmdMgr::LoadInvite(const std::list<std::string>& invite_key_list, std::list<ExecutingInviteCmdPtr>* invites)
 {
-	devices.clear();
+	invites->clear();
 	for (std::list<std::string>::const_iterator cit = invite_key_list.cbegin(); cit != invite_key_list.cend(); cit++)
 	{
 		ExecutingInviteCmd* invite = new ExecutingInviteCmd();
-		if (!redis_client_->getSerial(*it, *invite))
+		if (!redis_client_->getSerial(*cit, *invite))
 			continue;
-		inivte.sip_restarted = true;
+		//invite->sipRestarted = true;
 
 		ExecutingInviteCmdPtr invite_ptr(invite);
-		invites.push_back(invite_ptr);
+		invites->push_back(std::move(invite_ptr));
 	}
 	return 0;
 }
 
-int ExecutingInviteCmdMgr::Load(const std::string& gbdownlinker_device_id, int worker_thread_idx, std::list<ExecutingInviteCmdPtr>* invites)
+int ExecutingInviteCmdMgr::LoadInvite(const std::string& gbdownlinker_device_id, int worker_thread_idx, std::list<ExecutingInviteCmdPtr>* invites)
 {
 	std::list<std::string> invite_key_list;
 	GetInviteKeyList(gbdownlinker_device_id, worker_thread_idx, invite_key_list);
-	Load(invite_key_list, invites);
+	LoadInvite(invite_key_list, invites);
 	return 0;
 }
 
@@ -74,6 +74,11 @@ int ExecutingInviteCmdMgr::Insert(const std::string& gbdownlinker_device_id, int
 	return 0;
 }
 
+int ExecutingInviteCmdMgr::Update(const std::string& gbdownlinker_device_id, int worker_thread_idx, const ExecutingInviteCmd& cmd)
+{
+	return Insert(gbdownlinker_device_id, worker_thread_idx, cmd);
+}
+
 int ExecutingInviteCmdMgr::DeleteInvite(const std::string& invite_key)
 {
 	if (redis_client_->del(invite_key) == false)
@@ -82,7 +87,7 @@ int ExecutingInviteCmdMgr::DeleteInvite(const std::string& invite_key)
 	return 0;
 }
 
-int ExecutingInviteCmdMgr::Delete(const std::string& gbdownlinker_device_id, int worker_thread_no, const std::string& cmd_sender_id, const std::string& device_id, const std::string& cmd_seq)
+int ExecutingInviteCmdMgr::Delete(const std::string& gbdownlinker_device_id, int worker_thread_idx, const std::string& cmd_sender_id, const std::string& device_id, const int64_t& cmd_seq)
 {
 	std::string invite_key = std::string("{downlinker.invite}:") + gbdownlinker_device_id + ":" + std::to_string(worker_thread_idx) + ":" + cmd_sender_id + ":" + device_id + ":" + std::to_string(cmd_seq);
 	if(redis_client_->del(invite_key)==false)
@@ -103,17 +108,17 @@ int ExecutingInviteCmdMgr::Clear(const std::string& gbdownlinker_device_id, int 
 	return 0;
 }
 
-size_t ExecutingInviteCmdMgr::GetDeviceCount(const std::string& gbdownlinker_device_id)
+size_t ExecutingInviteCmdMgr::GetInviteCount(const std::string& gbdownlinker_device_id)
 {
 	std::list<std::string> invite_key_list;
-	GetDeviceKeyList(gbdownlinker_device_id, invite_key_list);
+	GetInviteKeyList(gbdownlinker_device_id, invite_key_list);
 	return invite_key_list.size();
 }
 
-size_t ExecutingInviteCmdMgr::GetDeviceCount(const std::string& gbdownlinker_device_id, int worker_thread_idx)
+size_t ExecutingInviteCmdMgr::GetInviteCount(const std::string& gbdownlinker_device_id, int worker_thread_idx)
 {
 	std::list<std::string> invite_key_list;
-	GetDeviceKeyList(gbdownlinker_device_id, worker_thread_idx, invite_key_list);
+	GetInviteKeyList(gbdownlinker_device_id, worker_thread_idx, invite_key_list);
 	return invite_key_list.size();
 }
 
