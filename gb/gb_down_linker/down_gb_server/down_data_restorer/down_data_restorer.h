@@ -14,6 +14,8 @@ class ExecutingInviteCmd;
 
 class CDownDataRestorer {
 public:
+	virtual ~CDownDataRestorer() {}
+
 	virtual int Init(const RestorerParamPtr& restorer_param/*, ErrorReportCallback error_callback*/)=0;
 	virtual int Uninit()=0;
     virtual int Start()=0;

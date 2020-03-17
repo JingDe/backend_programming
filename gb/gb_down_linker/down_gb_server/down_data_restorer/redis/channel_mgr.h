@@ -20,6 +20,7 @@ public:
 	ChannelMgr(RedisClient*);
 	
 	int GetChannelKeyList(const std::string& gbdownlinker_device_id, std::list<std::string>& channel_key_list);
+	int GetChannelKeyListByDeviceId(const std::string& gbdownlinker_device_id, const std::string& device_id, std::list<std::string>& channel_key_list);
 
 	int DeleteChannel(const std::string& channel_key);
 
@@ -28,7 +29,8 @@ public:
 
 	int InsertChannel(const std::string& gbdownlinker_device_id, const Channel& channel);
 	int UpdateChannel(const std::string& gbdownlinker_device_id, const Channel& channels);
-	int DeleteChannel(const std::string& gbdownlinker_device_id, const std::string& channel_id);
+	int DeleteChannel(const std::string& gbdownlinker_device_id, const std::string& device_id);
+	int DeleteChannel(const std::string& gbdownlinker_device_id, const std::string& device_id, const std::string& channel_device_id);
 	int ClearChannel(const std::string& gbdownlinker_device_id);
 
 	size_t GetChannelCount(const std::string& gbdownlinker_device_id);
@@ -41,7 +43,7 @@ private:
 	int ClearChannelWithLockHeld();
 
 	RedisClient* redis_client_;
-	RWMutex rwmutex_;
+//	RWMutex rwmutex_;
 };
 
 } // namespace GBGateway

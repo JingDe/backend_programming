@@ -20,7 +20,8 @@ using std::list;
 const string redis_ip="192.168.12.59";
 const uint16_t redis_port=6379;
 
-const std::string gbdownlinker_device_id="070aa23c-7167-4f55-8cde-8ab7e870f1d6";
+//const std::string g_gbdownlinker_device_id="070aa23c-7167-4f55-8cde-8ab7e870f1d6";
+const std::string g_gbdownlinker_device_id="gbdownlinker_device_id";
 
 using namespace GBGateway;
 
@@ -61,66 +62,311 @@ void print(const std::list<DevicePtr>& devices)
 void ShowDevices(CDownDataRestorerRedis& ddr)
 {
 	list<DevicePtr> devices;
-	ddr.LoadDeviceList(gbdownlinker_device_id, &devices);
+	ddr.LoadDeviceList(g_gbdownlinker_device_id, &devices);
 	print(devices);
 }
 
+
 void LoopProcessDevice(CDownDataRestorerRedis& ddr)
 {
-	int device_count=ddr.GetDeviceCount(gbdownlinker_device_id);
-	LOG(INFO)<<"devices size: "<<device_count;
+	int device_count = 0;
+	std::stringstream log_msg;
 
-	assert(device_count==0);
+	LOG_WRITE_INFO("test load device");
+	// load接口
+	std::list<DevicePtr> device_list;
+	ddr.LoadDeviceList(g_gbdownlinker_device_id, &device_list);
+	//assert(device_list.empty());
+	log_msg<<"load device, size is "<<device_list.size();
+	LOG_WRITE_INFO(log_msg.str());
+	getc(stdin);
 
+	LOG_WRITE_INFO("test insert device");
+	// insert接口
 	Device device1;
 	device1.deviceId="device_id_1";
-	ddr.InsertDeviceList(gbdownlinker_device_id, &device1);
+	ddr.InsertDeviceList(g_gbdownlinker_device_id, &device1);
+	sleep(7);
+	device_list.clear();
+	ddr.LoadDeviceList(g_gbdownlinker_device_id, &device_list);
+//	assert(device_list.size()==1);
+	log_msg.str("");
+	log_msg<<"device size is "<<device_list.size();
+	LOG_WRITE_INFO(log_msg.str());
+	getchar();
 
-	sleep(3);
-	
-	device_count=ddr.GetDeviceCount(gbdownlinker_device_id);
-	LOG(INFO)<<"after insert, devices size: "<<device_count;
+	LOG_WRITE_INFO("test update devie");	
+	// update接口
+	ddr.UpdateDeviceList(g_gbdownlinker_device_id, &device1);
+	sleep(7);
+	device_list.clear();
+	ddr.LoadDeviceList(g_gbdownlinker_device_id, &device_list);
+	//assert(device_list.size() == 1);
+	log_msg.str("");
+    log_msg<<"device size is "<<device_list.size();
+    LOG_WRITE_INFO(log_msg.str());
+	getc(stdin);
 
-	LOG(INFO)<<"after insert, before search, to check redis-cli";
-
+	LOG_WRITE_INFO("insert 3 device");
+	// insert接口
 	Device device2;
 	device2.deviceId="device_id_2";
-	ddr.InsertDeviceList(gbdownlinker_device_id, &device2);
-
+	ddr.InsertDeviceList(g_gbdownlinker_device_id, &device2);
 	Device device3;
 	device3.deviceId="device_id_3";
-	ddr.InsertDeviceList(gbdownlinker_device_id, &device3);
-
+	ddr.InsertDeviceList(g_gbdownlinker_device_id, &device3);
 	Device device4;
 	device4.deviceId="device_id_4";
-	ddr.InsertDeviceList(gbdownlinker_device_id, &device4);
+	ddr.InsertDeviceList(g_gbdownlinker_device_id, &device4);
+	sleep(7);
+	device_list.clear();
+	ddr.LoadDeviceList(g_gbdownlinker_device_id, &device_list);
+//	assert(device_list.size() == 4);
+	log_msg.str("");
+    log_msg<<"device size is "<<device_list.size();
+    LOG_WRITE_INFO(log_msg.str());
+	getchar();
 
-	sleep(3);
-	ShowDevices(ddr);
+	LOG_WRITE_INFO("test delete device");
+	// delete接口
+	ddr.DeleteDeviceList(g_gbdownlinker_device_id, device1.deviceId);
+	sleep(7);
+	device_list.clear();
+	ddr.LoadDeviceList(g_gbdownlinker_device_id, &device_list);
+	//assert(device_list.size() == 3);
+	log_msg.str("");
+    log_msg<<"device size is "<<device_list.size();
+    LOG_WRITE_INFO(log_msg.str());
+	getc(stdin);
 
-	LOG(INFO)<<"to delete device1";
-	ddr.DeleteDeviceList(gbdownlinker_device_id, device1.deviceId);
+	LOG_WRITE_INFO("test get device count");
+	// get count 接口
+	device_count=ddr.GetDeviceCount(g_gbdownlinker_device_id);
+	//assert(device_count == 3);
+	log_msg.str("");
+    log_msg<<"device count "<<device_count;
+    LOG_WRITE_INFO(log_msg.str());
+	getchar();
 
-	sleep(3);
-	ShowDevices(ddr);
-
-	LOG(INFO)<<"to clear";
-	ddr.DeleteDeviceList(gbdownlinker_device_id);
-	sleep(3);
-	
-	device_count=ddr.GetDeviceCount(gbdownlinker_device_id);
-	LOG(INFO)<<"after clear, devices size: "<<device_count;
-	ShowDevices(ddr);
-
-	sleep(3);
-	LOG(INFO)<<"after update";
-	ShowDevices(ddr);
-
-	sleep(3);
-	LOG(INFO)<<"to clear";
-	ddr.DeleteDeviceList(gbdownlinker_device_id);
-	sleep(3);
+	LOG_WRITE_INFO("test delete all device");
+	// delete/clear 接口
+	ddr.DeleteDeviceList(g_gbdownlinker_device_id);
+	sleep(5);
+	device_count = ddr.GetDeviceCount(g_gbdownlinker_device_id);
+	//assert(device_count == 0);
+	log_msg.str("");
+    log_msg<<"device count "<<device_count;
+    LOG_WRITE_INFO(log_msg.str());
+	getchar();
 }
+
+void LoopProcessChannel(CDownDataRestorerRedis& ddr)
+{
+	int channel_count = 0;
+	std::stringstream log_msg;
+
+	LOG_WRITE_INFO("test load channel");
+	// load接口
+	std::list<ChannelPtr> channel_list;
+	ddr.LoadChannelList(g_gbdownlinker_device_id, &channel_list);
+	log_msg<<"load channel, size is "<<channel_list.size();
+	LOG_WRITE_INFO(log_msg.str());
+	getc(stdin);
+
+	LOG_WRITE_INFO("insert some channel");
+	// insert接口
+	Channel channel11;
+	channel11.deviceId="device_id1";
+    channel11.channelDeviceId="channel_device_id_1";
+	ddr.InsertChannelList(g_gbdownlinker_device_id, &channel11);
+	Channel channel12;
+	channel12.deviceId="device_id1";
+    channel12.channelDeviceId="channel_device_id_2";
+	ddr.InsertChannelList(g_gbdownlinker_device_id, &channel12);
+	Channel channel13;
+	channel13.deviceId="device_id1";
+    channel13.channelDeviceId="channel_device_id_3";
+	ddr.InsertChannelList(g_gbdownlinker_device_id, &channel13);
+	
+	Channel channel24;
+	channel24.deviceId="device_id2";
+    channel24.channelDeviceId="channel_device_id_4";
+	ddr.InsertChannelList(g_gbdownlinker_device_id, &channel24);
+	Channel channel25;
+	channel25.deviceId="device_id2";
+    channel25.channelDeviceId="channel_device_id_5";
+	ddr.InsertChannelList(g_gbdownlinker_device_id, &channel25);
+	sleep(7);
+	channel_list.clear();
+	ddr.LoadChannelList(g_gbdownlinker_device_id, &channel_list);
+	log_msg.str("");
+    log_msg<<"channel size is "<<channel_list.size();
+    LOG_WRITE_INFO(log_msg.str());
+	getchar();
+
+	LOG_WRITE_INFO("test delete by device_id and channel_device_id");
+	// delete接口
+	ddr.DeleteChannelList(g_gbdownlinker_device_id, channel11.deviceId, channel11.channelDeviceId);
+	sleep(7);
+	channel_list.clear();
+	ddr.LoadChannelList(g_gbdownlinker_device_id, &channel_list);
+	log_msg.str("");
+    log_msg<<"channel size is "<<channel_list.size();
+    LOG_WRITE_INFO(log_msg.str());
+	getc(stdin);
+	
+	LOG_WRITE_INFO("test delete by device_id");
+	// delete接口
+	ddr.DeleteChannelList(g_gbdownlinker_device_id, channel24.deviceId);
+	sleep(7);
+	channel_list.clear();
+	ddr.LoadChannelList(g_gbdownlinker_device_id, &channel_list);
+	log_msg.str("");
+    log_msg<<"channel size is "<<channel_list.size();
+    LOG_WRITE_INFO(log_msg.str());
+	getc(stdin);
+
+	LOG_WRITE_INFO("test get channel count");
+	// get count 接口
+	channel_count=ddr.GetChannelCount(g_gbdownlinker_device_id);
+	//assert(channel_count == 3);
+	log_msg.str("");
+    log_msg<<"channel count "<<channel_count;
+    LOG_WRITE_INFO(log_msg.str());
+	getchar();
+
+	LOG_WRITE_INFO("test delete all channel");
+	// delete/clear 接口
+	ddr.DeleteChannelList(g_gbdownlinker_device_id);
+	sleep(5);
+	channel_count = ddr.GetChannelCount(g_gbdownlinker_device_id);
+	log_msg.str("");
+    log_msg<<"channel count "<<channel_count;
+    LOG_WRITE_INFO(log_msg.str());
+	getchar();
+}
+
+
+void LoopProcessExecutingInviteCmd(CDownDataRestorerRedis& ddr)
+{
+	int invite_count = 0;
+	int worker_thread_idx=0;
+	std::list<ExecutingInviteCmdPtr> invite_list;
+	
+	std::stringstream log_msg;
+
+	LOG_WRITE_INFO("test load invite");
+	worker_thread_idx=0;
+	ddr.LoadExecutingInviteCmdList(g_gbdownlinker_device_id, worker_thread_idx, &invite_list);
+	log_msg<<"load invite of thread 0, size is "<<invite_list.size();
+	LOG_WRITE_INFO(log_msg.str());
+	getc(stdin);	
+	worker_thread_idx=1;
+	ddr.LoadExecutingInviteCmdList(g_gbdownlinker_device_id, worker_thread_idx, &invite_list);
+	log_msg.str("");
+	log_msg<<"load invite of thread 1, size is "<<invite_list.size();
+	LOG_WRITE_INFO(log_msg.str());
+	getc(stdin);
+
+	LOG_WRITE_INFO("insert some invite");
+	ExecutingInviteCmd invite01;
+	invite01.cmdSenderId="cmd_sender_id_1";
+	invite01.deviceId="device_id1";
+    invite01.cmdSeq=1;
+	ddr.InsertExecutingInviteCmdList(g_gbdownlinker_device_id, 0, &invite01);
+	ExecutingInviteCmd invite02;
+	invite02.cmdSenderId="cmd_sender_id_2";
+	invite02.deviceId="device_id2";
+    invite02.cmdSeq=2;
+	ddr.InsertExecutingInviteCmdList(g_gbdownlinker_device_id, 0, &invite02);
+	ExecutingInviteCmd invite03;
+	invite03.cmdSenderId="cmd_sender_id_3";
+	invite03.deviceId="device_id3";
+    invite03.cmdSeq=3;
+	ddr.InsertExecutingInviteCmdList(g_gbdownlinker_device_id, 0, &invite03);	
+	
+	ExecutingInviteCmd invite14;
+	invite14.cmdSenderId="cmd_sender_id_4";
+	invite14.deviceId="device_id4";
+    invite14.cmdSeq=4;
+	ddr.InsertExecutingInviteCmdList(g_gbdownlinker_device_id, 1, &invite14);
+	ExecutingInviteCmd invite15;
+	invite15.cmdSenderId="cmd_sender_id_5";
+	invite15.deviceId="device_id5";
+    invite15.cmdSeq=5;
+	ddr.InsertExecutingInviteCmdList(g_gbdownlinker_device_id, 1, &invite15);
+	sleep(7);
+	
+	worker_thread_idx=0;
+	invite_list.clear();
+	ddr.LoadExecutingInviteCmdList(g_gbdownlinker_device_id, worker_thread_idx, &invite_list);
+	log_msg.str("");
+	log_msg<<"load invite of thread 0, size is "<<invite_list.size();
+	LOG_WRITE_INFO(log_msg.str());
+	getc(stdin);	
+	worker_thread_idx=1;
+	invite_list.clear();
+	ddr.LoadExecutingInviteCmdList(g_gbdownlinker_device_id, worker_thread_idx, &invite_list);
+	log_msg.str("");
+	log_msg<<"load invite of thread 1, size is "<<invite_list.size();
+	LOG_WRITE_INFO(log_msg.str());
+	getc(stdin);
+
+	LOG_WRITE_INFO("test get invite count");
+	worker_thread_idx=0;
+	invite_count=ddr.GetExecutingInviteCmdCount(g_gbdownlinker_device_id, worker_thread_idx);
+	log_msg.str("");
+    log_msg<<"invite count of worker 0 is "<<invite_count;
+    LOG_WRITE_INFO(log_msg.str());
+	getchar();
+	worker_thread_idx=1;
+	invite_count=ddr.GetExecutingInviteCmdCount(g_gbdownlinker_device_id, worker_thread_idx);
+	log_msg.str("");
+    log_msg<<"invite count of worker 1 is "<<invite_count;
+    LOG_WRITE_INFO(log_msg.str());
+	getchar();
+
+	LOG_WRITE_INFO("test delete by 3 arg");
+	ddr.DeleteExecutingInviteCmdList(g_gbdownlinker_device_id, 0, invite01.cmdSenderId, invite01.deviceId, invite01.cmdSeq);
+	sleep(7);
+	invite_list.clear();
+	worker_thread_idx=0;
+	ddr.LoadExecutingInviteCmdList(g_gbdownlinker_device_id, worker_thread_idx, &invite_list);
+	log_msg.str("");
+	log_msg<<"load invite of thread 0, size is "<<invite_list.size();
+	LOG_WRITE_INFO(log_msg.str());
+	getc(stdin);	
+	worker_thread_idx=1;
+	invite_list.clear();
+	ddr.LoadExecutingInviteCmdList(g_gbdownlinker_device_id, worker_thread_idx, &invite_list);
+	log_msg.str("");
+	log_msg<<"load invite of thread 1, size is "<<invite_list.size();
+	LOG_WRITE_INFO(log_msg.str());
+	getc(stdin);
+	
+	LOG_WRITE_INFO("test delete by worker_thread_idx");
+	ddr.DeleteExecutingInviteCmdList(g_gbdownlinker_device_id, 1);
+	sleep(7);	
+	worker_thread_idx=0;
+	invite_list.clear();
+	ddr.LoadExecutingInviteCmdList(g_gbdownlinker_device_id, worker_thread_idx, &invite_list);
+	log_msg.str("");
+	log_msg<<"load invite of thread 0, size is "<<invite_list.size();
+	LOG_WRITE_INFO(log_msg.str());
+	getc(stdin);	
+	worker_thread_idx=1;
+	invite_list.clear();
+	ddr.LoadExecutingInviteCmdList(g_gbdownlinker_device_id, worker_thread_idx, &invite_list);
+	log_msg.str("");
+	log_msg<<"load invite of thread 1, size is "<<invite_list.size();
+	LOG_WRITE_INFO(log_msg.str());
+	getc(stdin);
+
+	LOG_WRITE_INFO("delete all invite");
+	ddr.DeleteExecutingInviteCmdList(g_gbdownlinker_device_id, 0);
+	getchar();
+}
+
 
 void TestDDRInSentinelMode()
 {
@@ -154,9 +400,13 @@ void TestDDRInSentinelMode()
 	if(ddr.Start()==RESTORER_FAIL)
 		return;
 
+	ddr.PrepareLoadData(g_gbdownlinker_device_id, 3);
+
 //	while(true)
 	{
-		LoopProcessDevice(ddr);
+	//	LoopProcessDevice(ddr);
+//		LoopProcessChannel(ddr);
+//		LoopProcessExecutingInviteCmd(ddr);
 
 //		LOG(WARNING)<<"wait to loop";
 //		sleep(10);

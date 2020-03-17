@@ -7,6 +7,7 @@ namespace GBGateway{
 
 class CDownDataRestorerMySql : public CDownDataRestorer {
 public:
+	~CDownDataRestorerMySql();
 	int Init(const RestorerParamPtr& restorer_param);
 	int Uninit();
     int Start();

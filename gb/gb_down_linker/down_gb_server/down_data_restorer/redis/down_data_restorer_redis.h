@@ -56,7 +56,7 @@ public:
 	int UpdateChannelList(const std::string& gbdownlinker_device_id, Channel* channel);	
 	int DeleteChannelList(const std::string& gbdownlinker_device_id);
 	int DeleteChannelList(const std::string& gbdownlinker_device_id, const std::string& device_id);
-	int DeleteChannelList(const std::string& gbdownlinker_device_id, const std::string& device_id, const std::string& device_channel_id);
+	int DeleteChannelList(const std::string& gbdownlinker_device_id, const std::string& device_id, const std::string& channel_device_id);
 
 	int LoadExecutingInviteCmdList(const std::string& gbdownlinker_device_id, int worker_thread_idx, std::list<ExecutingInviteCmdPtr>* executing_invite_cmd_lists);
 	int InsertExecutingInviteCmdList(const std::string& gbdownlinker_device_id, int worker_thread_idx, ExecutingInviteCmd* executinginvitecmd);
@@ -75,6 +75,9 @@ private:
     static void* DataRestorerThreadFuncWrapper(void* arg);
     void DataRestorerThreadFunc();
 	void KillDataRestorerThread();
+
+	void DebugPrint(const std::list<std::string>& key_list);
+	void ResetKeyList();
 
 private:
 	//ErrorReportCallback error_callback_;

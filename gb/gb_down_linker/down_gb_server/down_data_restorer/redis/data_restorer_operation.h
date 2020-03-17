@@ -15,9 +15,9 @@ namespace GBGateway {
 
 struct DataRestorerOperation;
 
-void PushEntity(DataRestorerOperation operation, Device* device);
-void PushEntity(DataRestorerOperation operation, Channel* channel);
-void PushEntity(DataRestorerOperation operation, ExecutingInviteCmd* invite);
+bool PushEntity(DataRestorerOperation& operation, Device* device);
+bool PushEntity(DataRestorerOperation& operation, Channel* channel);
+bool PushEntity(DataRestorerOperation& operation, ExecutingInviteCmd* invite);
 	
 Device* CopyDevice(Device* d);
 Channel* CopyChannel(Channel* c);
@@ -30,6 +30,8 @@ struct DataRestorerOperation{
 		INSERT,
 		UPDATE,
 		DELETE,
+		DELETE_CHANNEL_BY_ID,
+		DELETE_CHANNEL_BY_DEVICE_ID,
 		CLEAR,
 	} operation_type;
 
@@ -43,13 +45,20 @@ struct DataRestorerOperation{
 	std::string gbdownlinker_device_id;
 	int worker_thread_idx;
 
-	std::string entity_id;
+	// Device
+	std::string device_id;
+
+	// Channel
+	std::string channel_device_id;
+	std::string channel_channel_device_id;
+
+	// ExecutingInviteCmd
 	std::string invite_cmd_sender_id;
 	std::string invite_device_id;
 	int64_t invite_cmd_seq;
 
 	
-	std::list<void*> entities; // pointer released in DownDataRestorer, after command sent
+	std::list<void*> entities; // pointer released in DownDataRestorer, after command processed
 
 	// list<shared_ptr<void> > entities; 
 
@@ -65,130 +74,14 @@ struct DataRestorerOperation{
 		entity_type = EntityType::UNKNOWN_ENTITY;
 		gbdownlinker_device_id = "";
 		worker_thread_idx = -1;
-		entity_id = "";
+		device_id = "";
+		channel_device_id="";
+		channel_channel_device_id="";
 		invite_cmd_sender_id = "";
 		invite_device_id = "";
 		invite_cmd_seq = 0;
 		entities.clear();
 	}
-    
-	//DataRestorerOperation(std::string gbdownlinker_device_id, OperationType operation_type, EntityType entity_type, void* entity, int worker_thread_idx)
-	//{
-	//	gbdownlinker_device_id = gbdownlinker_device_id;
-	//	gbdownlinker_device_id=operation_type;
-	//	entity_type=entity_type;
-	//	worker_thread_idx=worker_thread_idx;
-	//	
-	//	if(operation_type==INSERT  ||  operation_type==DELETE)
-	//	{
-	//		switch(entity_type)
-	//		{
-	//		case DEVICE:
-	//			{
- //               Device* device=(Device*)entity;
-	//			LOG_WRITE_INFO("to copy Device");
-	//			// void* new_entity=(void*)(new Device(*device));
-	//			void* new_entity=DeviceCopy(device);				
-	//			LOG_WRITE_INFO("copy device ok");	
-	//			// std::unique_ptr<Device> device_ptr = device->Clone();
-	//			// new_entity=(void*)device_ptr.get();
-	//			
-	//			entities.push_back(new_entity);
- //               }
-	//			break;
-	//		case CHANNEL:
-	//			{
- //               Channel* channel=(Channel*)entity;
-	//			// void* new_entity=(void*)(new Channel(*channel));
-	//			void* new_entity=(void*)(ChannelCopy(channel));
-	//			
-	//			// std::unique_ptr<Channel> new_entity = channel->Clone();
-	//			
-	//			entities.push_back(new_entity);
-	//			}
- //               break;
- //           case EXECUTING_INVITE_CMD:
-	//			{
- //               ExecutingInviteCmd* cmd=(ExecutingInviteCmd*)entity;
-	//			// void* new_entity=(void*)(new ExecutingInviteCmd(*cmd));
-	//			void* new_entity=(void*)(ExecutingInviteCmdCopy(cmd));
-	//			
-	//			// std::unique_ptr<ExecutingInviteCmd> new_entity = cmd->Clone();
-	//			
-	//			entities.push_back(new_entity);
-	//			}
- //               break;
- //           default:
-	//			assert(false);
-	//		}
-	//	}
-	//	else if(operation_type==CLEAR)
-	//	{
-	//		
-	//	}
-	//	else
-	//	{
-	//		assert(false);
-	//	}
-	//}
-	//
-	//DataRestorerOperation(std::string gbdownlinker_device_id, OperationType operation_type, EntityType entity_type, const list<void*>& entities, int worker_thread_idx)
-	//{
-	//	gbdownlinker_device_id = gbdownlinker_device_id;
-	//	gbdownlinker_device_id=operation_type;
-	//	entity_type=entity_type;
-	//	worker_thread_idx=worker_thread_idx;
-	//	
-	//	if(operation_type==UPDATE)
-	//	{
-	//		switch(entity_type)
-	//		{
-	//		case DEVICE:
-	//			for(list<void*>::const_iterator it=entities.begin(); it!=entities.end(); ++it)
-	//			{
-	//				Device* device=(Device*)(*it);
-	//				// void* new_entity=(void*)(new Device(*device));
-	//				void* new_entity=(void*)(DeviceCopy(device));	
-	//				
-	//				// std::unique_ptr<Device> new_entity = device->Clone();
-	//				entities.push_back(new_entity);
-	//			}
-	//			break;
-	//		case CHANNEL:
-	//			for(list<void*>::const_iterator it=entities.begin(); it!=entities.end(); ++it)
-	//			{
-	//				Channel* channel=(Channel*)(*it);
-	//				// void* new_entity=(void*)(new Channel(*channel));
-	//				void* new_entity=(void*)(ChannelCopy(channel));
-
-	//				// std::unique_ptr<Channel> new_entity = channel->Clone();
-	//				
-	//				entities.push_back(new_entity);
-	//			}
-	//			break;
-	//		case EXECUTING_INVITE_CMD:
-	//			for(list<void*>::const_iterator it=entities.begin(); it!=entities.end(); ++it)
-	//			{
-	//				ExecutingInviteCmd* cmd=(ExecutingInviteCmd*)(*it);
-	//				// void* new_entity=(void*)(new ExecutingInviteCmd(*cmd));
-	//				void* new_entity=(void*)(ExecutingInviteCmdCopy(cmd));
-	//				
-	//				// std::unique_ptr<ExecutingInviteCmd> new_entity = cmd->Clone();
-	//				
-	//				entities.push_back(new_entity);
-	//			}
-	//			break;
-	//		default:
-	//			assert(false);
-	//		}
-	//	}
-	//	else
-	//	{
-	//		assert(false);
-	//	}
-	//}
-
-
 
 	DataRestorerOperation& operator=(const DataRestorerOperation& op)
 	{
@@ -196,7 +89,9 @@ struct DataRestorerOperation{
 		entity_type=op.entity_type;
 		gbdownlinker_device_id = op.gbdownlinker_device_id;
 		worker_thread_idx = op.worker_thread_idx;
-		entity_id = op.entity_id;
+		device_id = op.device_id;
+		channel_device_id = op.channel_device_id;
+		channel_channel_device_id = op.channel_channel_device_id;
 		invite_cmd_sender_id = op.invite_cmd_sender_id;
 		invite_device_id = op.invite_device_id;
 		invite_cmd_seq = op.invite_cmd_seq;
@@ -206,6 +101,8 @@ struct DataRestorerOperation{
         {
             entities.push_back(*it);
         }
+		//LOG_WRITE_INFO("operator= DataRestorerOperation");
+		
         return *this;
 	}
 };

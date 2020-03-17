@@ -7,6 +7,7 @@ namespace GBGateway {
 
 class CDownDataRestorerSqlite : public CDownDataRestorer {
 public:
+	~CDownDataRestorerSqlite(); 
 	int Init(const RestorerParamPtr& restorer_param);
     int Uninit();
     int Start();

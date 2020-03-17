@@ -1,4 +1,5 @@
 #include"serialize_entity.h"
+#include<cassert>
 
 namespace GBGateway {
 
@@ -79,6 +80,8 @@ void loadtime(DBInStream& in, TimePtr& timeptr)
 	}
 	else
 	{	
+		assert(flag==1);
+
 		struct tm* time=(struct tm*)malloc(sizeof(struct tm));
 		in>>time->tm_sec;
 		in>>time->tm_min;
@@ -96,10 +99,15 @@ void loadtime(DBInStream& in, TimePtr& timeptr)
 
 void savechannellist(const ChannelListPtr& channellist, DBOutStream& out)
 {
+	if(channellist==nullptr)
+	{
+		out<<static_cast<uint32_t>(0);
+		return;
+	}
+
 	ChannelListPtr channel_list=channellist->Clone();
 	std::list<ChannelPtr>& channelptr_list=channel_list->GetChannelList();
 	
-	//out<<static_cast<uint32_t>(channel_list->size());
 	out<<static_cast<uint32_t>(channel_list->GetChannelCount());	
 
 	for(ChannelPtr& channel_ptr : channelptr_list)
@@ -109,9 +117,24 @@ void savechannellist(const ChannelListPtr& channellist, DBOutStream& out)
 	}
 }
 
+//void savechannellist(const ChannelListPtr& channellist, DBOutStream& out)
+//{
+//	std::list<ChannelPtr>& channelptr_list=channellist->GetChannelList();
+//	
+//	out<<static_cast<uint32_t>(channellist->GetChannelCount());	
+//
+//	for(ChannelPtr& channel_ptr : channelptr_list)
+//	{
+//		out<<channel_ptr->deviceId;
+//		out<<channel_ptr->channelDeviceId;
+//	}
+//}
+
 void loadchannellist(DBInStream& in, ChannelListPtr& channellist)
 {
 	channellist=std::make_unique<CChannelList>();
+//	if(channellist==nullptr)
+//		return;
 	
 	uint32_t channel_size;
 	in>>channel_size;
@@ -127,7 +150,9 @@ void loadchannellist(DBInStream& in, ChannelListPtr& channellist)
 			continue;
 		channel_ptr->deviceId=deviceId;
 		channel_ptr->channelDeviceId=channelDeviceId;
-		channellist->GetChannelList().push_back(std::move(channel_ptr));
+
+		if(channellist!=nullptr)
+			channellist->GetChannelList().push_back(std::move(channel_ptr));
 	}
 }
 

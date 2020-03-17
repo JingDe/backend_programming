@@ -2220,7 +2220,26 @@ bool RedisClient::scanKeys(const string& queryKey, uint32_t count, list<string> 
 	return keys.size()>0 ? true : false;
 }
 
-bool RedisClient::getKeys(const string & queryKey,list < string > & keys)
+bool RedisClient::getKeys(const string& queryKey, list < string >& keys)
+{
+	if(m_redisMode==CLUSTER_MODE)
+		return getKeysInCluster(queryKey, keys);
+
+	list<RedisCmdParaInfo> paraList;
+	int32_t paraLen = 0;
+	fillCommandPara("keys", 4, paraList);
+	paraLen += 15;
+	string key = queryKey + "*";
+	fillCommandPara(key.c_str(), key.length(), paraList);
+	paraLen += key.length() + 20;
+
+	bool success = false;
+	success = doRedisCommand("", paraLen, paraList, RedisCommandType::REDIS_COMMAND_KEYS, keys);
+	freeCommandList(paraList);
+	return success;
+}
+
+bool RedisClient::getKeysInCluster(const string & queryKey,list < string > & keys)
 {
 	//need send to all master cluster
 	list<RedisCmdParaInfo> paraList;

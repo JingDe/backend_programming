@@ -119,52 +119,6 @@ typedef struct RedisLockInfoTag
 typedef map<string, RedisClusterInfo> REDIS_CLUSTER_MAP;
 
 typedef map<uint16_t, string> REDIS_SLOT_MAP; // key is slot, value is clusterId
-//
-//struct RedisCommandType
-//{
-//	enum{
-//		REDIS_COMMAND_UNKNOWN = 0,
-//		
-//		REDIS_COMMAND_READ_TYPE_START,	// read type cmd
-//		REDIS_COMMAND_GET,
-//		REDIS_COMMAND_EXISTS,
-//		REDIS_COMMAND_DBSIZE,
-//		REDIS_COMMAND_ZCOUNT,
-//		REDIS_COMMAND_ZCARD,
-//		REDIS_COMMAND_ZSCORE,
-//		REDIS_COMMAND_ZRANGEBYSCORE,
-//		REDIS_COMMAND_SCARD,
-//		REDIS_COMMAND_SISMEMBER,
-//		REDIS_COMMAND_SMEMBERS,
-//		REDIS_COMMAND_READ_TYPE_END,	// read type cmd
-//
-//		REDIS_COMMAND_WRITE_TYPE_START, // write type cmd
-//		REDIS_COMMAND_SET,
-//		REDIS_COMMAND_DEL,
-//		REDIS_COMMAND_EXPIRE,
-//		REDIS_COMMAND_ZADD,
-//		REDIS_COMMAND_ZREM,
-//		REDIS_COMMAND_ZINCRBY,
-//		REDIS_COMMAND_ZREMRANGEBYSCORE,
-//		REDIS_COMMAND_SADD,
-//		REDIS_COMMAND_SREM,
-//		REDIS_COMMAND_WRITE_TYPE_END,	// write type cmd
-//		
-//		REDIS_COMMAND_FOR_STAND_ALONE_MODE_START,
-//		REDIS_COMMAND_WATCH,
-//		REDIS_COMMAND_UNWATCH,
-//		REDIS_COMMAND_MULTI,
-//		REDIS_COMMAND_EXEC,
-//		REDIS_COMMAND_DISCARD,		
-//		REDIS_COMMAND_FOR_STAND_ALONE_MODE_END,
-//	        
-//		REDIS_COMMAND_TO_SENTINEL_NODES_START,	// command to sentinel nodes
-//        REDIS_COMMAND_SENTINEL_GET_MASTER_ADDR,
-//        REDIS_COMMAND_INFO_REPLICATION,
-//        REDIS_COMMAND_TO_SENTINEL_NODES_END,	// command to sentinel nodes
-//	};
-//};
-
 
 
 enum RedisCommandType{
@@ -183,6 +137,7 @@ enum RedisCommandType{
 	REDIS_COMMAND_SCARD,
 	REDIS_COMMAND_SISMEMBER,
 	REDIS_COMMAND_SMEMBERS,
+	REDIS_COMMAND_KEYS,
 	REDIS_COMMAND_READ_TYPE_END,	// read type cmd
 
 	REDIS_COMMAND_WRITE_TYPE_START, // write type cmd
@@ -271,6 +226,7 @@ public:
 	bool scanKeys(const string& queryKey, uint32_t count, list<string> &keys, ScanMode scanMode);
 	//for query operation.
 	bool getKeys(const string& queryKey, list<string>& keys);
+	bool getKeysInCluster(const string& queryKey, list<string>& keys);
 //	bool getSerials(const string& key, map<string,RedisSerialize> &serials);
 	
 	bool zadd(const string& key,const string& member, int score);
@@ -888,6 +844,7 @@ bool RedisClient::ParseRedisReplyForStandAloneAndMasterMode(
 			break;
 		case RedisCommandType::REDIS_COMMAND_ZRANGEBYSCORE:
 		case RedisCommandType::REDIS_COMMAND_SMEMBERS:
+		case RedisCommandType::REDIS_COMMAND_KEYS:
 			if(parseGetKeysReply(replyInfo, members)==false)
 				return false;
 			break;		

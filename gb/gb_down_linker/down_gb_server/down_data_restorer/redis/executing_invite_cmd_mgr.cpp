@@ -34,7 +34,7 @@ int ExecutingInviteCmdMgr::GetInviteKeyList(const std::string& gbdownlinker_devi
 int ExecutingInviteCmdMgr::GetInviteKeyList(const std::string& gbdownlinker_device_id, int worker_thread_idx, std::list<std::string>& invite_key_list)
 {
 	invite_key_list.clear();
-	std::string key_prefix = std::string("{downlinker.invite}:") + gbdownlinker_device_id + std::to_string(worker_thread_idx);
+	std::string key_prefix = std::string("{downlinker.invite}:") + gbdownlinker_device_id + std::string(":") + std::to_string(worker_thread_idx);
 	redis_client_->getKeys(key_prefix, invite_key_list);
 	return 0;
 }

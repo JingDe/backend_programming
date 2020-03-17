@@ -37,7 +37,7 @@ private:
 	int ClearDeviceWithLockHeld();
 
 	RedisClient* redis_client_;
-	RWMutex rwmutex_;
+//	RWMutex rwmutex_;
 };
 
 } // namespace GBGateway

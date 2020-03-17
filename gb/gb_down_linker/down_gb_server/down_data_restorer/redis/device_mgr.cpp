@@ -9,8 +9,8 @@ namespace GBGateway {
 
 
 DeviceMgr::DeviceMgr(RedisClient* redis_client)
-	:redis_client_(redis_client),
-	rwmutex_()
+	:redis_client_(redis_client)//,
+//	rwmutex_()
 {
 	LOG_WRITE_INFO("DeviceMgr constructed");
 }
@@ -51,9 +51,16 @@ int DeviceMgr::LoadDevice(const std::string& gbdownlinker_device_id, std::list<D
 
 int DeviceMgr::InsertDevice(const std::string& gbdownlinker_device_id, const Device& device)
 {
-	WriteGuard guard(rwmutex_);
+//	WriteGuard guard(rwmutex_);
 
-	std::string device_key = std::string("{downlinker.device}:") + gbdownlinker_device_id + ":" + device.deviceId;
+	std::stringstream log_msg;
+	
+	
+	std::string device_key = std::string("{downlinker.device}:") + gbdownlinker_device_id + std::string(":") + device.deviceId;
+	
+	log_msg<<"insert device_key is "<<device_key;
+	LOG_WRITE_INFO(log_msg.str());
+
 	if(redis_client_->setSerial(device_key, device)==false)
 	{
 		return -1;
@@ -68,7 +75,7 @@ int DeviceMgr::UpdateDevice(const std::string& gbdownlinker_device_id, const Dev
 
 int DeviceMgr::DeleteDevice(const std::string& gbdownlinker_device_id, const std::string& device_id)
 {
-	WriteGuard guard(rwmutex_);
+//	WriteGuard guard(rwmutex_);
 
 	std::string device_key = std::string("{downlinker.device}:") + gbdownlinker_device_id + ":" + device_id;
 	if(redis_client_->del(device_key)==false)
@@ -79,7 +86,7 @@ int DeviceMgr::DeleteDevice(const std::string& gbdownlinker_device_id, const std
 
 int DeviceMgr::ClearDevice(const std::string& gbdownlinker_device_id)
 {
-	WriteGuard guard(rwmutex_);
+//	WriteGuard guard(rwmutex_);
 
 	std::list<std::string> device_key_list;
 	GetDeviceKeyList(gbdownlinker_device_id, device_key_list);
@@ -93,7 +100,7 @@ int DeviceMgr::ClearDevice(const std::string& gbdownlinker_device_id)
 
 size_t DeviceMgr::GetDeviceCount(const std::string& gbdownlinker_device_id)
 {
-	ReadGuard guard(rwmutex_);
+//	ReadGuard guard(rwmutex_);
 	std::list<std::string> device_key_list;
 	GetDeviceKeyList(gbdownlinker_device_id, device_key_list);
 	return device_key_list.size();
