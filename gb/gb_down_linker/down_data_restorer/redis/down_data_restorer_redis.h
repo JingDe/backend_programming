@@ -31,7 +31,9 @@ public:
 	CDownDataRestorerRedis();
 	~CDownDataRestorerRedis();
 
-	int Init(const RestorerParamPtr& restorer_param);
+	void RedisClientCallback(RedisClientStatus status);
+
+	int Init(const RestorerParamPtr& restorer_param, RestorerWorkHealthy initialRestorerWorkHealthy);
 	int Uninit();
 	int Start();
 	int Stop();
@@ -66,7 +68,9 @@ private:
 	void DataRestorerThreadFunc();
 	void StopDataRestorerThread();
 
-	void DebugPrint(const std::list<std::string>& key_list);
+	void StopRedisClient();
+	void StopRestorerMgr();
+	void ClearOperationQueue();
 
 private:
 	//ErrorReportCallback errorCallback_;
@@ -84,13 +88,12 @@ private:
 	mutable std::mutex operationQueueMutex_;
 	std::condition_variable operationQueueNotEmptyCondvar_;
 	std::queue<DataRestorerOperation> operationQueue_;
-	size_t maxQueueSize_;
-
-//	std::string gbDownlinkerDeviceId_;
-//	std::list<std::string> deviceKeyList_;
-//	std::list<std::string> channelKeyList_;
-//	std::list<std::string> inviteKeyList_;
-//	std::vector<std::list<std::string> > inviteKeyLists_;
+//	size_t maxQueueSize_;
+	
+	size_t unrecoverableQueueThreshold;
+	RestorerWorkStatus workStatus_;
+	bool needClearBackupData_;
+	std::function<void(RestorerWorkHealthy)> callback_;
 };
 
 } // namespace GBDownLinker

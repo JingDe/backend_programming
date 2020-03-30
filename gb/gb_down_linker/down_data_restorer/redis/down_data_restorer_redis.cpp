@@ -14,15 +14,6 @@
 
 namespace GBDownLinker {
 
-#define CHECK_CONDITION(condition, err_msg) do{\
-			if(!condition)\
-			{\
-				std::stringstream log_msg;\
-				log_msg << err_msg;\
-				LOG_WRITE_ERROR(log_msg.str());\
-				return RESTORER_FAIL;\
-			}\
-		}while(0);
 
 static bool ParseChannelKey(const std::string& channel_key, std::string& device_id, std::string& channelDeviceId)
 {
@@ -61,6 +52,32 @@ static bool ParseInviteKey(const std::string& invite_key, int& workerThreadIdx, 
 	return true;
 }
 
+// compare channel.device_id to device.id
+static bool CompareChannelDeviceId(std::string device_key, const std::string& channel_key_device_id)
+{
+	std::string device_id;
+	std::string::size_type pos = device_key.rfind(':');
+	if (pos == string::npos)
+		return false;
+	device_id = device_key.substr(pos + 1);
+	return device_id == channel_key_device_id;
+}
+
+class ChannelDeviceIdComparator : public std::binary_function<std::string, std::string, bool>
+{
+public:
+	bool operator()(const std::string& device_key, const std::string& channel_key_device_id) const
+	{
+		std::string device_id;
+		std::string::size_type pos = device_key.rfind(':');
+		if (pos == string::npos)
+			return false;
+		device_id = device_key.substr(pos + 1);
+		return device_id == channel_key_device_id;
+	}
+};
+
+
 CDownDataRestorerRedis::CDownDataRestorerRedis()
 	:redisMode_(STAND_ALONE_OR_PROXY_MODE),
 	redisClient_(NULL),
@@ -74,7 +91,10 @@ CDownDataRestorerRedis::CDownDataRestorerRedis()
 	operationQueueMutex_(),
 	operationQueueNotEmptyCondvar_(),
 	operationQueue_(),
-	maxQueueSize_(1000)
+//	maxQueueSize_(30000),
+	unrecoverableQueueThreshold(30000),
+	workStatus_(Normal),
+	needClearBackupData_(false)
 {
 	LOG_WRITE_INFO("CDownDataRestorerRedis constructed ok");
 }
@@ -89,26 +109,69 @@ CDownDataRestorerRedis::~CDownDataRestorerRedis()
 		Uninit();
 }
 
-int CDownDataRestorerRedis::Init(const RestorerParamPtr& restorer_param/*, ErrorReportCallback error_callback*/)
+void CDownDataRestorerRedis::RedisClientCallback(RedisClientStatus clientStatus)
+{
+	std::stringstream log_msg;
+	log_msg << "RedisClient status transfer to " << clientStatus;
+	LOG_WRITE_INFO(log_msg.str());
+
+	if(workStatus_==UnrecoverableException)
+	{
+		// ignore
+		StopRedisClient();
+		return;
+	}
+
+	if (workStatus_ == Normal  &&  clientStatus != RedisClientNormal)
+	{
+		workStatus_ = RecoverableException;
+
+		//CManager::AddException(Exception::RESTORER);
+		callback_(Unhealthy);
+		return;
+	}
+	
+	if (workStatus_ == RecoverableException  &&  clientStatus == RedisClientNormal)
+	{
+		workStatus_ = Normal;
+		if (needClearBackupData_)
+		{
+			ClearBackupData();
+			needClearBackupData_ = false;
+		}
+	
+		callback_(Healthy);
+	}
+}
+
+int CDownDataRestorerRedis::Init(const RestorerParamPtr& restorer_param, RestorerWorkHealthy initialRestorerWorkHealthy, std::function<void(RestorerWorkHealthy)> callback)
 {
 	if (inited_)
 	{
 		LOG_WRITE_WARNING("init called repeatedly");
-		return RESTORER_FAIL;
+		return RESTORER_OK;
 	}
 
 	assert(restorer_param->type == RestorerParam::Type::Redis);
 
 	std::stringstream log_msg;
 
+	needClearBackupData_ = false;
+
 	assert(redisClient_ == NULL);
 	redisClient_ = new RedisClient();
 	if (redisClient_ == NULL)
 	{
-		LOG_WRITE_ERROR("create RedisClient failed");
+		LOG_WRITE_FATAL("create RedisClient failed");
+		workStatus_=UnrecoverableException;
+		StopRedisClient();
+		if(initialRestorerWorkHealthy==true)
+		{
+			callback_(Unhealthy);
+		}
 		return RESTORER_FAIL;
 	}
-	//errorCallback_=error_callback;
+	callback_=callback;
 	redisMode_ = SENTINEL_MODE;
 
 	REDIS_SERVER_LIST redis_server_list;
@@ -124,17 +187,66 @@ int CDownDataRestorerRedis::Init(const RestorerParamPtr& restorer_param/*, Error
 	uint32_t read_timeout_ms = 3000;
 	std::string passwd = "";
 
-	if (redisClient_->init(redisMode_, redis_server_list, master_name, 1, connect_timeout_ms, read_timeout_ms, passwd) == false)
-	{
-		LOG_WRITE_ERROR("init RedisClient failed");
-		delete redisClient_;
-		redisClient_ = NULL;
-		return RESTORER_FAIL;
-	}
+	RedisClientInitResult init_result = redisClient_->init(redisMode_, redis_server_list, master_name, 1, connect_timeout_ms, read_timeout_ms, passwd);
 
-	inited_ = true;
-	return RESTORER_OK;
+	if (initialRestorerWorkHealthy == true)
+	{
+		if (init_result == InitSuccess)
+		{
+			workStatus_ = Normal;
+			inited_=true;
+			
+			return RESTORER_OK;
+		}
+		else if(init_result==RecoverableFail)
+		{
+			workStatus_ = RecoverableException;
+			needClearBackupData_ = true;
+			inited_=true;
+			
+			callback_(Unhealthy);
+			return RESTORER_OK;
+		}
+		else if(init_result==UnrecoverableFail)
+		{
+			workStatus_=UnrecoverableException;
+			StopRedisClient();
+			inited_=false;
+			
+			callback_(Unhealthy);
+			return RESTORER_FAIL;
+		}
+	}
+	else
+	{
+		if (init_result == InitSuccess)
+		{
+			workStatus_ = Normal;
+			needClearBackupData_ = true;
+			inited_=true;
+			
+			callback_(Healthy);
+			return RESTORER_OK;
+		}
+		else if(init_result==RecoverableFail)
+		{
+			workStatus_ = RecoverableException;
+			needClearBackupData_ = true;
+			inited_=true;
+			
+			return RESTORER_OK;
+		}
+		else
+		{
+			workStatus_=UnrecoverableException;
+			StopRedisClient();
+			inited_=false;
+			
+			return RESTORER_FAIL;
+		}
+	}
 }
+
 
 int CDownDataRestorerRedis::Uninit()
 {
@@ -150,17 +262,38 @@ int CDownDataRestorerRedis::Uninit()
 	return RESTORER_OK;
 }
 
+void CDownDataRestorerRedis::StopRedisClient()
+{
+	if(redisClient_)
+	{
+		redisClient_->freeRedisClient();
+		delete redisClient_;
+		redisClient_=NULL;
+	}
+
+	// TODO
+//	Stop();
+}
+
 int CDownDataRestorerRedis::Start()
 {
 	if (!inited_)
 	{
-		LOG_WRITE_WARNING("please init CDownDataRestorerRedis first");
+		LOG_WRITE_ERROR("please init CDownDataRestorerRedis first");
 		return RESTORER_FAIL;
 	}
 
 	if (started_)
 	{
-		LOG_WRITE_WARNING("start called repeatedly");
+		LOG_WRITE_WARNING("CDownDataRestorerRedis has started");
+		return RESTORER_OK;
+	}
+
+	if(workStatus_==UnrecoverableException)
+	{
+		StopRedisClient();
+	
+		callback_(Unhealthy);
 		return RESTORER_FAIL;
 	}
 
@@ -174,13 +307,13 @@ int CDownDataRestorerRedis::Start()
 		goto CLEAR;
 	}
 
-	try 
+	try
 	{
-		dataRestorerThread_=std::make_unique<std::thread>(&CDownDataRestorerRedis::DataRestorerThreadFuncWrapper, this);
-	} 
-	catch (const std::exception& e)
+		dataRestorerThread_ = std::make_unique<std::thread>(&CDownDataRestorerRedis::DataRestorerThreadFuncWrapper, this);
+	}
+	catch (const std::exception & e)
 	{
-		LOG_WRITE_ERROR("start data restorer thread failed");
+		LOG_WRITE_FATAL("start data restorer thread failed");		
 		goto CLEAR;
 	}
 
@@ -188,31 +321,29 @@ int CDownDataRestorerRedis::Start()
 	return RESTORER_OK;
 
 CLEAR:
-	if (deviceMgr_)
-	{
-		delete deviceMgr_;
-		deviceMgr_ = NULL;
-	}
-	if (channelMgr_)
-	{
-		delete channelMgr_;
-		channelMgr_ = NULL;
-	}
-	if (inviteMgr_)
-	{
-		delete inviteMgr_;
-		inviteMgr_ = NULL;
-	}
+	StopRestorerMgr();
+	workStatus_=UnrecoverableException;
+	StopRedisClient();
+	
+	callback_(Unhealthy);
 	return RESTORER_FAIL;
 }
 
 int CDownDataRestorerRedis::Stop()
 {
-	CHECK_CONDITION(started_, "CDownDataRestorerRedis not started");
+	CHECK_CONDITION_LOG(started_, "CDownDataRestorerRedis not started");
 	LOG_WRITE_INFO("CDownDataRestorerRedis stop now");
 
-	StopDataRestorerThread();	
-	
+	StopDataRestorerThread();
+
+	StopRestorerMgr();
+
+	started_ = false;
+	return RESTORER_OK;
+}
+
+void CDownDataRestorerRedis::StopRestorerMgr()
+{
 	if (deviceMgr_)
 	{
 		delete deviceMgr_;
@@ -228,14 +359,11 @@ int CDownDataRestorerRedis::Stop()
 		delete inviteMgr_;
 		inviteMgr_ = NULL;
 	}
-
-	started_ = false;
-	return RESTORER_OK;
 }
 
 void CDownDataRestorerRedis::StopDataRestorerThread()
 {
-	forceThreadExit_=true;
+	forceThreadExit_ = true;
 	operationQueueNotEmptyCondvar_.notify_all();
 	dataRestorerThread_->join();
 }
@@ -246,12 +374,49 @@ void CDownDataRestorerRedis::DataRestorerThreadFuncWrapper(void* arg)
 	down_data_restorer->DataRestorerThreadFunc();
 }
 
+void CDownDataRestorerRedis::ClearOperationQueue()
+{
+	std::lock_guard<std::mutex> guard(operationQueueMutex_);
+	operationQueue_.clear();
+}
+
 void CDownDataRestorerRedis::DataRestorerThreadFunc()
 {
 	LOG_WRITE_INFO("restorer thread started");
 
 	while (!forceThreadExit_)
 	{
+		if (workStatus_ == UnrecoverableException)
+		{
+			ClearOperationQueue();
+			StopRedisClient();
+			callback_(Unhealthy);
+			break;
+		}
+		else if (workStatus_ == RecoverableException)
+		{
+			size_t queue_size = 0;
+			{
+				std::lock_guard<std::mutex> guard(operationQueueMutex_);
+				queue_size = operationQueue_.size();
+			}
+
+			if (queue_size > unrecoverableQueueThreshold)
+			{
+				workStatus_ = UnrecoverableException;
+				ClearOperationQueue();
+				StopRedisClient();
+				callback_(Unhealthy);
+				break;
+			}
+			else
+			{
+				continue;
+			}
+		}
+
+		assert(workStatus_ == Normal);
+
 		DataRestorerOperation operation;
 		{
 			std::unique_lock<std::mutex> lock(operationQueueMutex_);
@@ -259,7 +424,7 @@ void CDownDataRestorerRedis::DataRestorerThreadFunc()
 			{
 				if (forceThreadExit_)
 					break;
-				operationQueueNotEmptyCondvar_.wait(lock);
+				operationQueueNotEmptyCondvar_.wait_for(lock, std::chrono::seconds(5));
 			}
 			if (forceThreadExit_)
 				break;
@@ -365,47 +530,41 @@ int CDownDataRestorerRedis::GetStats()
 	return RESTORER_OK;
 }
 
-// compare channel.device_id to device.id
-static bool CompareChannelDeviceId(std::string device_key, const std::string& channel_key_device_id)
-{
-	std::string device_id;
-	std::string::size_type pos = device_key.rfind(':');
-	if (pos == string::npos)
-		return false;
-	device_id = device_key.substr(pos + 1);
-	return device_id == channel_key_device_id;
-}
 
-class ChannelDeviceIdComparator : public std::binary_function<std::string, std::string, bool>
-{
-public:
-	bool operator()(const std::string& device_key, const std::string& channel_key_device_id) const
+int CDownDataRestorerRedis::ClearBackupData(const std::string& gbDownlinkerDeviceId, int worker_thread_number)
+{	
+	if (started_)
 	{
-		std::string device_id;
-		std::string::size_type pos = device_key.rfind(':');
-		if (pos == string::npos)
-			return false;
-		device_id = device_key.substr(pos + 1);
-		return device_id == channel_key_device_id;
-	}
+		deviceMgr_->ClearDevice(gbDownlinkerDeviceId);
+		channelMgr_->ClearChannel(gbDownlinkerDeviceId);
 
-};
+		for (int idx = 0; i < worker_thread_number; ++idx)
+			inviteMgr_->ClearInvite(gbDownlinkerDeviceId, idx);
 
-void CDownDataRestorerRedis::DebugPrint(const std::list<std::string>& key_list)
-{
-	for (std::list<std::string>::const_iterator it = key_list.begin(); it != key_list.end(); ++it)
-	{
-		LOG_WRITE_INFO(*it);
+		return RESTORER_OK;
 	}
+	return RESTORER_FAIL;
 }
 
 int CDownDataRestorerRedis::PrepareLoadData(const std::string& gbDownlinkerDeviceId, int worker_thread_number)
 {
-	CHECK_CONDITION(started_, "please start CDownDataRestorerRedis first");
+	CHECK_CONDITION_LOG(started_, "please start CDownDataRestorerRedis first");
+	
+	if (needClearBackupData_)
+	{
+		ClearBackupData();
+		needClearBackupData_ = false;
+		return RESTORER_OK;
+	}
+	
+	if (workStatus_ != Normal)
+	{
+		return RESTORER_OK;
+	}
 
-    std::list<std::string> deviceKeyList;
-    std::list<std::string> channelKeyList;
-    std::list<std::string> inviteKeyList;
+	std::list<std::string> deviceKeyList;
+	std::list<std::string> channelKeyList;
+	std::list<std::string> inviteKeyList;
 
 	std::stringstream log_msg;
 
@@ -478,28 +637,29 @@ int CDownDataRestorerRedis::PrepareLoadData(const std::string& gbDownlinkerDevic
 
 int CDownDataRestorerRedis::LoadDeviceList(const std::string& gbDownlinkerDeviceId, std::list<DevicePtr>* device_list)
 {
-	CHECK_CONDITION(started_, "please start CDownDataRestorerRedis first");
-	device_list->clear();
-	{
+	CHECK_CONDITION_LOG(started_, "please start CDownDataRestorerRedis first");
+
+	if(workStatus_==Normal)
 		deviceMgr_->LoadDevice(gbDownlinkerDeviceId, device_list);
-	}
+
 	return RESTORER_OK;
 }
 
 int CDownDataRestorerRedis::InsertDeviceList(const std::string& gbDownlinkerDeviceId, Device* device)
 {
-	CHECK_CONDITION(started_, "please start CDownDataRestorerRedis first");
+	CHECK_CONDITION_LOG(started_, "please start CDownDataRestorerRedis first");
+	CHECK_CONDITION(workStatus_!=UnrecoverableException);
+
 	std::lock_guard<std::mutex> guard(operationQueueMutex_);
 
 	DataRestorerOperation operation;
 	operation.operationType = DataRestorerOperation::INSERT;
 	operation.entityType = DataRestorerOperation::DEVICE;
 	operation.gbDownlinkerDeviceId = gbDownlinkerDeviceId;
-	CHECK_CONDITION(PushEntity(operation, device), "push entity failed");
+	CHECK_CONDITION_LOG(PushEntity(operation, device), "push entity failed");
 
-	if (operationQueue_.size() > maxQueueSize_)
-		operationQueue_.pop();
-
+//	if (operationQueue_.size() > maxQueueSize_)
+//		operationQueue_.pop();
 	operationQueue_.push(operation);
 	operationQueueNotEmptyCondvar_.notify_one();
 	return RESTORER_OK;
@@ -512,7 +672,9 @@ int CDownDataRestorerRedis::UpdateDeviceList(const std::string& gbDownlinkerDevi
 
 int CDownDataRestorerRedis::DeleteDeviceList(const std::string& gbDownlinkerDeviceId, const std::string& device_id)
 {
-	CHECK_CONDITION(started_, "please start CDownDataRestorerRedis first");
+	CHECK_CONDITION_LOG(started_, "please start CDownDataRestorerRedis first");
+	CHECK_CONDITION(workStatus_!=UnrecoverableException);
+	
 	std::lock_guard<std::mutex> guard(operationQueueMutex_);
 
 	DataRestorerOperation operation;
@@ -521,8 +683,8 @@ int CDownDataRestorerRedis::DeleteDeviceList(const std::string& gbDownlinkerDevi
 	operation.gbDownlinkerDeviceId = gbDownlinkerDeviceId;
 	operation.deviceId = device_id;
 
-	if (operationQueue_.size() > maxQueueSize_)
-		operationQueue_.pop();
+//	if (operationQueue_.size() > maxQueueSize_)
+//		operationQueue_.pop();
 	operationQueue_.push(operation);
 	operationQueueNotEmptyCondvar_.notify_one();
 	return RESTORER_OK;
@@ -530,7 +692,9 @@ int CDownDataRestorerRedis::DeleteDeviceList(const std::string& gbDownlinkerDevi
 
 int CDownDataRestorerRedis::DeleteDeviceList(const std::string& gbDownlinkerDeviceId)
 {
-	CHECK_CONDITION(started_, "please start CDownDataRestorerRedis first");
+	CHECK_CONDITION_LOG(started_, "please start CDownDataRestorerRedis first");
+	CHECK_CONDITION(workStatus_!=UnrecoverableException);
+
 	std::lock_guard<std::mutex> guard(operationQueueMutex_);
 
 	DataRestorerOperation operation;
@@ -538,8 +702,8 @@ int CDownDataRestorerRedis::DeleteDeviceList(const std::string& gbDownlinkerDevi
 	operation.entityType = DataRestorerOperation::DEVICE;
 	operation.gbDownlinkerDeviceId = gbDownlinkerDeviceId;
 
-	if (operationQueue_.size() > maxQueueSize_)
-		operationQueue_.pop();
+//	if (operationQueue_.size() > maxQueueSize_)
+//		operationQueue_.pop();
 	operationQueue_.push(operation);
 	operationQueueNotEmptyCondvar_.notify_one();
 	return RESTORER_OK;
@@ -547,27 +711,29 @@ int CDownDataRestorerRedis::DeleteDeviceList(const std::string& gbDownlinkerDevi
 
 int CDownDataRestorerRedis::LoadChannelList(const std::string& gbDownlinkerDeviceId, std::list<ChannelPtr>* channel_list)
 {
-	CHECK_CONDITION(started_, "please start CDownDataRestorerRedis first");
-	channel_list->clear();
-	{
+	CHECK_CONDITION_LOG(started_, "please start CDownDataRestorerRedis first");
+
+	if(workStatus_==Normal)
 		channelMgr_->LoadChannel(gbDownlinkerDeviceId, channel_list);
-	}
+	
 	return RESTORER_OK;
 }
 
 int CDownDataRestorerRedis::InsertChannelList(const std::string& gbDownlinkerDeviceId, Channel* channel)
 {
-	CHECK_CONDITION(started_, "please start CDownDataRestorerRedis first");
+	CHECK_CONDITION_LOG(started_, "please start CDownDataRestorerRedis first");
+	CHECK_CONDITION(workStatus_!=UnrecoverableException);
+	
 	std::lock_guard<std::mutex> guard(operationQueueMutex_);
 
 	DataRestorerOperation operation;
 	operation.operationType = DataRestorerOperation::INSERT;
 	operation.entityType = DataRestorerOperation::CHANNEL;
 	operation.gbDownlinkerDeviceId = gbDownlinkerDeviceId;
-	CHECK_CONDITION(PushEntity(operation, channel), "push entity failed");
+	CHECK_CONDITION_LOG(PushEntity(operation, channel), "push entity failed");
 
-	if (operationQueue_.size() > maxQueueSize_)
-		operationQueue_.pop();
+//	if (operationQueue_.size() > maxQueueSize_)
+//		operationQueue_.pop();
 	operationQueue_.push(operation);
 	operationQueueNotEmptyCondvar_.notify_one();
 	return RESTORER_OK;
@@ -580,7 +746,9 @@ int CDownDataRestorerRedis::UpdateChannelList(const std::string& gbDownlinkerDev
 
 int CDownDataRestorerRedis::DeleteChannelList(const std::string& gbDownlinkerDeviceId, const std::string& device_id)
 {
-	CHECK_CONDITION(started_, "please start CDownDataRestorerRedis first");
+	CHECK_CONDITION_LOG(started_, "please start CDownDataRestorerRedis first");
+	CHECK_CONDITION(workStatus_!=UnrecoverableException);
+	
 	std::lock_guard<std::mutex> guard(operationQueueMutex_);
 
 	DataRestorerOperation operation;
@@ -589,8 +757,8 @@ int CDownDataRestorerRedis::DeleteChannelList(const std::string& gbDownlinkerDev
 	operation.gbDownlinkerDeviceId = gbDownlinkerDeviceId;
 	operation.channelDeviceId = device_id;
 
-	if (operationQueue_.size() > maxQueueSize_)
-		operationQueue_.pop();
+//	if (operationQueue_.size() > maxQueueSize_)
+//		operationQueue_.pop();
 	operationQueue_.push(operation);
 	operationQueueNotEmptyCondvar_.notify_one();
 	return RESTORER_OK;
@@ -598,7 +766,9 @@ int CDownDataRestorerRedis::DeleteChannelList(const std::string& gbDownlinkerDev
 
 int CDownDataRestorerRedis::DeleteChannelList(const std::string& gbDownlinkerDeviceId, const std::string& device_id, const std::string& channelDeviceId)
 {
-	CHECK_CONDITION(started_, "please start CDownDataRestorerRedis first");
+	CHECK_CONDITION_LOG(started_, "please start CDownDataRestorerRedis first");
+	CHECK_CONDITION(workStatus_!=UnrecoverableException);
+	
 	std::lock_guard<std::mutex> guard(operationQueueMutex_);
 
 	DataRestorerOperation operation;
@@ -608,8 +778,8 @@ int CDownDataRestorerRedis::DeleteChannelList(const std::string& gbDownlinkerDev
 	operation.channelDeviceId = device_id;
 	operation.channelChannelDeviceId = channelDeviceId;
 
-	if (operationQueue_.size() > maxQueueSize_)
-		operationQueue_.pop();
+//	if (operationQueue_.size() > maxQueueSize_)
+//		operationQueue_.pop();
 	operationQueue_.push(operation);
 	operationQueueNotEmptyCondvar_.notify_one();
 	return RESTORER_OK;
@@ -617,7 +787,9 @@ int CDownDataRestorerRedis::DeleteChannelList(const std::string& gbDownlinkerDev
 
 int CDownDataRestorerRedis::DeleteChannelList(const std::string& gbDownlinkerDeviceId)
 {
-	CHECK_CONDITION(started_, "please start CDownDataRestorerRedis first");
+	CHECK_CONDITION_LOG(started_, "please start CDownDataRestorerRedis first");
+	CHECK_CONDITION(workStatus_!=UnrecoverableException);
+	
 	std::lock_guard<std::mutex> guard(operationQueueMutex_);
 
 	DataRestorerOperation operation;
@@ -625,8 +797,8 @@ int CDownDataRestorerRedis::DeleteChannelList(const std::string& gbDownlinkerDev
 	operation.entityType = DataRestorerOperation::CHANNEL;
 	operation.gbDownlinkerDeviceId = gbDownlinkerDeviceId;
 
-	if (operationQueue_.size() > maxQueueSize_)
-		operationQueue_.pop();
+//	if (operationQueue_.size() > maxQueueSize_)
+//		operationQueue_.pop();
 	operationQueue_.push(operation);
 	operationQueueNotEmptyCondvar_.notify_one();
 	return RESTORER_OK;
@@ -634,8 +806,9 @@ int CDownDataRestorerRedis::DeleteChannelList(const std::string& gbDownlinkerDev
 
 int CDownDataRestorerRedis::LoadExecutingInviteCmdList(const std::string& gbDownlinkerDeviceId, int workerThreadIdx, std::list<ExecutingInviteCmdPtr>* executing_invite_cmd_lists)
 {
-	CHECK_CONDITION(started_, "please start CDownDataRestorerRedis first");
-	executing_invite_cmd_lists->clear();
+	CHECK_CONDITION_LOG(started_, "please start CDownDataRestorerRedis first");
+
+	if(workStatus_==Normal)
 	{
 		inviteMgr_->LoadInvite(gbDownlinkerDeviceId, workerThreadIdx, executing_invite_cmd_lists);
 	}
@@ -645,7 +818,9 @@ int CDownDataRestorerRedis::LoadExecutingInviteCmdList(const std::string& gbDown
 
 int CDownDataRestorerRedis::InsertExecutingInviteCmdList(const std::string& gbDownlinkerDeviceId, int workerThreadIdx, ExecutingInviteCmd* executing_invite_cmd)
 {
-	CHECK_CONDITION(started_, "please start CDownDataRestorerRedis first");
+	CHECK_CONDITION_LOG(started_, "please start CDownDataRestorerRedis first");
+	CHECK_CONDITION(workStatus_!=UnrecoverableException);
+	
 	std::lock_guard<std::mutex> guard(operationQueueMutex_);
 
 	DataRestorerOperation operation;
@@ -653,10 +828,10 @@ int CDownDataRestorerRedis::InsertExecutingInviteCmdList(const std::string& gbDo
 	operation.entityType = DataRestorerOperation::EXECUTING_INVITE_CMD;
 	operation.gbDownlinkerDeviceId = gbDownlinkerDeviceId;
 	operation.workerThreadIdx = workerThreadIdx;
-	CHECK_CONDITION(PushEntity(operation, executing_invite_cmd), "push entity failed");
+	CHECK_CONDITION_LOG(PushEntity(operation, executing_invite_cmd), "push entity failed");
 
-	if (operationQueue_.size() > maxQueueSize_)
-		operationQueue_.pop();
+//	if (operationQueue_.size() > maxQueueSize_)
+//		operationQueue_.pop();
 	operationQueue_.push(operation);
 	operationQueueNotEmptyCondvar_.notify_one();
 	return RESTORER_OK;
@@ -670,7 +845,9 @@ int CDownDataRestorerRedis::UpdateExecutingInviteCmdList(const std::string& gbDo
 
 int CDownDataRestorerRedis::DeleteExecutingInviteCmdList(const std::string& gbDownlinkerDeviceId, int workerThreadIdx, const std::string& inviteCmdSenderId, const std::string& device_id, const int64_t& cmd_seq)
 {
-	CHECK_CONDITION(started_, "please start CDownDataRestorerRedis first");
+	CHECK_CONDITION_LOG(started_, "please start CDownDataRestorerRedis first");
+	CHECK_CONDITION(workStatus_!=UnrecoverableException);
+	
 	std::lock_guard<std::mutex> guard(operationQueueMutex_);
 
 	DataRestorerOperation operation;
@@ -682,8 +859,8 @@ int CDownDataRestorerRedis::DeleteExecutingInviteCmdList(const std::string& gbDo
 	operation.inviteDeviceId = device_id;
 	operation.inviteCmdSeq = cmd_seq;
 
-	if (operationQueue_.size() > maxQueueSize_)
-		operationQueue_.pop();
+//	if (operationQueue_.size() > maxQueueSize_)
+//		operationQueue_.pop();
 	operationQueue_.push(operation);
 	operationQueueNotEmptyCondvar_.notify_one();
 	return RESTORER_OK;
@@ -692,7 +869,9 @@ int CDownDataRestorerRedis::DeleteExecutingInviteCmdList(const std::string& gbDo
 
 int CDownDataRestorerRedis::DeleteExecutingInviteCmdList(const std::string& gbDownlinkerDeviceId, int workerThreadIdx)
 {
-	CHECK_CONDITION(started_, "please start CDownDataRestorerRedis first");
+	CHECK_CONDITION_LOG(started_, "please start CDownDataRestorerRedis first");
+	CHECK_CONDITION(workStatus_!=UnrecoverableException);
+	
 	std::lock_guard<std::mutex> guard(operationQueueMutex_);
 
 	DataRestorerOperation operation;
@@ -701,8 +880,8 @@ int CDownDataRestorerRedis::DeleteExecutingInviteCmdList(const std::string& gbDo
 	operation.gbDownlinkerDeviceId = gbDownlinkerDeviceId;
 	operation.workerThreadIdx = workerThreadIdx;
 
-	if (operationQueue_.size() > maxQueueSize_)
-		operationQueue_.pop();
+//	if (operationQueue_.size() > maxQueueSize_)
+//		operationQueue_.pop();
 	operationQueue_.push(operation);
 	operationQueueNotEmptyCondvar_.notify_one();
 	return RESTORER_OK;

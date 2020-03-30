@@ -166,6 +166,13 @@ enum RedisMode {
 	SENTINEL_MODE,
 };
 
+enum WaitReadEventResult : uint8_t {
+	Readable=0,
+	Timeout,
+	Disconnected,
+	InternalError,
+};
+
 bool createRedisCommand(list<RedisCmdParaInfo>& paraList, char** cmdString, int32_t& cmdLen);
 bool parseRedisReply(char* replyString, RedisReplyInfo& replyInfo);
 bool parseArrayInfo(char** arrayString, ReplyArrayInfo& arrayInfo);

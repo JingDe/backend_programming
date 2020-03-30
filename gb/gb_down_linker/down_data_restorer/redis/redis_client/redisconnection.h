@@ -62,7 +62,7 @@ public:
 	}
 	void SetCanRelease(bool canRelease);
 	bool ListenMessage(int& handler);
-	bool WaitMessage(int handler);
+	WaitReadEventResult WaitMessage(int handler);
 	bool StopListen(int handler);
 	string GetServerIp() {
 		return m_serverIp;

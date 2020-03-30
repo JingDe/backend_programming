@@ -16,6 +16,8 @@ DeviceMgr::DeviceMgr(RedisClient* redis_client)
 
 int DeviceMgr::GetDeviceKeyList(const std::string& gbdownlinker_device_id, std::list<std::string>& device_key_list)
 {
+	CHECK_LOG_RETURN(redisClient_!=NULL, "RedisClient not inited", -1);
+
 	device_key_list.clear();
 	std::string key_prefix = std::string("{downlinker.device}:") + gbdownlinker_device_id;
 	redisClient_->getKeys(key_prefix, device_key_list);
@@ -24,6 +26,8 @@ int DeviceMgr::GetDeviceKeyList(const std::string& gbdownlinker_device_id, std::
 
 int DeviceMgr::LoadDevice(const std::list<std::string>& device_key_list, std::list<DevicePtr>* devices)
 {
+	CHECK_LOG_RETURN(redisClient_!=NULL, "RedisClient not inited", -1);
+
 	devices->clear();
 	for (std::list<std::string>::const_iterator cit = device_key_list.cbegin(); cit != device_key_list.cend(); cit++)
 	{
@@ -41,6 +45,8 @@ int DeviceMgr::LoadDevice(const std::list<std::string>& device_key_list, std::li
 
 int DeviceMgr::LoadDevice(const std::string& gbdownlinker_device_id, std::list<DevicePtr>* devices)
 {
+	CHECK_LOG_RETURN(redisClient_!=NULL, "RedisClient not inited", -1);
+
 	std::list<std::string> device_key_list;
 	GetDeviceKeyList(gbdownlinker_device_id, device_key_list);
 	LoadDevice(device_key_list, devices);
@@ -50,7 +56,7 @@ int DeviceMgr::LoadDevice(const std::string& gbdownlinker_device_id, std::list<D
 
 int DeviceMgr::InsertDevice(const std::string& gbdownlinker_device_id, const Device& device)
 {
-	std::stringstream log_msg;
+	CHECK_LOG_RETURN(redisClient_!=NULL, "RedisClient not inited", -1);
 	
 	std::string device_key = std::string("{downlinker.device}:") + gbdownlinker_device_id + std::string(":") + device.deviceId;
 
@@ -68,6 +74,8 @@ int DeviceMgr::UpdateDevice(const std::string& gbdownlinker_device_id, const Dev
 
 int DeviceMgr::DeleteDevice(const std::string& gbdownlinker_device_id, const std::string& device_id)
 {
+	CHECK_LOG_RETURN(redisClient_!=NULL, "RedisClient not inited", -1);
+
 	std::string device_key = std::string("{downlinker.device}:") + gbdownlinker_device_id + ":" + device_id;
 	if (redisClient_->del(device_key) == false)
 		return -1;
@@ -77,6 +85,8 @@ int DeviceMgr::DeleteDevice(const std::string& gbdownlinker_device_id, const std
 
 int DeviceMgr::ClearDevice(const std::string& gbdownlinker_device_id)
 {
+	CHECK_LOG_RETURN(redisClient_!=NULL, "RedisClient not inited", -1);
+
 	std::list<std::string> device_key_list;
 	GetDeviceKeyList(gbdownlinker_device_id, device_key_list);
 
@@ -89,6 +99,8 @@ int DeviceMgr::ClearDevice(const std::string& gbdownlinker_device_id)
 
 size_t DeviceMgr::GetDeviceCount(const std::string& gbdownlinker_device_id)
 {
+	CHECK_LOG_RETURN(redisClient_!=NULL, "RedisClient not inited", -1);
+
 	std::list<std::string> device_key_list;
 	GetDeviceKeyList(gbdownlinker_device_id, device_key_list);
 	return device_key_list.size();

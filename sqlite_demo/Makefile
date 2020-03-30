@@ -15,12 +15,16 @@ PAGER_DEMO_SRC:=$(filter-out pcache_origin.c, $(PAGER_DEMO_SRC))
 
 
 OS_DEMO_OBJ=$(patsubst %.c, %.o, $(OS_DEMO_SRC))
+
 OS_API_OBJ=$(patsubst %.c, %.o, $(OS_API_SRC))
 # TODO 
 OS_API_OBJ= os/os.o os/os_unix.o
 
 PAGER_DEMO_OBJ=$(patsubst %.c, %.o, $(PAGER_DEMO_SRC))
+
 ALL_OBJ= $(OS_DEMO_OBJ) $(PAGER_DEMO_OBJ)
+
+
 
 
 .PHONY: all
@@ -29,9 +33,9 @@ all: $(OS_TEST) $(PAGER_TEST)
 
 CC=gcc
 GCC_FLAGS=-g -Wall
-INCLUDE_COMMON=-I include/ -I os
+INCLUDE_COMMON=-I include/ -I os/
 
-
+# os test demo
 $(OS_TEST): $(OS_DEMO_OBJ)
 	$(CC) -o $(OS_TEST) $(OS_DEMO_OBJ)
 
@@ -41,9 +45,13 @@ $(OS_TEST): $(OS_DEMO_OBJ)
 #$(ALL_OBJ): %.o:%.c
 #	$(CC) $(GCC_FLAGS) $(INCLUDE_COMMON) -c $< -o $@ 
 
+
+
 $(ALL_OBJ): %.o:%.c
 	$(CC) $(GCC_FLAGS) $(INCLUDE_COMMON) -c $< -o $@ -MD -MF "$(dir $@).$(notdir $@).d"
 	
+
+# pager test demo
 $(PAGER_TEST): $(PAGER_DEMO_OBJ) $(OS_API_OBJ)
 	echo $(OS_DEMO_SRC)
 	echo $(OS_API_SRC)
@@ -55,3 +63,7 @@ $(PAGER_TEST): $(PAGER_DEMO_OBJ) $(OS_API_OBJ)
 clean:
 	-rm -rf $(OS_TEST) $(PAGER_TEST) 
 	-rm -rf $(OS_DEMO_OBJ) $(PAGER_DEMO_OBJ) *.o
+
+.PHONY: cleand
+cleand:
+	-rm -rf .*.d pager/.*.d os/.*.d tree/.*.d

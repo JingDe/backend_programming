@@ -79,7 +79,7 @@ int unixAccess(SqlVFS* vfs, const char* filename, int flag, int *ret)
 	return SQL_OK;
 }
 
-int unixSleep(SqlVFS* vfs, int micro_secs)
+int unixSleep(SqlVFS* vfs, int micro_secs) // 微妙
 {
 	static const int T=1000000;
 	sleep(micro_secs/T);

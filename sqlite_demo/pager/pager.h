@@ -3,7 +3,7 @@
 
 /*
 pager层，一次从文件中读或写一页，
-未上层提供page cache
+为上层提供page cache
 */
 
 

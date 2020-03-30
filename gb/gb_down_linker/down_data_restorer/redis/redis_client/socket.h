@@ -79,7 +79,7 @@ public:
 	void setSoTimeout(int timeout);
 
 	bool WatchReadEvent(int& epollfd);
-	bool WaitReadEvent(int epollfd);
+	WaitReadEventResult WaitReadEvent(int epollfd);
 	bool UnWatchEvent(int handler);
 
 private:

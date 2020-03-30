@@ -11,6 +11,13 @@
 
 namespace GBDownLinker {
 
+static void DefaultCallback(RedisClientStatus status)
+{
+	std::stringstream log_msg;
+	log_msg << "RedisClient DefaultCallback: redis client status change to " << status;
+	LOG_WRITE_WARNING(log_mg.str());
+}
+
 RedisClient::RedisClient()
 	:m_redisMode(STAND_ALONE_OR_PROXY_MODE),
 	m_connectionNum(0),
@@ -19,6 +26,7 @@ RedisClient::RedisClient()
 	m_passwd(),
 	m_connected(false),
 	m_redisProxy(),
+	// for CLUSER_MODE
 	m_serverList(),
 	m_slotMap(),
 	m_rwSlotMutex(),
@@ -28,22 +36,34 @@ RedisClient::RedisClient()
 	//	m_redisMonitor(NULL),
 	m_checkClusterNodesThreadId(),
 	m_checkClusterNodesThreadStarted(false),
-	m_signalQueue(),
-	m_lockSignalQueue(),
-	m_condSignalQueue(&m_lockSignalQueue),
+	m_checkClusterSignalQueue(),
+	m_lockCheckClusterSignalQueue(),
+	m_condCheckClusterSignalQueue(&m_lockCheckClusterSignalQueue),
+	// for SENTINEL_MODE
 	m_sentinelList(),
 	m_masterName(),
 	m_sentinelHandlers(),
+	m_rwSentinelHandlers(),
+	m_initMasterAddrGot(false),
 	m_initMasterAddr(),
 	m_dataNodes(),
 	m_masterClusterId(),
 	m_rwMasterMutex(),
-	m_threadArg(),
+	m_threadArg(), // +switch-master
 	m_subscribeThreadIdList(),
+	m_rwSubscribeThreadIdMutex(),
+    m_forceSubscribeThreadExit(false),
+	m_sentinelHealthCheckThreadId(), // sentinel health check
 	m_sentinelHealthCheckThreadStarted(false),
 	m_forceSentinelHealthCheckThreadExit(false),
-	m_sentinelHealthCheckThreadId()
-
+	m_checkMasterNodeThreadId(), // master health check
+	m_checkMasterNodeThreadStarted(false),
+	m_forceCheckMasterNodeThreadExit(false),
+	m_workStatus(RedisClientStatus::RedisClientNormal),
+	m_checkMasterSignalQueue(), // notify check master health
+	m_lockCheckMasterSignalQueue(),
+	m_condCheckMasterSignalQueue(&m_lockCheckMasterSignalQueue),
+	m_callback(DefaultCallback)
 {
 	LOG_WRITE_INFO("construct RedisClient ok");
 }
@@ -81,6 +101,7 @@ bool RedisClient::freeRedisClient()
 	}
 	else if (m_redisMode == SENTINEL_MODE)
 	{
+		StopSentinelThreads();
 		freeSentinels();
 		freeMasterSlaves();
 	}
@@ -106,12 +127,12 @@ bool RedisClient::init(const REDIS_SERVER_LIST& sentinelList, const string& mast
 	return init(SENTINEL_MODE, sentinelList, masterName, connectionNum, connectTimeout, readTimeout, passwd);
 }
 
-bool RedisClient::init(RedisMode redis_mode, const REDIS_SERVER_LIST& serverList, const string& masterName, uint32_t connectionNum, uint32_t connectTimeout, uint32_t readTimeout, const string& passwd)
+RedisClientInitResult RedisClient::init(RedisMode redis_mode, const REDIS_SERVER_LIST& serverList, const string& masterName, uint32_t connectionNum, uint32_t connectTimeout, uint32_t readTimeout, const string& passwd)
 {
 	if (m_connected == true)
 	{
 		LOG_WRITE_WARNING("why RedisClient init called, when m_connected is true");
-		return false;
+		return InitSuccess;
 	}
 
 	m_redisMode = redis_mode;
@@ -130,7 +151,7 @@ bool RedisClient::init(RedisMode redis_mode, const REDIS_SERVER_LIST& serverList
 		if (!initRedisProxy())
 		{
 			LOG_WRITE_ERROR("init redis proxy failed.");
-			return false;
+			return UnrecoverableFail;
 		}
 		std::stringstream log_msg;
 		log_msg << "init the redis proxy or redis server " << m_redisProxy.connectIp << ", " << m_redisProxy.connectPort << " ok";
@@ -141,32 +162,44 @@ bool RedisClient::init(RedisMode redis_mode, const REDIS_SERVER_LIST& serverList
 		if (!getRedisClusterNodes())
 		{
 			LOG_WRITE_ERROR("get redis cluster info failed.please check redis config.");
-			return false;
+			return UnrecoverableFail;
 		}
 
 		if (!initRedisCluster())
 		{
 			LOG_WRITE_ERROR("init redis cluster failed.");
-			return false;
+			return UnrecoverableFail;
 		}
 
 		if (StartCheckClusterThread() == false)
 		{
 			LOG_WRITE_ERROR("start thread to check cluster nodes failed");
-			return false;
+			return UnrecoverableFail;
 		}
 	}
 	else if (m_redisMode == SENTINEL_MODE)
 	{
+		if (!StartSentinelHealthCheckTask())
+		{
+			LOG_WRITE_FATAL("fail to start sentinel health check task");
+			return UnrecoverableFail;
+		}
+
+		if (!StartCheckMasterThread())
+		{
+			LOG_WRITE_FATAL("failed to start master node health check thread");
+			return UnrecoverableFail;
+		}
+	
 		if (!initSentinels())
 		{
 			LOG_WRITE_ERROR("init sentinels failed");
-			return false;
+			return RecoverableFail;
 		}
 		if (!initMasterSlaves())
 		{
 			LOG_WRITE_ERROR("init master and slaves connection failed");
-			return false;
+			return RecoverableFail;
 		}
 
 		LOG_WRITE_INFO("init redis sentinels and data nodes connection ok");
@@ -176,11 +209,11 @@ bool RedisClient::init(RedisMode redis_mode, const REDIS_SERVER_LIST& serverList
 		std::stringstream log_msg;
 		log_msg << "unsupported redis mode " << m_redisMode;
 		LOG_WRITE_ERROR(log_msg.str());
-		return false;
+		return UnrecoverableFail;
 	}
 
 	m_connected = true;
-	return true;
+	return InitSuccess;
 }
 
 bool RedisClient::initRedisProxy()
@@ -357,9 +390,10 @@ bool RedisClient::initRedisCluster()
 bool RedisClient::initSentinels()
 {
 	std::stringstream log_msg;
-	bool masterNodeGot = false;
+	m_initMasterAddrGot = false;
 	int aliveSentinel = 0;
 	bool switchMasterSubsribed = false;
+	WriteGuard guard(m_rwSentinelHandlers);
 	for (REDIS_SERVER_LIST::const_iterator it = m_sentinelList.begin(); it != m_sentinelList.end(); ++it)
 	{
 		RedisProxyInfo sentinelHandler;
@@ -405,68 +439,35 @@ bool RedisClient::initSentinels()
 		else
 		{
 			switchMasterSubsribed = true;
-			//			sentinelHandler.subscribed=true;
 			m_sentinelHandlers[sentinelHandler.proxyId].subscribed = true;
 		}
 
-		if (!masterNodeGot)
+		if (!m_initMasterAddrGot)
 		{
 			if (SentinelGetMasterAddrByName(sentinelHandler.clusterHandler, m_initMasterAddr)
 				&& CheckMasterRole(m_initMasterAddr))
 			{
-				masterNodeGot = true;
+				m_initMasterAddrGot = true;
 			}
 		}
 	}
 	log_msg.str("");
-	log_msg << "initial config sentinel size is " << m_sentinelList.size() << ", connected sentinel is " << aliveSentinel;
+	log_msg << "initial config sentinel count is " << m_sentinelList.size() << ", connected sentinel is " << aliveSentinel;
 	LOG_WRITE_INFO(log_msg.str());
 
-	if (!masterNodeGot)
+	if (!m_initMasterAddrGot)
 	{
 		LOG_WRITE_ERROR("get master addr failed");
-		goto CLEAR_SENTINELS;
+		return false;
 	}
 
 	if (!switchMasterSubsribed)
 	{
 		LOG_WRITE_ERROR("subscribe +switch-master failed");
-		goto CLEAR_SENTINELS;
-	}
-
-	if (!StartSentinelHealthCheckTask())
-	{
-		LOG_WRITE_WARNING("fail to start sentinel health check task");
+//		return false;
 	}
 
 	return true;
-
-CLEAR_SENTINELS:
-	for (map<string, RedisProxyInfo>::iterator it = m_sentinelHandlers.begin(); it != m_sentinelHandlers.end(); ++it)
-	{
-		if (it->second.clusterHandler)
-		{
-			it->second.clusterHandler->freeConnectPool();
-			delete it->second.clusterHandler;
-		}
-	}
-	m_sentinelHandlers.clear();
-
-	if (m_sentinelHealthCheckThreadStarted)
-	{
-		m_forceSentinelHealthCheckThreadExit=true;
-		pthread_join(m_sentinelHealthCheckThreadId, NULL);
-	}
-
-	{
-		WriteGuard guard(m_rwSubscribeThreadIdMutex);
-		for (size_t i = 0; i < m_subscribeThreadIdList.size(); i++)
-		{
-			pthread_cancel(m_subscribeThreadIdList[i]);
-		}
-		m_subscribeThreadIdList.clear();
-	}
-	return false;
 }
 
 bool RedisClient::CheckMasterRole(const RedisServerInfo& masterAddr)
@@ -478,7 +479,7 @@ bool RedisClient::StartSentinelHealthCheckTask()
 {
 	if (m_sentinelHealthCheckThreadStarted)
 		return true;
-	m_forceSentinelHealthCheckThreadExit=false;
+	m_forceSentinelHealthCheckThreadExit = false;
 	int ret = pthread_create(&m_sentinelHealthCheckThreadId, NULL, SentinelHealthCheckTask, this);
 	if (ret)
 	{
@@ -489,14 +490,21 @@ bool RedisClient::StartSentinelHealthCheckTask()
 	return true;
 }
 
-bool RedisClient::SentinelReinit()
+
+
+bool RedisClient::SentinelReinit(SentinelStats& stats)
 {
 	bool sentinel_reinit_work_all_done = true;
+
+	stats.sentinelCount=m_sentinelHandlers.size();
+	stats.connectedCount=0;
+	stats.subsribedCount=0;
+
+	WriteGuard guard(m_rwSentinelHandlers);
 	for (map<string, RedisProxyInfo>::iterator it = m_sentinelHandlers.begin(); it != m_sentinelHandlers.end(); ++it)
 	{
 		if (it->second.isAlived == false)
 		{
-			//
 			if (it->second.clusterHandler == NULL)
 				it->second.clusterHandler = new RedisCluster;
 			if (it->second.clusterHandler == NULL)
@@ -524,7 +532,7 @@ bool RedisClient::SentinelReinit()
 			}
 		}
 
-		if (it->second.isAlived && !it->second.subscribed)
+		if (it->second.isAlived  &&  !it->second.subscribed)
 		{
 			if (!SubscribeSwitchMaster(it->second.clusterHandler))
 			{
@@ -538,6 +546,11 @@ bool RedisClient::SentinelReinit()
 				it->second.subscribed = true;
 			}
 		}
+
+		if(it->second.isAlived)		
+			stats.connectedCount++;
+		if(it->second.subsribed)
+			stats.subsribedCount++;
 	}
 
 	return sentinel_reinit_work_all_done;
@@ -553,35 +566,111 @@ void* RedisClient::SentinelHealthCheckTask(void* arg)
 
 	while (!client->m_forceSentinelHealthCheckThreadExit)
 	{
-		if (sentinel_reinit_work_all_done == false)
-			sentinel_reinit_work_all_done = client->SentinelReinit();
-		else
-			break;
-
-		//		client->CheckSentinelGetMasterAddrByName();
-
 		sleep(10);
+		
+		if (sentinel_reinit_work_all_done == false)
+		{
+			SentinelStats stats;
+			sentinel_reinit_work_all_done = client->SentinelReinit(stats);
+
+			if(sentinel_reinit_work_all_done==false)
+			{
+				std::stringstream log_msg;
+				log_msg<<"sentinel stats: "<<stats.sentinelCount<<" sentinels, "<<stats.connectedCount<<" connected, "<<stats.subsribedCount<<" subscribed";
+				LOG_WRITE_WARNING(log_msg.str());
+			}
+		}
+
+		if (client->CheckSentinelCkquorum() == false)
+		{
+			m_workStatus = RedisClientStatus::RedisClientRecoverable;
+			m_callback(RedisClientStatus::RedisClientRecoverable);
+		}
+		else 
+		{
+			if (m_workStatus != RedisClientStatus::RedisClientNormal)
+				m_callback(RedisClientStatus::RedisClientNormal);
+			
+			m_workStatus = RedisClientStatus::RedisClientNormal;
+			
+		}
 	}
 
-	LOG_WRITE_INFO("sentinel health check task finish");
+	LOG_WRITE_INFO("sentinel health check task exit");
 	client->m_sentinelHealthCheckThreadStarted = false;
 	return 0;
 }
 
-void RedisClient::CheckSentinelGetMasterAddrByName()
+bool RedisClient::DoCkquorum(const RedisProxyInfo& server)
 {
-	// TODO 1,lock guard, 2, check connection pool
+	list<RedisCmdParaInfo> paraList;
+	int32_t paraLen = 0;
+	string cmd1 = "sentinel";
+	fillCommandPara(cmd1.c_str(), cmd1.size(), paraList);
+	paraLen += cmd1.size() + 10;
+	string cmd2 = "ckquorum";
+	fillCommandPara(cmd2.c_str(), cmd2.size(), paraList);
+	paraLen += cmd2.size() + 10;
+	fillCommandPara(m_masterName.c_str(), m_masterName.length(), paraList);
+	paraLen += m_masterName.length() + 10;
 
-//	for(map<string, RedisProxyInfo>::iterator it=m_sentinelHandlers.begin(); it!=m_sentinelHandlers.end(); ++it)
-//	{
-//		RedisServerInfo masterAddr;
-//		if(SentinelGetMasterAddrByName(it->second.clusterHandler, masterAddr)  
-//				&&  CheckMasterRole(masterAddr))
-//		{
-//			
-//		}
-//	}
+	RedisReplyInfo replyInfo;
+	bool success = cluster->doRedisCommand(paraList, paraLen, replyInfo);
+	freeCommandList(paraList);
+	if (!success)
+	{
+		LOG_WRITE_ERROR("sentinel ckquorum failed");
+		return false;
+	}
+
+	if (!ParseSentinelCkquorumReply(replyInfo, serverInfo))
+	{
+		freeReplyInfo(replyInfo);
+		return false;
+	}
+	else
+	{
+		freeReplyInfo(replyInfo);
+		return true;
+	}
 }
+
+bool RedisClient::ParseSentinelCkquorumReply()
+{
+	std::stringstream log_msg;
+	log_msg << "sentinel ckquorum command has replyType " << replyInfo.replyType << ", resultString " << replyInfo.resultString << ", intValue " << replyInfo.intValue;
+	LOG_WRITE_INFO(log_msg.str());
+
+	if (replyInfo.replyType == RedisReplyType::REDIS_REPLY_ERROR)
+	{
+		LOG_WRITE_ERROR("ckquorum command reply error");
+		return false;
+	}
+
+	if (replyInfo.replyType != RedisReplyType::REDIS_REPLY_STATUS)
+	{
+		std::stringstream log_msg;
+		log_msg << "ckquorum failed, redis response:[" << replyInfo.resultString << "].";
+		LOG_WRITE_ERROR(log_msg.str());
+		return false;
+	}
+
+	return true;
+}
+
+bool RedisClient::CheckSentinelCkquorum()
+{
+	ReadGuard guard(m_rwSentinelHandlers);
+	for (map<string, RedisProxyInfo>::iterator it = m_sentinelHandlers.begin(); it != m_sentinelHandlers.end(); ++it)
+	{
+		if (it->second.isAlived && DoCkquorum(it->second))
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
 
 bool RedisClient::SubscribeSwitchMaster(RedisCluster* cluster)
 {
@@ -621,6 +710,7 @@ bool RedisClient::SubscribeSwitchMaster(RedisCluster* cluster)
 	pthread_t thread_id;
 	m_threadArg.con = con;
 	m_threadArg.client = this;
+	m_forceSubscribeThreadExit=false;
 	if (pthread_create(&thread_id, NULL, SubscribeSwitchMasterThreadFun, &m_threadArg))
 	{
 		std::stringstream log_msg;
@@ -630,7 +720,6 @@ bool RedisClient::SubscribeSwitchMaster(RedisCluster* cluster)
 	}
 	else
 	{
-		pthread_detach(thread_id);
 		WriteGuard guard(m_rwSubscribeThreadIdMutex);
 		m_subscribeThreadIdList.push_back(thread_id);
 		return true;
@@ -640,8 +729,6 @@ bool RedisClient::SubscribeSwitchMaster(RedisCluster* cluster)
 
 void* RedisClient::SubscribeSwitchMasterThreadFun(void* arg)
 {
-//	pthread_detach(pthread_self());
-
 	SwitchMasterThreadArgType* tmp = (SwitchMasterThreadArgType*)arg;
 
 	RedisClient* client = tmp->client;
@@ -650,22 +737,53 @@ void* RedisClient::SubscribeSwitchMasterThreadFun(void* arg)
 	log_msg << "subscribe +switch-master thread start, sentinel addr: " << con->GetServerIp() << ", " << con->GetServerPort();
 	LOG_WRITE_INFO(log_msg.str());
 
+	bool listened=false;
 	int handler;
-	if (!con->ListenMessage(handler))
+	while (!client->m_forceSubscribeThreadExit)
 	{
-		LOG_WRITE_ERROR("fail to listen switch-master mesages");
-		return 0;
-	}
-	while (true)
-	{
-		LOG_WRITE_INFO("redisclient: waiting +switch-master channel message now");
+		if(!con->CheckConnected())
+		{
+			sleep(5);
+			continue;
+		}
+	
+		if(listened==false)
+		{
+			if (!con->ListenMessage(handler))
+			{
+				LOG_WRITE_ERROR("fail to listen +switch-master mesages");
+				conintue;
+			}
+			else
+			{
+				listened=true;
+			}
+		}
+		
+		LOG_WRITE_INFO("redisclient: waiting +switch-master channel message now ...");
+		
 		RedisReplyInfo replyInfo;
-		if (con->WaitMessage(handler))
+		WaitReadEventResult result=con->WaitMessage(handler, 3*1000);
+		if (result==Readable)
 		{
 			con->recv(replyInfo);
 		}
-		else
+		else if(result==Timeout)
 		{
+			continue;
+		}
+		else if(result==Disconnected)
+		{
+			close(handler);
+			listened=false;
+			continue;
+		}
+		else if(result==InternalError)
+		{
+			// TODO
+			LOG_WRITE_ERROR("wait message encounter internal error");
+			close(handler);
+			listened=false;
 			continue;
 		}
 
@@ -679,7 +797,8 @@ void* RedisClient::SubscribeSwitchMasterThreadFun(void* arg)
 		client->DoSwitchMaster(masterAddr);
 	}
 
-	con->StopListen(handler);
+	if(listened)
+		con->StopListen(handler);
 
 	return NULL;
 }
@@ -795,15 +914,25 @@ bool RedisClient::ParseSubsribeSwitchMasterReply(const RedisReplyInfo& replyInfo
 bool RedisClient::DoSwitchMaster(const RedisServerInfo& masterAddr)
 {
 	WriteGuard guard(m_rwMasterMutex);
-	m_masterClusterId = masterAddr.serverIp + ":" + toStr(masterAddr.serverPort);
+	std::string masterClusterId = masterAddr.serverIp + ":" + toStr(masterAddr.serverPort);
+	if(m_masterClusterId==masterClusterId)
+	{
+		return true;
+	}
 
-	// TODO
+	m_masterClusterId=masterClusterId;
+
 	if (m_dataNodes.count(m_masterClusterId) == 0)
 	{
 		std::stringstream log_msg;
 		log_msg << "no info of new master: " << m_masterClusterId;
-		LOG_WRITE_ERROR(log_msg.str());
-		return false;
+		LOG_WRITE_WARNING(log_msg.str());
+
+		m_dataNodes[m_masterClusterId].connectIp = m_initMasterAddr.serverIp;
+		m_dataNodes[m_masterClusterId].connectPort = m_initMasterAddr.serverPort;
+		m_dataNodes[m_masterClusterId].proxyId = m_masterClusterId;
+		m_dataNodes[m_masterClusterId].isAlived = false;
+		m_dataNodes[m_masterClusterId].clusterHandler = NULL;
 	}
 
 	RedisProxyInfo& masterNode = m_dataNodes[m_masterClusterId];
@@ -834,42 +963,51 @@ bool RedisClient::DoSwitchMaster(const RedisServerInfo& masterAddr)
 		AuthPasswd(m_passwd, masterNode.clusterHandler);
 	}
 	masterNode.isAlived = true;
+	LOG_WRITE_INFO("master switched success");
 	return true;
 }
 
 bool RedisClient::initMasterSlaves()
 {
+	assert(m_initMasterAddrGot);
+
+	WriteGuard guard(m_rwMasterMutex);
+	
 	std::stringstream log_msg;
 	vector<RedisServerInfo> slavesAddr;
-	RedisProxyInfo masterNode;
+	
+	RedisProxyInfo& masterNode=m_dataNodes[masterNode.proxyId];
 	masterNode.connectIp = m_initMasterAddr.serverIp;
 	masterNode.connectPort = m_initMasterAddr.serverPort;
-	masterNode.proxyId = masterNode.connectIp + ":" + toStr(masterNode.connectPort);
+	
+	m_masterClusterId=masterNode.connectIp + ":" + toStr(masterNode.connectPort);
+	masterNode.proxyId = m_masterClusterId;
+	
 	masterNode.isAlived = false;
 	masterNode.clusterHandler = new RedisCluster;
+		
 	if (masterNode.clusterHandler == NULL)
 	{
 		return false;
 	}
+		
 	if (!masterNode.clusterHandler->initConnectPool(masterNode.connectIp, masterNode.connectPort, m_connectionNum, m_connectTimeout, m_readTimeout))
 	{
 		LOG_WRITE_ERROR("init master node connection pool failed");
-		goto CLEAR_DATANODES;
+		return false;
 	}
+
+	masterNode.isAlived = true;
+
 	if (m_passwd.empty() == false)
 	{
 		AuthPasswd(m_passwd, masterNode.clusterHandler);
 	}
 
-	m_masterClusterId = masterNode.proxyId;
-	masterNode.isAlived = true;
-	m_dataNodes[masterNode.proxyId] = masterNode;
-
-	//	if(!SentinelGetSlavesInfo(slavesAddr))
 	if (!MasterGetReplicationSlavesInfo(masterNode.clusterHandler, slavesAddr))
 	{
 		LOG_WRITE_WARNING("get slave nodes failed");
-		goto CLEAR_DATANODES;
+		return true;
 	}
 
 	log_msg.str("");
@@ -883,40 +1021,31 @@ bool RedisClient::initMasterSlaves()
 		slave_node.connectPort = slavesAddr[i].serverPort;
 		slave_node.proxyId = slave_node.connectIp + ":" + toStr(slave_node.connectPort);
 		slave_node.isAlived = false;
-		slave_node.clusterHandler = new RedisCluster;
-		if (slave_node.clusterHandler == NULL)
-		{
-			LOG_WRITE_ERROR("new slave RedisCluster failed");
-		}
-		else if (!slave_node.clusterHandler->initConnectPool(slave_node.connectIp, slave_node.connectPort, m_connectionNum, m_connectTimeout, m_readTimeout))
-		{
-			LOG_WRITE_WARNING("init slave connection pool failed");
-		}
-		else
-		{
-			slave_node.isAlived = true;
-
-			if (m_passwd.empty() == false)
-			{
-				AuthPasswd(m_passwd, slave_node.clusterHandler);
-			}
-		}
+		slave_node.clusterHandler=NULL;
+		
+//		slave_node.clusterHandler = new RedisCluster;
+//		if (slave_node.clusterHandler == NULL)
+//		{
+//			LOG_WRITE_ERROR("new slave RedisCluster failed");
+//		}
+//		else if (!slave_node.clusterHandler->initConnectPool(slave_node.connectIp, slave_node.connectPort, m_connectionNum, m_connectTimeout, m_readTimeout))
+//		{
+//			LOG_WRITE_WARNING("init slave connection pool failed");
+//		}
+//		else
+//		{
+//			slave_node.isAlived = true;
+//
+//			if (m_passwd.empty() == false)
+//			{
+//				AuthPasswd(m_passwd, slave_node.clusterHandler);
+//			}
+//		}
 
 		m_dataNodes[slave_node.proxyId] = slave_node;
 	}
-	return true;
 
-CLEAR_DATANODES:
-	for (map<string, RedisProxyInfo>::iterator it = m_dataNodes.begin(); it != m_dataNodes.end(); ++it)
-	{
-		if (it->second.clusterHandler)
-		{
-			it->second.clusterHandler->freeConnectPool();
-			delete it->second.clusterHandler;
-		}
-	}
-	m_dataNodes.clear();
-	return false;
+	return true;
 }
 
 bool RedisClient::freeRedisProxy()
@@ -956,8 +1085,43 @@ bool RedisClient::freeRedisCluster()
 	return true;
 }
 
+bool RedisClient::StopSentinelThreads()
+{
+	if (m_sentinelHealthCheckThreadStarted)
+	{
+		m_forceSentinelHealthCheckThreadExit = true;
+		pthread_join(m_sentinelHealthCheckThreadId, NULL);
+		
+		m_sentinelHealthCheckThreadStarted=false;
+		m_forceSentinelHealthCheckThreadExit=false;
+	}
+
+	{
+		m_forceSubscribeThreadExit=true;
+		WriteGuard guard(m_rwSubscribeThreadIdMutex);
+		for (size_t i = 0; i < m_subscribeThreadIdList.size(); i++)
+		{
+			pthread_join(m_subscribeThreadIdList[i]);
+		}
+		m_subscribeThreadIdList.clear();
+		m_forceSubscribeThreadExit=false;
+	}
+
+	if (m_checkMasterNodeThreadStarted)
+	{
+		m_forceCheckMasterNodeThreadExit = true;
+		pthread_join(m_checkMasterNodeThreadId, NULL);
+		
+		m_checkMasterNodeThreadStarted=false;
+		m_forceCheckMasterNodeThreadExit=false;
+	}
+
+	return true;
+}
+
 bool RedisClient::freeSentinels()
 {
+	WriteGuard guard(m_rwSentinelHandlers);
 	for (map<string, RedisProxyInfo>::iterator it = m_sentinelHandlers.begin(); it != m_sentinelHandlers.end(); ++it)
 	{
 		if (it->second.clusterHandler)
@@ -969,36 +1133,29 @@ bool RedisClient::freeSentinels()
 	}
 	m_sentinelHandlers.clear();
 
-	if (m_sentinelHealthCheckThreadStarted)
-	{
-		m_forceSentinelHealthCheckThreadExit=true;
-		pthread_join(m_sentinelHealthCheckThreadId, NULL);
-	}
-
-	{
-		WriteGuard guard(m_rwSubscribeThreadIdMutex);
-		for (size_t i = 0; i < m_subscribeThreadIdList.size(); i++)
-		{
-			pthread_cancel(m_subscribeThreadIdList[i]);
-		}
-		m_subscribeThreadIdList.clear();
-	}
+	
 	return true;
 }
 
 bool RedisClient::freeMasterSlaves()
 {
-	for (map<string, RedisProxyInfo>::iterator it = m_dataNodes.begin(); it != m_dataNodes.end(); ++it)
 	{
-		if (it->second.clusterHandler)
+		WriteGuard guard(m_rwMasterMutex);
+		m_masterClusterId.clear();
+		for (map<string, RedisProxyInfo>::iterator it = m_dataNodes.begin(); it != m_dataNodes.end(); ++it)
 		{
-			if (it->second.isAlived)
-				it->second.clusterHandler->freeConnectPool();
-			delete it->second.clusterHandler;
-			it->second.clusterHandler = NULL;
+			if (it->second.clusterHandler)
+			{
+				if (it->second.isAlived)
+					it->second.clusterHandler->freeConnectPool();
+				delete it->second.clusterHandler;
+				it->second.clusterHandler = NULL;
+			}
 		}
+		m_dataNodes.clear();
 	}
-	m_dataNodes.clear();
+	m_initMasterAddr.serverIp.clear();
+	m_initMasterAddrGot=false;
 	return true;
 }
 
@@ -1072,22 +1229,6 @@ bool RedisClient::ParseSentinelGetMasterReply(const RedisReplyInfo& replyInfo, R
 	log_msg << "sentinel get-master-addr-by-name ok: " << serverInfo.serverIp << ", " << serverInfo.serverPort;
 	LOG_WRITE_INFO(log_msg.str());
 	return true;
-}
-
-void RedisClient::DoTestOfSentinelSlavesCommand()
-{
-	for (map<string, RedisProxyInfo>::iterator it = m_sentinelHandlers.begin(); it != m_sentinelHandlers.end(); ++it)
-	{
-		if (it->second.isAlived)
-		{
-			vector<RedisServerInfo> slavesAddr;
-			if (SentinelGetSlavesInfo(it->second.clusterHandler, slavesAddr))
-			{
-				LOG_WRITE_INFO("do sentinel slaves ok");
-				return;
-			}
-		}
-	}
 }
 
 
@@ -1634,6 +1775,19 @@ bool RedisClient::CreateConnectionPool(RedisProxyInfo& node)
 	return true;
 }
 
+bool RedisClient::StartCheckMasterThread()
+{
+	if (m_checkMasterNodeThreadStarted)
+		return true;
+	m_forceCheckMasterNodeThreadExit=false;
+	int ret = pthread_create(&m_checkMasterNodeThreadId, NULL, CheckMasterNodeThreadFunc, this);
+	if (ret)
+	{
+		return false;
+	}
+	m_checkMasterNodeThreadStarted = true;
+	return true;
+}
 
 bool RedisClient::StartCheckClusterThread()
 {
@@ -1654,17 +1808,90 @@ bool RedisClient::StartCheckClusterThread()
 
 void RedisClient::SignalToDoClusterNodes()
 {
-	MutexLockGuard guard(&m_lockSignalQueue);
-	if (m_signalQueue.empty())
+	MutexLockGuard guard(&m_lockCheckClusterSignalQueue);
+	if (m_checkClusterSignalQueue.empty())
 	{
-		m_signalQueue.push(1);
+		m_checkClusterSignalQueue.push(1);
 	}
-	m_condSignalQueue.SignalAll();
+	m_condCheckClusterSignalQueue.SignalAll();
+}
+
+void RedisClient::SignalToDoMasterCheck()
+{
+	MutexLockGuard guard(&m_lockCheckMasterSignalQueue);
+	if (m_checkMasterSignalQueue.empty())
+	{
+		m_checkMasterSignalQueue.push(1);
+	}
+	m_condCheckMasterSignalQueue.SignalAll();
+}
+
+void* RedisClient::CheckMasterNodeThreadFunc(void* arg)
+{
+	LOG_WRITE_INFO("check master node thread start");
+
+	RedisClient* client = (RedisClient*)arg;
+
+	while (!client->m_forceCheckMasterNodeThreadExit)
+	{
+		{
+			MutexLockGuard guard(&(client->m_lockCheckMasterSignalQueue));
+			while (client->m_checkMasterSignalQueue.empty())
+			{
+				if(client->m_forceCheckMasterNodeThreadExit)
+					break;
+				client->m_condCheckMasterSignalQueue.WaitForSeconds(3);
+			}
+		}
+		if(client->m_forceCheckMasterNodeThreadExit)
+			break;
+		assert(!client->m_checkMasterSignalQueue.empty());
+		client->m_checkMasterSignalQueue = std::move(std::queue<int>());
+
+		LOG_WRITE_INFO("now recv signal to connect master node");
+
+		if(!client->DoConnectMasterNode())
+		{
+			m_workStatus=RedisClientStatus::RedisClientRecoverable;
+			m_callback(RedisClientStatus::RedisClientRecoverable);
+		}
+		else
+		{
+			if(m_workStatus!=RedisClientStatus::RedisClientNormal)
+				m_callback(RedisClientStatus::RedisClientNormal);
+			m_workStatus=RedisClientStatus::RedisClientNormal;
+		}
+	}
+
+	LOG_WRITE_INFO("check master node thread exit");
+	return 0;
+}
+
+bool RedisClient::DoConnectMasterNode()
+{
+	ReadGuard guard(m_rwSentinelHandlers);
+	for (map<string, RedisProxyInfo>::iterator it = m_sentinelHandlers.begin(); it != m_sentinelHandlers.end(); ++it)
+	{
+		if (!it->second.isAlived)
+			continue;
+		
+		RedisServerInfo masterInfo;
+		if (SentinelGetMasterAddrByName(it->second.clusterHandler, masterInfo)  &&  CheckMasterRole(masterInfo))
+		{
+			if(DoSwitchMaster(masterInfo))
+			{
+				return true;
+			}
+		}
+		
+	}
+
+	return false;
 }
 
 void* RedisClient::CheckClusterNodesThreadFunc(void* arg)
 {
-//	pthread_detach(pthread_self());
+	//	pthread_detach(pthread_self());
 
 	LOG_WRITE_INFO("check cluster nodes thread start");
 
@@ -1673,18 +1900,18 @@ void* RedisClient::CheckClusterNodesThreadFunc(void* arg)
 	while (true)
 	{
 		{
-			MutexLockGuard guard(&(client->m_lockSignalQueue));
-			while (client->m_signalQueue.empty())
+			MutexLockGuard guard(&(client->m_lockCheckClusterSignalQueue));
+			while (client->m_checkClusterSignalQueue.empty())
 			{
-				client->m_condSignalQueue.Wait();
+				client->m_condCheckClusterSignalQueue.Wait();
 			}
 		}
 
-		//		client->m_signalQueue.swap(queue<int>());
+		//		client->m_checkClusterSignalQueue.swap(queue<int>());
 		//		std::queue<int> empty_queue;
-		//		client->m_signalQueue.swap(empty_queue);
+		//		client->m_checkClusterSignalQueue.swap(empty_queue);
 
-		client->m_signalQueue = std::move(std::queue<int>());
+		client->m_checkClusterSignalQueue = std::move(std::queue<int>());
 
 		LOG_WRITE_INFO("now recv signal to do cluster nodes command");
 

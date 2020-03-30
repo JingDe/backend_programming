@@ -28,6 +28,39 @@ namespace GBDownLinker {
 class RedisConnection;
 class RedisMonitor;
 
+enum class RedisClientStatus : uint8_t {
+	RedisClientNormal = 0,
+	RedisClientRecoverable,
+	RedisClientUnrecoverable,
+};
+
+enum RedisClientInitResult : uint8_t {
+	InitSuccess=0,
+	RecoverableFail,
+	UnrecoverableFail,
+};
+
+struct SentinelStats {
+	int sentinelCount;
+	int connectedCount;
+	int subsribedCount;
+};
+
+
+std::ostream& operator<<(std::ostream& os, enum RedisClientStatus status)
+{
+	switch (status)
+	{
+	case RedisClientStatus::RedisClientNormal:
+		os<<"Normal";
+	case RedisClientStatus::RedisClientRecoverable:
+		os<<"RecoverableException";
+	case RedisClientStatus::RedisClientUnrecoverable:
+		os<<"UnrecoverableException";
+	}
+	return os;
+}
+
 typedef struct RedisServerInfoTag
 {
 	RedisServerInfoTag()
@@ -163,6 +196,7 @@ enum RedisCommandType {
 	REDIS_COMMAND_TO_SENTINEL_NODES_START,	// command to sentinel nodes
 	REDIS_COMMAND_SENTINEL_GET_MASTER_ADDR,
 	REDIS_COMMAND_INFO_REPLICATION,
+	REDIS_COMMAND_SENTINEL_CKQUORUM,
 	REDIS_COMMAND_TO_SENTINEL_NODES_END,	// command to sentinel nodes
 };
 
@@ -186,6 +220,8 @@ struct SwitchMasterThreadArgType
 	RedisClient* client;
 };
 
+extern void DefaultCallback(RedisClientStatus);
+
 
 class RedisClient
 {
@@ -197,6 +233,20 @@ public:
 
 	RedisClient();
 	~RedisClient();
+
+	static std::string ToDesc(RedisClientStatus status)
+	{
+		switch (status)
+		{
+		case RedisClientStatus::Normal:
+			return "Normal";
+		case RedisClientStatus::Exception:
+			return "Exception";
+		default:
+			return "Unknown";
+		}
+	}
+
 	RedisMode GetRedisMode() {
 		return m_redisMode;
 	}
@@ -204,6 +254,7 @@ public:
 	bool init(const REDIS_SERVER_LIST& clusterList, uint32_t connectionNum, uint32_t connectTimeout = 1200, uint32_t read_timeout_ms = 3000, const string& passwd = "");
 	bool init(const REDIS_SERVER_LIST& sentinelList, const string& masterName, uint32_t connectionNum, uint32_t connectTimeout = 1200, uint32_t read_timeout_ms = 3000, const string& passwd = "");
 	bool init(RedisMode redis_mode, const REDIS_SERVER_LIST& serverList, const string& masterName, uint32_t connectionNum, uint32_t connectTimeout, uint32_t readTimeout, const string& passwd);
+	void SetCallback(std::function<void(RedisClientStatus)>());
 	bool freeRedisClient();
 	template<typename DBSerialize>
 	bool getSerial(const string& key, DBSerialize& serial);
@@ -356,19 +407,25 @@ private:
 	bool ParseSentinelGetMasterReply(const RedisReplyInfo& replyInfo, RedisServerInfo& serverInfo);
 	bool MasterGetReplicationSlavesInfo(RedisCluster* cluster, vector<RedisServerInfo>& slaves);
 	bool ParseInfoReplicationReply(const RedisReplyInfo& replyInfo, vector<RedisServerInfo>& slaves);
+	bool StopSentinelThreads();
 	bool freeSentinels();
 	bool freeMasterSlaves();
 	bool ParseSubsribeSwitchMasterReply(const RedisReplyInfo& replyInfo);
+	
 	static void* SentinelHealthCheckTask(void* arg);
 	bool CheckMasterRole(const RedisServerInfo& masterAddr);
-	bool SentinelReinit();
-	void CheckSentinelGetMasterAddrByName();
+	bool SentinelReinit(SentinelStats& stats);
+	
+	void SignalToDoMasterCheck();
+	static void* CheckMasterNodeThreadFunc(void* arg);
+	void DoCheckMasterNode();
 
 	bool StartCheckClusterThread();
 	void SignalToDoClusterNodes();
 	static void* CheckClusterNodesThreadFunc(void* arg);
 	void DoCheckClusterNodes();
-	//	bool CreateConnectionPool(map<string, RedisProxyInfo>::iterator& it);
+
+	
 	bool CreateConnectionPool(RedisProxyInfo&);
 
 	bool AuthPasswd(const string& passwd, RedisCluster* cluster);
@@ -377,7 +434,7 @@ private:
 private:
 	// for all RedisMode
 	RedisMode m_redisMode;
-	uint32_t m_connectionNum;
+	uint32_t m_connectionNum; // data nodes connection pool size
 	uint32_t m_connectTimeout;
 	uint32_t m_readTimeout;
 	string m_passwd;
@@ -386,6 +443,7 @@ private:
 	// for STAND_ALONE_OR_PROXY_MODE
 	RedisProxyInfo m_redisProxy;
 	//	RWMutex m_rwProxyMutex;	
+	// end for STAND_ALONE_OR_PROXY_MODE
 
 	// for CLUSTER_MODE
 	REDIS_SERVER_LIST m_serverList; // redis data nodes
@@ -397,25 +455,53 @@ private:
 	//    RedisMonitor* m_redisMonitor;
 	pthread_t m_checkClusterNodesThreadId;
 	bool m_checkClusterNodesThreadStarted;
-	queue<int> m_signalQueue;
-	MutexLock m_lockSignalQueue;
-	CondVar m_condSignalQueue;
+	queue<int> m_checkClusterSignalQueue;
+	MutexLock m_lockCheckClusterSignalQueue;
+	CondVar m_condCheckClusterSignalQueue;
+	// end for CLUSTER_MODE
 
 	// for SENTINEL_MODE
 	REDIS_SERVER_LIST m_sentinelList; // redis sentinel nodes addr
 	string m_masterName;
+	
 	map<string, RedisProxyInfo> m_sentinelHandlers;
+	RWMutex m_rwSentinelHandlers; // guard m_sentinelHandlers
+	
+	bool m_initMasterAddrGot;
 	RedisServerInfo m_initMasterAddr;
+	
 	map<string, RedisProxyInfo> m_dataNodes; // key: clusterId
-	string m_masterClusterId;
-	RWMutex m_rwMasterMutex;
+	string m_masterClusterId; // current master
+	RWMutex m_rwMasterMutex; // guard m_masterClusterId and m_dataNodes
+
 	SwitchMasterThreadArgType m_threadArg;
 	vector<pthread_t> m_subscribeThreadIdList;
+	RWMutex m_rwSubscribeThreadIdMutex; // guard m_subscribeThreadIdList
+	bool m_forceSubscribeThreadExit;
+
+	// for sentinel nodes health check
+	pthread_t m_sentinelHealthCheckThreadId;
 	bool m_sentinelHealthCheckThreadStarted;
 	bool m_forceSentinelHealthCheckThreadExit;
-	pthread_t m_sentinelHealthCheckThreadId;
-	RWMutex m_rwSubscribeThreadIdMutex; // guard pthread_t above
-};
+
+	// for master node health check
+	// when master node disconnect, try to get the actual master and re-connect
+	pthread_t m_checkMasterNodeThreadId; 
+	bool m_checkMasterNodeThreadStarted;
+	bool m_forceCheckMasterNodeThreadExit;
+
+	// when doRedisCommand find master disconnected, notify m_checkMasterNodeThreadId
+	std::queue<int> m_checkMasterSignalQueue; 
+	MutexLock m_lockCheckMasterSignalQueue; // guard m_checkMasterSignalQueue
+	CondVar m_condCheckMasterSignalQueue;
+	// end for SENTINEL_MODE
+
+	// internal status check and report
+	RedisClientStatus m_workStatus;
+	std::function<void(RedisClientStatus)> m_callback;
+}; // Class RedisClient
+
+
 
 
 template<typename DBSerialize>
@@ -837,6 +923,7 @@ bool RedisClient::doRedisCommandMaster(const string& key,
 	RedisReplyInfo replyInfo;
 	bool needRedirect;
 	string redirectInfo;
+	bool disconnected = false;
 
 	RedisProxyInfo& masterNode = m_dataNodes[m_masterClusterId];
 	if (masterNode.clusterHandler == NULL || masterNode.isAlived == false)
@@ -844,8 +931,8 @@ bool RedisClient::doRedisCommandMaster(const string& key,
 		std::stringstream log_msg;
 		log_msg << "master node " << m_masterClusterId << " not alive";
 		LOG_WRITE_ERROR(log_msg.str());
-		//		CreateConnectionPool(masterNode);
-		return false;
+
+		disconnected = true;
 	}
 	if (!masterNode.clusterHandler->doRedisCommand(commandList, commandLen, replyInfo))
 	{
@@ -853,42 +940,15 @@ bool RedisClient::doRedisCommandMaster(const string& key,
 		std::stringstream log_msg;
 		log_msg << "master: " << masterNode.proxyId << " do redis command failed.";
 		LOG_WRITE_ERROR(log_msg.str());
-
-		if (IsCommandWriteType(commandType))
-		{
-			std::stringstream log_msg;
-			log_msg << "commandType is " << commandType << ", cannot send to slave";
-			LOG_WRITE_WARNING(log_msg.str());
-			return false;
-		}
-
-		bool success = false;
-		for (map<string, RedisProxyInfo>::iterator it = m_dataNodes.begin(); it != m_dataNodes.end(); ++it)
-		{
-			if (it->second.proxyId == m_masterClusterId)
-				continue;
-			//			if(it->second.isAlived==false)
-			//				CreateConnectionPool(it);
-			if (it->second.isAlived && it->second.clusterHandler->doRedisCommand(commandList, commandLen, replyInfo))
-			{
-				success = true;
-				break;
-			}
-			else
-			{
-				freeReplyInfo(replyInfo);
-			}
-		}
-		if (!success)
-		{
-			freeReplyInfo(replyInfo);
-			std::stringstream log_msg;
-			log_msg << "try slaves failed";
-			LOG_WRITE_ERROR(log_msg.str());
-			return false;
-		}
+		
+		disconnected = true;		
 	}
 
+	if (disconnected == true)
+	{
+		SignalToDoMasterCheck();
+		return false;
+	}
 
 	bool success = ParseRedisReplyForStandAloneAndMasterMode(replyInfo, needRedirect, redirectInfo, key, commandType, members, serial, count);
 	freeReplyInfo(replyInfo);

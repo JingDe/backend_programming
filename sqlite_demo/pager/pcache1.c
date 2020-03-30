@@ -26,7 +26,7 @@ struct PgHdr1{
 
 // PCache1 模块
 struct PCache1{
-	PgHdr1 *plru_head; // LRU链表头,存储unpinned不使用已分配的页面，不计入mx_pages和npage中
+	PgHdr1 *plru_head; // LRU链表头,存储unpinned不使用、已分配的页面，不计入mx_pages和npage中
 	PgHdr1 *plru_tail; // 
 	
 	int sz_page; // 页面大小

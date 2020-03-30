@@ -578,16 +578,26 @@ bool Socket::WatchReadEvent(int& epollfd)
 	return true;
 }
 
-bool Socket::WaitReadEvent(int epollfd)
+
+
+WaitReadEventResult Socket::WaitReadEvent(int epollfd, int milliseconds)
 {
 	struct epoll_event event;
-	int nEvents = epoll_wait(epollfd, &event, 1, -1);
+	int nEvents = epoll_wait(epollfd, &event, 1, milliseconds);
 	if (nEvents < 0)
 	{
 		std::stringstream log_msg;
 		log_msg << "epoll_wait failed" << ", " << errno;
 		LOG_WRITE_ERROR(log_msg.str());
-		return false;
+
+		if(errno == EINTR)
+		{
+			return Timeout;
+		}
+		else
+		{
+			return InternalError;
+		}
 	}
 	if (nEvents != 1)
 	{
@@ -597,32 +607,32 @@ bool Socket::WaitReadEvent(int epollfd)
 		else
 			log_msg << "unknown error: " << errno;
 		LOG_WRITE_ERROR(log_msg.str());
-		return false;
+		return InternalError;
 	}
 
 	std::stringstream log_msg;
 	log_msg << "event.events is " << event.events;
 	LOG_WRITE_INFO(log_msg.str());
 
-	if (event.events & EPOLLRDHUP)
+	if (event.events & (EPOLLIN | EPOLLPRI | EPOLLRDNORM | POLLRDBAND))
+	{
+		return Readable;
+	}
+	else if (event.events & EPOLLRDHUP)
 	{
 		std::stringstream log_msg;
 		log_msg << "peer disconnect";
 		LOG_WRITE_ERROR(log_msg.str());
 		close();
-		return false;
+		return Disconnected;
 	}
-	else if (event.events & (EPOLLIN | EPOLLPRI | EPOLLRDNORM | POLLRDBAND))
-	{
-		return true;
-	}
-	else
+	else 
 	{
 		std::stringstream log_msg;
 		log_msg << "unkonwn socket event occur";
 		LOG_WRITE_ERROR(log_msg.str());
 		close();
-		return false;
+		return Disconnected;
 	}
 }
 

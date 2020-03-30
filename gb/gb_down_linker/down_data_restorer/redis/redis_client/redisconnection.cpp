@@ -230,29 +230,19 @@ bool RedisConnection::ListenMessage(int& handler)
 	return m_socket.WatchReadEvent(handler);
 }
 
-bool RedisConnection::WaitMessage(int handler)
+bool RedisConnection::CheckConnected()
 {
-	if (m_socket.WaitReadEvent(handler))
+  	if(m_socket.fd==INVALID_SOCKET_HANDLE   &&  !connect())
 	{
-		return true;
-	}
-	else
-	{
-		if (m_socket.fd == INVALID_SOCKET_HANDLE)
-		{
-			if (!connect())
-			{
-				return false;
-			}
-			else
-			{
-				std::stringstream log_msg;
-				log_msg << "re-connect to server ok :[" << m_serverIp << ":" << m_serverPort << "]";
-				LOG_WRITE_INFO(log_msg.str());
-			}
-		}
 		return false;
 	}
+	return true;
+}
+
+WaitReadEventResult RedisConnection::WaitMessage(int handler, int milliseconds)
+{
+	WaitReadEventResult result=m_socket.WaitReadEvent(handler, milliseconds);
+	return result;
 }
 
 bool RedisConnection::StopListen(int handler)

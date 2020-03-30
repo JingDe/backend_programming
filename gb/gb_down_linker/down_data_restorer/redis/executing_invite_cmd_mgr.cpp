@@ -9,7 +9,6 @@
 
 namespace GBDownLinker {
 
-
 ExecutingInviteCmdMgr::ExecutingInviteCmdMgr(RedisClient* redis_client)
 	:redisClient_(redis_client)
 {
@@ -22,6 +21,8 @@ ExecutingInviteCmdMgr::~ExecutingInviteCmdMgr()
 
 int ExecutingInviteCmdMgr::GetInviteKeyList(const std::string& gbdownlinker_device_id, std::list<std::string>& invite_key_list)
 {
+	CHECK_LOG_RETURN(redisClient_!=NULL, "RedisClient not inited", -1);
+
 	invite_key_list.clear();
 	std::string key_prefix = std::string("{downlinker.invite}:") + gbdownlinker_device_id;
 	redisClient_->getKeys(key_prefix, invite_key_list);
@@ -30,6 +31,8 @@ int ExecutingInviteCmdMgr::GetInviteKeyList(const std::string& gbdownlinker_devi
 
 int ExecutingInviteCmdMgr::GetInviteKeyList(const std::string& gbdownlinker_device_id, int worker_thread_idx, std::list<std::string>& invite_key_list)
 {
+	CHECK_LOG_RETURN(redisClient_!=NULL, "RedisClient not inited", -1);
+
 	invite_key_list.clear();
 	std::string key_prefix = std::string("{downlinker.invite}:") + gbdownlinker_device_id + std::string(":") + std::to_string(worker_thread_idx);
 	redisClient_->getKeys(key_prefix, invite_key_list);
@@ -38,6 +41,8 @@ int ExecutingInviteCmdMgr::GetInviteKeyList(const std::string& gbdownlinker_devi
 
 int ExecutingInviteCmdMgr::LoadInvite(const std::list<std::string>& invite_key_list, std::list<ExecutingInviteCmdPtr>* invites)
 {
+	CHECK_LOG_RETURN(redisClient_!=NULL, "RedisClient not inited", -1);
+
 	invites->clear();
 	for (std::list<std::string>::const_iterator cit = invite_key_list.cbegin(); cit != invite_key_list.cend(); cit++)
 	{
@@ -54,6 +59,8 @@ int ExecutingInviteCmdMgr::LoadInvite(const std::list<std::string>& invite_key_l
 
 int ExecutingInviteCmdMgr::LoadInvite(const std::string& gbdownlinker_device_id, int worker_thread_idx, std::list<ExecutingInviteCmdPtr>* invites)
 {
+	CHECK_LOG_RETURN(redisClient_!=NULL, "RedisClient not inited", -1);
+
 	std::list<std::string> invite_key_list;
 	GetInviteKeyList(gbdownlinker_device_id, worker_thread_idx, invite_key_list);
 	LoadInvite(invite_key_list, invites);
@@ -62,6 +69,8 @@ int ExecutingInviteCmdMgr::LoadInvite(const std::string& gbdownlinker_device_id,
 
 int ExecutingInviteCmdMgr::InsertInvite(const std::string& gbdownlinker_device_id, int worker_thread_idx, const ExecutingInviteCmd& cmd)
 {
+	CHECK_LOG_RETURN(redisClient_!=NULL, "RedisClient not inited", -1);
+
 	std::string invite_key = std::string("{downlinker.invite}:") + gbdownlinker_device_id + ":" + std::to_string(worker_thread_idx) + ":" + cmd.cmdSenderId + ":" + cmd.deviceId + ":" + std::to_string(cmd.cmdSeq);
 	if (redisClient_->setSerial(invite_key, cmd) == false)
 	{
@@ -78,6 +87,8 @@ int ExecutingInviteCmdMgr::UpdateInvite(const std::string& gbdownlinker_device_i
 
 int ExecutingInviteCmdMgr::DeleteInvite(const std::string& invite_key)
 {
+	CHECK_LOG_RETURN(redisClient_!=NULL, "RedisClient not inited", -1);
+
 	if (redisClient_->del(invite_key) == false)
 		return -1;
 
@@ -86,6 +97,8 @@ int ExecutingInviteCmdMgr::DeleteInvite(const std::string& invite_key)
 
 int ExecutingInviteCmdMgr::DeleteInvite(const std::string& gbdownlinker_device_id, int worker_thread_idx, const std::string& cmd_sender_id, const std::string& device_id, const int64_t& cmd_seq)
 {
+	CHECK_LOG_RETURN(redisClient_!=NULL, "RedisClient not inited", -1);
+
 	std::string invite_key = std::string("{downlinker.invite}:") + gbdownlinker_device_id + ":" + std::to_string(worker_thread_idx) + ":" + cmd_sender_id + ":" + device_id + ":" + std::to_string(cmd_seq);
 	if (redisClient_->del(invite_key) == false)
 		return -1;
@@ -95,6 +108,8 @@ int ExecutingInviteCmdMgr::DeleteInvite(const std::string& gbdownlinker_device_i
 
 int ExecutingInviteCmdMgr::ClearInvite(const std::string& gbdownlinker_device_id, int worker_thread_idx)
 {
+	CHECK_LOG_RETURN(redisClient_!=NULL, "RedisClient not inited", -1);
+
 	std::list<std::string> invite_key_list;
 	GetInviteKeyList(gbdownlinker_device_id, worker_thread_idx, invite_key_list);
 
@@ -107,6 +122,8 @@ int ExecutingInviteCmdMgr::ClearInvite(const std::string& gbdownlinker_device_id
 
 size_t ExecutingInviteCmdMgr::GetInviteCount(const std::string& gbdownlinker_device_id)
 {
+	CHECK_LOG_RETURN(redisClient_!=NULL, "RedisClient not inited", -1);
+
 	std::list<std::string> invite_key_list;
 	GetInviteKeyList(gbdownlinker_device_id, invite_key_list);
 	return invite_key_list.size();
@@ -114,6 +131,8 @@ size_t ExecutingInviteCmdMgr::GetInviteCount(const std::string& gbdownlinker_dev
 
 size_t ExecutingInviteCmdMgr::GetInviteCount(const std::string& gbdownlinker_device_id, int worker_thread_idx)
 {
+	CHECK_LOG_RETURN(redisClient_!=NULL, "RedisClient not inited", -1);
+
 	std::list<std::string> invite_key_list;
 	GetInviteKeyList(gbdownlinker_device_id, worker_thread_idx, invite_key_list);
 	return invite_key_list.size();

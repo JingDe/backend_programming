@@ -51,6 +51,12 @@ void CallbackSignal(int iSignalNo) {
 	exit(1); // QUIT PROCESS. IF NOT, MAYBE ENDLESS LOOP.
 }
 
+void MyDownlinkerCallback(RestorerWorkHealthy healthy)
+{
+	std::stringstream log_msg;
+	log_msg<<"MyDownlinkerCallback get status: "<<healthy;
+	LOG_WRITE_INFO(log_msg.str());
+}
 
 void print(const std::list<DevicePtr>& devices)
 {
@@ -371,7 +377,7 @@ void LoopProcessExecutingInviteCmd(CDownDataRestorerRedis& ddr)
 }
 
 
-void TestDDRInSentinelMode()
+void TestDDRInSentinelMode(bool initialRestorerWorkHealthy)
 {
 	RestorerParam::RedisConfig redis_config;
 	redis_config.masterName = "mymaster";
@@ -397,8 +403,9 @@ void TestDDRInSentinelMode()
 
 
 	CDownDataRestorerRedis ddr;
+	RestorerCallback callback=MyDownlinkerCallback;
 
-	if (ddr.Init(param) == RESTORER_FAIL)
+	if (ddr.Init(param, initialRestorerWorkHealthy, callback) == RESTORER_FAIL)
 		return;
 	if (ddr.Start() == RESTORER_FAIL)
 		return;
@@ -491,7 +498,7 @@ int main(int argc, char** argv)
 
 
 
-	TestDDRInSentinelMode();
+	TestDDRInSentinelMode(true);
 
 //	TestControlQueueSize();
 
