@@ -1,26 +1,27 @@
-
-
 /*
 memcached的slab内存池实现：
 	一个slabclass_t表示一个slab分配器 ，能够分配特定大小的item。
-		每次分配item_max_size大小的一块内存/一个slab内存页，然后将此slab划分为多个item分配出去。
+	一个slabclass_t包含多个slab页
+	每次分配item_max_size大小的一块内存/一个slab内存页，然后将此slab划分为多个item分配出去。
 		
-	slabclass_t数组，包含不同大小的slab分配器。满足分配不同大小item。
-	
-	
+slabclass_t数组，包含不同大小的slab分配器。满足分配不同大小item。
 	
 */
 
 typedef struct{
-	unsigned int size; //item的大小
+	unsigned int size; //item的大小，不同大小的slabclass指的就是size不同
+	// item的大小 = item结构体的大小+用户数据的大小
+	// 最小的item的大小 = sizeof(item)+settings.chunk_size
 	unsigned int perslab; // 每个slab包含多少个item
-	// size * perslab表示此slabclass_t的每个slab的大小
-	
+	// size * perslab 表示slabclass_t的每个slab页的大小
+	// 不同的slabclass 的 size*perslab 都相同
+
+	// 空闲、可分配的item
 	void *slots; // 空闲item指针链表。第一个空闲item指针。
 	unsigned int sl_curr; // 链表中的空闲item个数
-	
+
+	// slabclass已分配的slab页
 	unsigned int slabs; // 此slab分配器已分配的slab的个数。即slab_list已经使用的个数。
-	
 	void **slab_list; // slab指针数组，每一个指针指向一个slab内存页
 	unsigned int list_size; // slab_list数组的大小。即slab_list总个数。
 	
@@ -32,10 +33,13 @@ static slabclass_t slabclass[MAX_NUMBER_OF_SLAB_CLASSES]; // 201
 static int power_largest; // slabclass数组的实际大小
 
 /*
-初始化slabclass数组。每个slabclass_t表示不同大小的slab分配器。
+初始化slabclass数组。
+每个slabclass_t表示不同大小的slab分配器。
 factor是slab大小的扩容因子。
 
-先初始化slabclass数组数据结构；后进行内存预分配？？
+先初始化slabclass数组数据结构；后进行内存预分配
+
+
 */
 void slabs_init(const size_t limit, const double factor, const bool prealloc, const uint32_t *slab_sizes)
 {
@@ -61,7 +65,7 @@ void slabs_init(const size_t limit, const double factor, const bool prealloc, co
 	
 	memset(slabclass, 0, sizeof(slabclass));
 	
-	// item_size_max 最大的item大小
+	// item_size_max 是最大的item大小，同时是slab的大小
 	while(++i < POWER_SMALLEST  &&  size<=settings.item_size_max/factor)
 	{
 		// 将size向 CHUNK_ALIGN_BYTES往上对齐
@@ -69,8 +73,7 @@ void slabs_init(const size_t limit, const double factor, const bool prealloc, co
 			size += CHUNK_ALIGN_BYTES-(size%CHUNK_ALIGN_BYTES);
 		
 		slabclass[i].size=size; // 设置当前slab分配器分配的item的大小
-		slabclass[i].preslab=settings.item_size_max/slabclass[i].class;
-		// item_size_max同时是slab的大小。限制了最大的slab的item的大小
+		slabclass[i].preslab=settings.item_size_max/slabclass[i].size;
 		size *= factor;		
 	}
 	
@@ -109,12 +112,13 @@ static void slabs_preallocate(const unsigned int maxslabs)
 }
 
 /*
-为第id个slabclass预分配一个slab内存页。
-grow_slab_list双倍增长slab_list数组，但 do_slabs_newslab只分配一个slab内存页，插入到slab_list数组中。
+为第id个slabclass预分配一个slab内存页，并划分为item。
+grow_slab_list双倍增长slab_list数组，但 do_slabs_newslab 只分配一个slab内存页，插入到slab_list数组中。
 */
 static int do_slabs_newslab(const unsigned int id)
 {
 	slabclass_t *p=&slabclass[id];
+	// len 要么是 item_size_max，要么是 一个slab的大小
 	int len=settings.slab_reassign ? settings.item_size_max : p->size*perslab;
 	char *ptr;
 	
@@ -160,7 +164,7 @@ static void* memory_allocate(size_t size)
 	{
 		ret=mem_current;
 		
-		if(size>mem_size)
+		if(size>mem_size) // 检查可用内存大小
 		{
 			return NULL;
 		}
@@ -170,7 +174,7 @@ static void* memory_allocate(size_t size)
 		mem_current=((char*)mem_current)+size;
 		if(size<mem_avail)
 			mem_avail-=size;
-		else
+		else // 不要求满足对齐内存大小
 			mem_avail=0;
 	}
 	return ret;
@@ -179,6 +183,8 @@ static void* memory_allocate(size_t size)
 /*
 为什么当ptr指向的内存不足item_size_max或者p->size*p->perslab时，也ok??
 */
+
+// 将ptr指向的slab内存页分配给第id个slabclass，划分为多个item
 static void split_slab_page_into_freelist(char* ptr, const unsigned int id)
 {
 	slabclass_t *p=&slabclass[id];
@@ -190,6 +196,7 @@ static void split_slab_page_into_freelist(char* ptr, const unsigned int id)
 	}
 }
 
+// 释放ptr指向的内存/item，给第id个slabclass，插入到空闲item链表中。size表示分配字节大小
 static void do_slabs_free(void* ptr, const size_t size, unsigned int id)
 {
 	slabclass_t *p;
@@ -221,14 +228,14 @@ typedef struct _stritem{
 	struct _stritem *prev;
 	...
 	
-	uint8_t slabs_clsid; // 属于第几个slabclass_t
+	uint8_t slabs_clsid; // 属于第几个slabclass_t，0表示空闲未分配
 	...
 }item;
 
 
 
 /*
-向内存池申请内存：
+向第id个slabclass内存池申请大小为size的内存：
 */
 static void* do_slabs_alloc(const size_t size, unsigned int id)
 {
@@ -279,6 +286,7 @@ static void* do_slabs_alloc(const size_t size, unsigned int id)
 	// }
 	// return 0;
 // }
+// 分配size大小内存时，需要从哪个slabclass中分配
 unsigned int slabs_clsid(const size_t size)
 {
 	int res=POWER_SMALLEST;

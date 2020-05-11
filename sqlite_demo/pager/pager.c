@@ -149,6 +149,8 @@ static void _pagerWritePage(PgHdr *pdirty)
 	// 将对应页面的数据从数据库文件中读取到pager的fd中
 	int ret=osWrite(pdirty->pager->fd, pdata, sz, offset);
 	if(SQL_OK!=ret)
-	{}
+	{
+		// TODO
+	}
 }
 

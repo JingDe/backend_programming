@@ -94,14 +94,13 @@ static PgHdr* _pcacheFinishConvert(
 	{
 		_pcacheFinishConvertInit(p, pcache, pgno);
 	}
-	++pgd->nref; // 怎加页面的引用数
+	++pgd->nref; // 增加页面的引用数
 	return pgd;
 }
 
 static void _pcacheFinishConvertInit(SqlPCachePage *p, PCache *pcache, Pgno pgno)
 {
-	PgHdr *ret;
-	ret=(PgHdr*)p->extra;
+	PgHdr *ret=(PgHdr*)p->extra;
 	
 	ret->ppage=p;
 	ret->pdata=p->content;

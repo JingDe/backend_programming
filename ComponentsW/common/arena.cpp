@@ -54,6 +54,7 @@ char* Arena::AllocateAligned(size_t bytes)
 	return result;
 }
 
+// 返回地址必定是一个内存块的首地址
 char* Arena::AllocateFallback(size_t bytes)
 {
 	if (bytes > kBlockSize / 4)

@@ -170,14 +170,14 @@ bool search(Node* node, Key k, void* &p_data, int &size_data)
 			}
 		}
 		
-		// ?? TODO 在右儿子节点中继续查找
+		// 在右儿子节点中继续查找
 		return search(node->right_child, k, p_data, size_data);
 	}
 }
 
 bool insert(Tree *&root, Key k, void *p_data, int size_data)
 {
-	Node *p=0;
+	Node *p=0; // 考虑分裂，树高度增加1
 	if(!insert2(root, k, p_data, size_data, p))
 		return 0;
 	if(p)
@@ -324,13 +324,13 @@ void splitLeafNode(Node* node, Node* &father)
 			insertIntCell(father, cell.key, node);
 			father->right_child=new_node;
 		}
-		else // 说明node时father的第kth个cell
+		else // 说明node是father的第kth个cell
 		{
 			// 先将node从cell数组中删除，因为node的最大key变化了
 			struct IntCell intcell;
 			getKthIntCell(father, kth, &intcell);
 			removeKthIntCell(father, kth);
-			// 再重新插入两个儿子节点
+			// 再重新插入两个儿子节点，先插入右边的，再插入左边的
 			insertIntCell(father, intcell.key, new_node);
 			insertIntCell(father, cell.key, node);
 		}
@@ -377,7 +377,7 @@ void splitIntNode(Node* node, Node*& father)
 		if(kth==-1) // node是father的最右节点right_child
 		{
 			assert(node==father->right_child);
-			// 
+			// 将node插入到父节点的cell数组中，cell的key是node的最大key，也就是node目前的right_child的key
 			insertIntCell(father, cell.key, node);
 			father->right_child=new_node;
 		}
@@ -636,7 +636,7 @@ void printfTree(Node* node, int indent)
 		else
 		{
 			getKthIntCell(node, i, &intcell);
-			// 打印第i个儿子节点紫薯
+			// 打印第i个儿子节点子树
 			printfTree(intcell.child_point, indent+2);
 			for(int j=0; j<indent; ++j)
 				printf(" ");

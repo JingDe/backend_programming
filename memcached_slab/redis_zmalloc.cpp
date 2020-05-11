@@ -18,7 +18,7 @@ void* zmalloc(size_t size)
 
 // 对于提供分配内存大小的系统，获得malloc分配内存返回的ptr，实际底层分配的总大小：
 // 包括ptr之前存储大小的字节，包括ptr返回的内存之后 用来对齐的空闲内存
-#ifdef HAVE_MALLOC_SIZE
+#ifdef HAVE_MALLOC_SIZE // 提供分配内存大小的系统
 size_t zmalloc_size(void*  ptr)
 {
 	void* realptr=(char*)ptr-PREFIX_SIZE;

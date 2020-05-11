@@ -216,7 +216,7 @@ void splitLeafNode(Node *node, Node* &father)
 	}
 	
 	// 获得分裂后node的最大cell
-	getKthLeafCell(node, node->cell_size-1; &cell);
+	getKthLeafCell(node, node->cell_size-1, &cell);
 	if(father)
 	{
 		int kth=getKnumByChild(father, node):
@@ -423,7 +423,7 @@ void spaceCleanUp(Node* node)
 	{
 		// 对于叶子结点：将原始节点中的cell重新插入一个空白节点
 		memcpy(temp_node, leafnode, PAGE_SIZE);
-		for(int i=0; i<node->cell_size; I++)
+		for(int i=0; i<node->cell_size; i++)
 		{
 			getKthLeafCell(node, i, &leafcell);
 			insertLeafCell(temp_node, leafcell.key, leafcell.data_point, leafcell.size);

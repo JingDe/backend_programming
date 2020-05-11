@@ -89,13 +89,14 @@ inline char* Arena::Allocate(size_t bytes)
 
 static const int kBlockSize = 4096;
 
-char* Arena::AllocateFallback(size_t size)
+char* Arena::AllocateFallback(size_t bytes)
 {
 	if(bytes > kBlockSize/4) // 当请求的内存足够大时，直接分配一个恰好满足请求的内存块, 减少内存碎片
 	{
 		char* result=AllocateNewBlock(bytes);
 		return result;
 	}
+	// 当上一块内存块剩余内存不足要求时，丢弃，并分配新的内存块
 	alloc_ptr_ = AllocateNewBlock(kBlockSize);
 	alloc_bytes_remainming_ = kBlockSize;
 	
@@ -114,6 +115,7 @@ char* Arena::AllocateNewBlock(size_t size)
 	blocks_.push_back(block);
 	//memory_usage_.set(memory_usage_.get()+size);
 	memory_usage_.fetch_add(size+sizeof(char*), std::memory_order_relaxed);
+	// 原子地以当前值+(size+sizeof(char*))替换当前值
 	return block;
 }
 
