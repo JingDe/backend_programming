@@ -309,4 +309,4 @@ test_redisclient
 downdatarestorerlogdir/
 
 *.zip
-
+.vs

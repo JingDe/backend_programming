@@ -43,7 +43,7 @@ static char* ngx_http_myfilter_merge_conf(ngx_conf_t *cf, void* parent, void* ch
 	return NGX_CONF_OK;
 }
 
-/*http请求你上下文*/
+/*http请求上下文*/
 typedef struct{
 	ngx_int_t add_prefix; /*为0表示不需要在返回的包体之前添加前缀，为1表示在包体之前加前缀，
 		为2表示已经添加过前缀了。*/
